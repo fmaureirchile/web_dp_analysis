@@ -125,7 +125,7 @@ describe("Etapa 5.2 T03 consulta operativa", () => {
 
     const operational = await request(app)
       .get("/api/v1/crawler/passive/executions/operational")
-      .query({ states: "COMPLETED,FAILED", from, to, limit: 10 });
+      .query({ projectId: project.body.data.id, states: "COMPLETED,FAILED", from, to, limit: 10 });
 
     expect(operational.status).toBe(200);
     expect(operational.body.data.states).toEqual(["COMPLETED", "FAILED"]);
@@ -251,6 +251,7 @@ describe("Etapa 5.2 T03 consulta operativa", () => {
     const windowed = await request(app)
       .get("/api/v1/crawler/passive/executions/operational")
       .query({
+        projectId: project.body.data.id,
         states: "COMPLETED,FAILED",
         from: windowStart,
         to: new Date(Date.now() + 5 * 60_000).toISOString(),
@@ -266,6 +267,7 @@ describe("Etapa 5.2 T03 consulta operativa", () => {
     const limited = await request(app)
       .get("/api/v1/crawler/passive/executions/operational")
       .query({
+        projectId: project.body.data.id,
         states: "FAILED",
         from: windowStart,
         to: new Date(Date.now() + 5 * 60_000).toISOString(),

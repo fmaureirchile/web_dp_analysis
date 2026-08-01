@@ -237,6 +237,7 @@ export async function listExecutionsByStateAndWindow(input: {
   states: ExecutionState[];
   from?: string;
   to?: string;
+  projectId?: string;
   limit: number;
 }): Promise<
   Array<{
@@ -250,10 +251,15 @@ export async function listExecutionsByStateAndWindow(input: {
 
   const where: {
     state: { in: ExecutionState[] };
+    projectId?: string;
     updatedAt?: { gte?: string; lte?: string };
   } = {
     state: { in: input.states }
   };
+
+  if (input.projectId) {
+    where.projectId = input.projectId;
+  }
 
   if (input.from || input.to) {
     where.updatedAt = {};

@@ -462,6 +462,9 @@ export function createStage2Router(): Router {
   router.get("/crawler/passive/executions/operational", async (req, res) => {
     const cid = correlationId(req);
 
+    const projectId = typeof req.query.projectId === "string" && req.query.projectId.trim().length > 0
+      ? req.query.projectId.trim()
+      : undefined;
     const states = parseOperationalStates(typeof req.query.states === "string" ? req.query.states : undefined);
     const from = parseIso(typeof req.query.from === "string" ? req.query.from : undefined);
     const to = parseIso(typeof req.query.to === "string" ? req.query.to : undefined);
@@ -495,6 +498,7 @@ export function createStage2Router(): Router {
       states,
       from,
       to,
+      projectId,
       limit
     });
 
