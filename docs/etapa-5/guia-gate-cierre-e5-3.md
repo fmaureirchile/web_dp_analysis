@@ -95,3 +95,5 @@ E5-3-T04 se considera cumplida cuando:
 3. Falla por estabilidad de runner
 - Verificar decision y criterio de rollback en docs/adr/ADR-007-estabilidad-runner-vitest-gate-e5-2.md.
 - Mantener configuracion --pool=forks mientras no se cumpla criterio de rollback.
+- En CI, los pasos Stage 5.2 gate E5-2 y Stage 5.3 gate E5-3 aplican un reintento automatico unico solo si aparece el error "Worker exited unexpectedly".
+- Si el segundo intento falla o el error no corresponde a worker intermitente, el pipeline falla de forma explicita.

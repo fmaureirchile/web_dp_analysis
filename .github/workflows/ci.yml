@@ -116,7 +116,23 @@ jobs:
         run: |
           set -euo pipefail
           # Estabilidad runner Stage 5: ver ADR-007 para decision --pool=forks y rollback.
-          npm run lab:e5-2:gate | tee e5_2_gate.log
+          attempt=1
+          max_attempts=2
+          while true; do
+            rm -f e5_2_gate.log
+            if npm run lab:e5-2:gate | tee e5_2_gate.log; then
+              break
+            fi
+
+            if grep -q "Worker exited unexpectedly" e5_2_gate.log && [ "$attempt" -lt "$max_attempts" ]; then
+              echo "Se detecto error intermitente de worker. Reintentando gate E5.2 (intento $((attempt + 1))/${max_attempts})..."
+              attempt=$((attempt + 1))
+              continue
+            fi
+
+            echo "Gate E5.2 fallo de forma no recuperable."
+            exit 1
+          done
 
       - name: Report Stage 5.2 gate result
         shell: bash
@@ -154,7 +170,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm run lab:e5-3:gate | tee e5_3_gate.log
+          attempt=1
+          max_attempts=2
+          while true; do
+            rm -f e5_3_gate.log
+            if npm run lab:e5-3:gate | tee e5_3_gate.log; then
+              break
+            fi
+
+            if grep -q "Worker exited unexpectedly" e5_3_gate.log && [ "$attempt" -lt "$max_attempts" ]; then
+              echo "Se detecto error intermitente de worker. Reintentando gate E5.3 (intento $((attempt + 1))/${max_attempts})..."
+              attempt=$((attempt + 1))
+              continue
+            fi
+
+            echo "Gate E5.3 fallo de forma no recuperable."
+            exit 1
+          done
 
       - name: Report Stage 5.3 gate result
         shell: bash
