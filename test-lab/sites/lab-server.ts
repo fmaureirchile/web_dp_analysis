@@ -225,7 +225,7 @@ export function buildLaboratoryServer(): Express {
   function extractMultipartField(rawBody: Buffer, fieldName: string): string | undefined {
     const source = rawBody.toString("utf8");
     const escapedField = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(`name=\"${escapedField}\"\\r?\\n\\r?\\n([\\s\\S]*?)\\r?\\n`);
+    const pattern = new RegExp(`name="${escapedField}"\\r?\\n\\r?\\n([\\s\\S]*?)\\r?\\n`);
     const match = pattern.exec(source);
     return match ? match[1] : undefined;
   }
@@ -233,7 +233,7 @@ export function buildLaboratoryServer(): Express {
   function extractMultipartFilename(rawBody: Buffer, fieldName: string): string | undefined {
     const source = rawBody.toString("utf8");
     const escapedField = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(`name=\"${escapedField}\"; filename=\"([^\"]*)\"`);
+    const pattern = new RegExp(`name="${escapedField}"; filename="([^"]*)"`);
     const match = pattern.exec(source);
     return match ? match[1] : undefined;
   }

@@ -24,10 +24,19 @@ module.exports = [
         ecmaVersion: "latest"
       },
       globals: {
+        AbortController: "readonly",
+        Buffer: "readonly",
+        Response: "readonly",
+        TextDecoder: "readonly",
+        __dirname: "readonly",
+        __filename: "readonly",
+        clearTimeout: "readonly",
         console: "readonly",
+        fetch: "readonly",
         module: "readonly",
         process: "readonly",
         require: "readonly",
+        setTimeout: "readonly",
         URL: "readonly"
       }
     },
