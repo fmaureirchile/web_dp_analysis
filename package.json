@@ -21,12 +21,12 @@
     "lab:start": "tsx test-lab/sites/lab-server.ts",
     "lab:manifests:validate": "tsx tools/validate-lab-manifests.ts",
     "lab:test": "vitest run --config vitest.lab.config.ts",
-    "lab:e4b1:gate": "npm run lab:manifests:validate && npm run lab:test",
-    "lab:e5-1:gate": "npm run openapi:validate && npm run typecheck && npm run test:integration -- --run tests/integration/stage5-scope-gate.integration.test.ts tests/integration/stage5-passive-fetch.integration.test.ts tests/integration/stage5-e2e-lab.integration.test.ts tests/integration/stage5-evidence-recovery.integration.test.ts tests/integration/stage5-operational-query.integration.test.ts tests/integration/stage5-fetch-errors.integration.test.ts",
-    "lab:e5-2:baseline": "npm run openapi:validate && npm run typecheck && npm run test:integration -- --run --pool=forks tests/integration/stage5-scope-gate.integration.test.ts tests/integration/stage5-passive-fetch.integration.test.ts tests/integration/stage5-e2e-lab.integration.test.ts tests/integration/stage5-e2e-lab-extended.integration.test.ts tests/integration/stage5-evidence-recovery.integration.test.ts tests/integration/stage5-operational-query.integration.test.ts tests/integration/stage5-fetch-errors.integration.test.ts tests/integration/stage5-result-recovery.integration.test.ts tests/integration/stage5-observability.integration.test.ts",
-    "lab:e5-2:gate": "npm run lab:e5-2:baseline",
-    "lab:e5-3:obs-regression": "npm run test:integration -- --run --pool=forks tests/integration/stage5-observability.integration.test.ts",
-    "lab:e5-3:gate": "npm run lab:e5-2:gate && npm run lab:e5-3:obs-regression"
+    "lab:e4b1:gate": "corepack pnpm run lab:manifests:validate && corepack pnpm run lab:test",
+    "lab:e5-1:gate": "corepack pnpm run openapi:validate && corepack pnpm run typecheck && vitest run --config vitest.integration.config.ts --run tests/integration/stage5-scope-gate.integration.test.ts tests/integration/stage5-passive-fetch.integration.test.ts tests/integration/stage5-e2e-lab.integration.test.ts tests/integration/stage5-evidence-recovery.integration.test.ts tests/integration/stage5-operational-query.integration.test.ts tests/integration/stage5-fetch-errors.integration.test.ts",
+    "lab:e5-2:baseline": "corepack pnpm run openapi:validate && corepack pnpm run typecheck && vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage5-scope-gate.integration.test.ts tests/integration/stage5-passive-fetch.integration.test.ts tests/integration/stage5-e2e-lab.integration.test.ts tests/integration/stage5-e2e-lab-extended.integration.test.ts tests/integration/stage5-evidence-recovery.integration.test.ts tests/integration/stage5-operational-query.integration.test.ts tests/integration/stage5-fetch-errors.integration.test.ts tests/integration/stage5-result-recovery.integration.test.ts tests/integration/stage5-observability.integration.test.ts",
+    "lab:e5-2:gate": "corepack pnpm run lab:e5-2:baseline",
+    "lab:e5-3:obs-regression": "vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage5-observability.integration.test.ts",
+    "lab:e5-3:gate": "corepack pnpm run lab:e5-2:gate && corepack pnpm run lab:e5-3:obs-regression"
   },
   "prisma": {
     "seed": "tsx database/seeds/stage2.seed.ts"
