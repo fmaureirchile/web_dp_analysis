@@ -273,7 +273,7 @@ export async function listExecutionsByStateAndWindow(input: {
 
   const rows = await prisma.execution.findMany({
     where,
-    orderBy: { updatedAt: "desc" },
+    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     take: input.limit
   });
 

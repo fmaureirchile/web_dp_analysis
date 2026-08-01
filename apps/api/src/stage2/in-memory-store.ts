@@ -499,7 +499,14 @@ export async function listOperationalExecutions(input: {
       if (toTs !== undefined && updatedTs > toTs) return false;
       return true;
     })
-    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+    .sort((a, b) => {
+      const byUpdatedAt = Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+      if (byUpdatedAt !== 0) {
+        return byUpdatedAt;
+      }
+
+      return b.id.localeCompare(a.id);
+    })
     .slice(0, input.limit)
     .map((execution) => ({
       executionId: execution.id,
