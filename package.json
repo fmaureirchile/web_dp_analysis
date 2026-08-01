@@ -1,0 +1,52 @@
+{
+  "name": "web-analysis",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.14.0",
+  "scripts": {
+    "lint": "eslint . --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "build": "tsc -p tsconfig.json",
+    "env:validate": "tsx tools/validate-env.ts",
+    "secret:check": "tsx tools/check-hardcoded-secrets.ts",
+    "api:start": "tsx apps/api/src/server.ts",
+    "db:generate": "prisma generate",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "db:seed": "prisma db seed",
+    "openapi:validate": "redocly lint --config redocly.yaml docs/contracts/openapi.yaml",
+    "lab:start": "tsx test-lab/sites/lab-server.ts",
+    "lab:manifests:validate": "tsx tools/validate-lab-manifests.ts",
+    "lab:test": "vitest run --config vitest.lab.config.ts",
+    "lab:e4b1:gate": "npm run lab:manifests:validate && npm run lab:test",
+    "lab:e5-1:gate": "npm run openapi:validate && npm run typecheck && npm run test:integration -- --run tests/integration/stage5-scope-gate.integration.test.ts tests/integration/stage5-passive-fetch.integration.test.ts tests/integration/stage5-e2e-lab.integration.test.ts tests/integration/stage5-evidence-recovery.integration.test.ts tests/integration/stage5-operational-query.integration.test.ts tests/integration/stage5-fetch-errors.integration.test.ts",
+    "lab:e5-2:baseline": "npm run openapi:validate && npm run typecheck && npm run test:integration -- --run --pool=forks tests/integration/stage5-scope-gate.integration.test.ts tests/integration/stage5-passive-fetch.integration.test.ts tests/integration/stage5-e2e-lab.integration.test.ts tests/integration/stage5-e2e-lab-extended.integration.test.ts tests/integration/stage5-evidence-recovery.integration.test.ts tests/integration/stage5-operational-query.integration.test.ts tests/integration/stage5-fetch-errors.integration.test.ts tests/integration/stage5-result-recovery.integration.test.ts tests/integration/stage5-observability.integration.test.ts",
+    "lab:e5-2:gate": "npm run lab:e5-2:baseline",
+    "lab:e5-3:obs-regression": "npm run test:integration -- --run --pool=forks tests/integration/stage5-observability.integration.test.ts",
+    "lab:e5-3:gate": "npm run lab:e5-2:gate && npm run lab:e5-3:obs-regression"
+  },
+  "prisma": {
+    "seed": "tsx database/seeds/stage2.seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.12.0",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.0",
+    "@types/supertest": "^6.0.3",
+    "@redocly/cli": "^1.27.0",
+    "@typescript-eslint/parser": "^8.38.0",
+    "eslint": "^9.18.0",
+    "prisma": "^6.12.0",
+    "supertest": "^7.1.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

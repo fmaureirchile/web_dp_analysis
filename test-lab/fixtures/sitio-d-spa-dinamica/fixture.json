@@ -1,0 +1,15 @@
+{
+  "scenarioId": "E4-D-001",
+  "stage": "E4",
+  "site": "sitio-d-spa-dinamica",
+  "request": {
+    "method": "POST",
+    "path": "/sitio-d/spa/bootstrap",
+    "payload": {}
+  },
+  "expected": {
+    "status": 200,
+    "signal": "render_dinamico"
+  },
+  "manifestRef": "test-lab/golden-results/sitio-d-spa-dinamica/expected-manifest.json"
+}

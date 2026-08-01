@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sitio E - Datos sensibles</title>
+  </head>
+  <body>
+    <h1>Sitio E - Datos sensibles</h1>
+    <p>Datos de prueba sinteticos para evaluar detecciones de salud y archivos.</p>
+    <p><strong>Prohibido usar datos reales.</strong> Este entorno es solo para pruebas sinteticas.</p>
+
+    <form action="/sitio-e/upload" method="post" enctype="multipart/form-data">
+      <label>Condicion de salud sintetica <input type="text" name="healthCondition" required /></label>
+      <label>Documento sintetico <input type="file" name="medicalDocument" /></label>
+      <p>Aviso: este sitio no debe contener datos personales reales.</p>
+      <button type="submit">Enviar</button>
+    </form>
+
+    <p>Health endpoint: <code>/sitio-e/health</code></p>
+    <p>Upload endpoint: <code>/sitio-e/upload</code> (multipart/form-data)</p>
+    <p>Submissions endpoint: <code>/sitio-e/submissions</code></p>
+  </body>
+</html>

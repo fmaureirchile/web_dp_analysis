@@ -1,0 +1,442 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ExecutionState {
+  DRAFT
+  VALIDATED
+  QUEUED
+  RUNNING
+  PAUSED
+  COMPLETED
+  COMPLETED_WITH_WARNINGS
+  FAILED
+  CANCELLED
+}
+
+enum ReviewState {
+  PENDING
+  CONFIRMED
+  REJECTED
+  RECLASSIFIED
+}
+
+enum EvidenceLevel {
+  E1
+  E2
+  E3
+}
+
+enum DataStorageMode {
+  OMITTED
+  MASKED
+}
+
+enum AuthorizationStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum ConsentStatus {
+  UNKNOWN
+  ACCEPTED
+  REJECTED
+}
+
+enum PolicyKind {
+  PRIVACY
+  COOKIES
+  TERMS
+}
+
+model Organization {
+  id            String    @id @default(uuid())
+  name          String
+  correlationId String    @default("system")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  users         User[]
+  projects      Project[]
+}
+
+model User {
+  id             String       @id @default(uuid())
+  organizationId String
+  email          String
+  displayName    String
+  correlationId  String       @default("system")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@unique([organizationId, email])
+}
+
+model Project {
+  id              String           @id @default(uuid())
+  organizationId  String
+  name            String
+  correlationId   String           @default("system")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  organization    Organization     @relation(fields: [organizationId], references: [id])
+  authorizations  Authorization[]
+  targets         Target[]
+  scanProfiles    ScanProfile[]
+  executions      Execution[]
+  policyDocuments PolicyDocument[]
+  findings        Finding[]
+  reports         Report[]
+
+  @@index([organizationId])
+}
+
+model Authorization {
+  id            String              @id @default(uuid())
+  projectId     String
+  status        AuthorizationStatus @default(ACTIVE)
+  validFrom     DateTime
+  validTo       DateTime
+  allowedDomains String[]
+  allowSubdomains Boolean           @default(true)
+  excludedPaths  String[]
+  permittedOperations String[]
+  prohibitedActions String[]
+  maxRequestsPerMinute Int          @default(60)
+  maxConcurrentExecutions Int       @default(5)
+  maxDepth       Int                @default(3)
+  maxDurationSeconds Int            @default(180)
+  agentId        String             @default("stage3-agent")
+  emergencyContact String           @default("security@example.local")
+  killSwitchActive Boolean          @default(false)
+  killSwitchActivatedAt DateTime?
+  correlationId String              @default("system")
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  project       Project             @relation(fields: [projectId], references: [id])
+  targets       Target[]
+  executions    Execution[]
+  scopeAuditRequests ScopeAuditRequest[]
+
+  @@index([projectId])
+}
+
+model Target {
+  id              String         @id @default(uuid())
+  projectId       String
+  authorizationId String
+  baseUrl         String
+  correlationId   String         @default("system")
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  project         Project        @relation(fields: [projectId], references: [id])
+  authorization   Authorization  @relation(fields: [authorizationId], references: [id])
+  executions      Execution[]
+
+  @@index([projectId])
+  @@index([authorizationId])
+}
+
+model ScanProfile {
+  id            String      @id @default(uuid())
+  projectId     String
+  name          String
+  correlationId String      @default("system")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  project       Project     @relation(fields: [projectId], references: [id])
+  executions    Execution[]
+
+  @@index([projectId])
+}
+
+model Execution {
+  id              String          @id @default(uuid())
+  projectId       String
+  authorizationId String
+  targetId        String
+  scanProfileId   String?
+  state           ExecutionState
+  operation       String          @default("SCAN_PASSIVE")
+  entryUrl        String?
+  redirectUrl     String?
+  correlationId   String          @default("system")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  project         Project         @relation(fields: [projectId], references: [id])
+  authorization   Authorization   @relation(fields: [authorizationId], references: [id])
+  target          Target          @relation(fields: [targetId], references: [id])
+  scanProfile     ScanProfile?    @relation(fields: [scanProfileId], references: [id])
+  browserSessions BrowserSession[]
+  pages           Page[]
+  observations    DataObservation[]
+  networkRequests NetworkRequest[]
+  storageArtifacts StorageArtifact[]
+  thirdParties    ThirdParty[]
+  consentStates   ConsentState[]
+  evidences       Evidence[]
+  passiveSinglePageResult PassiveSinglePageResult?
+
+  @@index([projectId])
+  @@index([authorizationId])
+  @@index([targetId])
+  @@index([scanProfileId])
+}
+
+model PassiveSinglePageResult {
+  executionId   String   @id
+  ok            Boolean
+  entryUrl      String
+  statusHttp    Int?
+  title         String?
+  evidenceId    String?
+  fetchedAt     DateTime?
+  contentType   String?
+  contentLength Int?
+  errorCode     String?
+  errorMessage  String?
+  correlationId String   @default("system")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  execution     Execution @relation(fields: [executionId], references: [id])
+
+  @@index([updatedAt])
+}
+
+model ScopeAuditRequest {
+  id              String        @id @default(uuid())
+  authorizationId String
+  url             String
+  operation       String
+  allowed         Boolean
+  reason          String
+  timestamp       DateTime
+  correlationId   String        @default("system")
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  authorization   Authorization @relation(fields: [authorizationId], references: [id])
+
+  @@index([authorizationId])
+  @@index([timestamp])
+}
+
+model BrowserSession {
+  id            String    @id @default(uuid())
+  executionId   String
+  browserName   String
+  correlationId String    @default("system")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  execution     Execution @relation(fields: [executionId], references: [id])
+
+  @@index([executionId])
+}
+
+model Page {
+  id            String          @id @default(uuid())
+  executionId   String
+  url           String
+  title         String?
+  correlationId String          @default("system")
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  execution     Execution       @relation(fields: [executionId], references: [id])
+  forms         Form[]
+  formFields    FormField[]
+  observations  DataObservation[]
+
+  @@index([executionId])
+}
+
+model Form {
+  id            String      @id @default(uuid())
+  pageId        String
+  action        String?
+  method        String?
+  correlationId String      @default("system")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  page          Page        @relation(fields: [pageId], references: [id])
+  formFields    FormField[]
+
+  @@index([pageId])
+}
+
+model FormField {
+  id            String            @id @default(uuid())
+  pageId        String
+  formId        String?
+  name          String
+  type          String
+  required      Boolean
+  correlationId String            @default("system")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  page          Page              @relation(fields: [pageId], references: [id])
+  form          Form?             @relation(fields: [formId], references: [id])
+  observations  DataObservation[]
+
+  @@index([pageId])
+  @@index([formId])
+}
+
+model DataCategory {
+  id            String            @id @default(uuid())
+  code          String            @unique
+  description   String
+  correlationId String            @default("system")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  observations  DataObservation[]
+}
+
+model DataObservation {
+  id            String        @id @default(uuid())
+  executionId   String
+  pageId        String?
+  formFieldId   String?
+  categoryId    String?
+  description   String
+  reviewState   ReviewState
+  correlationId String        @default("system")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  execution     Execution     @relation(fields: [executionId], references: [id])
+  page          Page?         @relation(fields: [pageId], references: [id])
+  formField     FormField?    @relation(fields: [formFieldId], references: [id])
+  category      DataCategory? @relation(fields: [categoryId], references: [id])
+  evidences     Evidence[]
+
+  @@index([executionId])
+  @@index([pageId])
+  @@index([formFieldId])
+  @@index([categoryId])
+}
+
+model NetworkRequest {
+  id            String    @id @default(uuid())
+  executionId   String
+  url           String
+  method        String
+  correlationId String    @default("system")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  execution     Execution @relation(fields: [executionId], references: [id])
+
+  @@index([executionId])
+}
+
+model StorageArtifact {
+  id            String          @id @default(uuid())
+  executionId   String
+  key           String
+  valueMode     DataStorageMode
+  correlationId String          @default("system")
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  execution     Execution       @relation(fields: [executionId], references: [id])
+
+  @@index([executionId])
+}
+
+model ThirdParty {
+  id            String    @id @default(uuid())
+  executionId   String
+  domain        String
+  correlationId String    @default("system")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  execution     Execution @relation(fields: [executionId], references: [id])
+
+  @@index([executionId])
+}
+
+model ConsentState {
+  id            String        @id @default(uuid())
+  executionId   String
+  state         ConsentStatus
+  correlationId String        @default("system")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  execution     Execution     @relation(fields: [executionId], references: [id])
+
+  @@index([executionId])
+}
+
+model PolicyDocument {
+  id            String     @id @default(uuid())
+  projectId     String
+  url           String
+  kind          PolicyKind
+  correlationId String     @default("system")
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  project       Project    @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+}
+
+model Evidence {
+  id            String            @id @default(uuid())
+  executionId   String
+  level         EvidenceLevel
+  kind          String
+  location      String
+  correlationId String            @default("system")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  execution     Execution         @relation(fields: [executionId], references: [id])
+  observations  DataObservation[]
+  findings      Finding[]
+
+  @@index([executionId])
+}
+
+model Finding {
+  id              String           @id @default(uuid())
+  projectId       String
+  reviewState     ReviewState
+  summary         String
+  correlationId   String           @default("system")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  project         Project          @relation(fields: [projectId], references: [id])
+  evidences       Evidence[]
+  reviewDecisions ReviewDecision[]
+  reports         Report[]
+
+  @@index([projectId])
+}
+
+model ReviewDecision {
+  id            String      @id @default(uuid())
+  findingId     String
+  reviewState   ReviewState
+  comment       String
+  correlationId String      @default("system")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  finding       Finding     @relation(fields: [findingId], references: [id])
+
+  @@index([findingId])
+}
+
+model Report {
+  id            String    @id @default(uuid())
+  projectId     String
+  generatedAt   DateTime
+  correlationId String    @default("system")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  project       Project   @relation(fields: [projectId], references: [id])
+  findings      Finding[]
+
+  @@index([projectId])
+}

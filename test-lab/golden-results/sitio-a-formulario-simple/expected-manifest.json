@@ -1,0 +1,61 @@
+{
+  "manifestVersion": "1.0.0",
+  "stage": "E4",
+  "meta": {
+    "siteId": "A",
+    "slug": "sitio-a-formulario-simple",
+    "name": "Sitio A - formulario simple",
+    "scenarioType": "form-capture"
+  },
+  "description": "Escenario base de formulario sintetico con consentimiento explicito.",
+  "routes": {
+    "entry": "/sitio-a",
+    "health": "/sitio-a/health",
+    "submit": "/sitio-a/submit"
+  },
+  "expectedSignals": [
+    "formulario_visible",
+    "campo_oculto_presente",
+    "privacy_checkbox_presente",
+    "submit_local_disponible"
+  ],
+  "assertions": {
+    "fields": [
+      {
+        "name": "name",
+        "type": "text",
+        "required": true,
+        "visible": true
+      },
+      {
+        "name": "email",
+        "type": "email",
+        "required": true,
+        "visible": true
+      },
+      {
+        "name": "phone",
+        "type": "tel",
+        "required": true,
+        "visible": true
+      },
+      {
+        "name": "campaign",
+        "type": "hidden",
+        "required": false,
+        "visible": false,
+        "expectedValue": "synthetic-a"
+      },
+      {
+        "name": "privacyAccepted",
+        "type": "checkbox",
+        "required": true,
+        "visible": true
+      }
+    ]
+  },
+  "negativeExpectations": [
+    "no_external_tracking",
+    "no_real_personal_data"
+  ]
+}

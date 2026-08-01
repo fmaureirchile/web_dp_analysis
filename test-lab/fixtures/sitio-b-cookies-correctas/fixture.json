@@ -1,0 +1,17 @@
+{
+  "scenarioId": "E4-B-001",
+  "stage": "E4",
+  "site": "sitio-b-cookies-correctas",
+  "request": {
+    "method": "POST",
+    "path": "/sitio-b/consent/action",
+    "payload": {
+      "action": "accept_all"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "signal": "aceptar_habilita_analytics"
+  },
+  "manifestRef": "test-lab/golden-results/sitio-b-cookies-correctas/expected-manifest.json"
+}

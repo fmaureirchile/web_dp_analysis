@@ -1,0 +1,49 @@
+{
+  "manifestVersion": "1.0.0",
+  "stage": "E4",
+  "meta": {
+    "siteId": "D",
+    "slug": "sitio-d-spa-dinamica",
+    "name": "Sitio D - SPA dinamica",
+    "scenarioType": "spa-dynamic"
+  },
+  "description": "Escenario SPA sintetico con render dinamico, navegacion sin recarga y estado de storage observable.",
+  "routes": {
+    "entry": "/sitio-d",
+    "health": "/sitio-d/health",
+    "state": "/sitio-d/spa/state",
+    "bootstrap": "/sitio-d/spa/bootstrap",
+    "navigate": "/sitio-d/spa/navigate",
+    "api": "/sitio-d/api/profile"
+  },
+  "expectedSignals": [
+    "render_dinamico",
+    "navegacion_sin_recarga",
+    "api_json_local"
+  ],
+  "assertions": {
+    "expectedInitialState": {
+      "dynamicRendered": false,
+      "currentRoute": "/",
+      "renderCount": 0,
+      "localStorage": {}
+    },
+    "expectedAfterBootstrap": {
+      "dynamicRendered": true,
+      "currentRoute": "/registro",
+      "localStorageKeys": [
+        "synthetic_spa_boot",
+        "synthetic_spa_route"
+      ]
+    },
+    "expectedRouteTransition": {
+      "to": "/resumen",
+      "storageRouteKey": "synthetic_spa_route"
+    },
+    "expectedApiSignal": {
+      "source": "sitio-d-api-local",
+      "mode": "synthetic"
+    }
+  },
+  "negativeExpectations": []
+}

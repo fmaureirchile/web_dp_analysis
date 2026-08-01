@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sitio A - Formulario simple</title>
+    <style>
+      body { font-family: Segoe UI, sans-serif; margin: 2rem; }
+      form { display: grid; gap: 0.75rem; max-width: 460px; }
+      label { display: grid; gap: 0.25rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Sitio A - Formulario simple</h1>
+    <p>Escenario sintetico para detectar campos de captura y casilla de privacidad.</p>
+    <p><strong>Solo datos de prueba.</strong> No ingresar datos reales.</p>
+
+    <form action="/sitio-a/submit" method="post">
+      <label>Nombre<input type="text" name="name" required /></label>
+      <label>Correo<input type="email" name="email" required /></label>
+      <label>Telefono<input type="tel" name="phone" required /></label>
+      <input type="hidden" name="campaign" value="synthetic-a" />
+      <label><input type="checkbox" name="privacyAccepted" required /> Acepto aviso de privacidad sintetico</label>
+      <button type="submit">Enviar</button>
+    </form>
+
+    <p>Health endpoint: <code>/sitio-a/health</code></p>
+    <p>Submit endpoint: <code>/sitio-a/submit</code></p>
+  </body>
+</html>

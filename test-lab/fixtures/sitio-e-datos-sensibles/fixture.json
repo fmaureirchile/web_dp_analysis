@@ -1,0 +1,17 @@
+{
+  "scenarioId": "E4-E-001",
+  "stage": "E4",
+  "site": "sitio-e-datos-sensibles",
+  "request": {
+    "method": "POST",
+    "path": "/sitio-e/upload",
+    "payload": {
+      "contentType": "multipart/form-data"
+    }
+  },
+  "expected": {
+    "status": 201,
+    "signal": "multipart_local"
+  },
+  "manifestRef": "test-lab/golden-results/sitio-e-datos-sensibles/expected-manifest.json"
+}

@@ -1,0 +1,51 @@
+{
+  "manifestVersion": "1.0.0",
+  "stage": "E4",
+  "meta": {
+    "siteId": "E",
+    "slug": "sitio-e-datos-sensibles",
+    "name": "Sitio E - datos sensibles",
+    "scenarioType": "sensitive-multipart"
+  },
+  "description": "Escenario sintetico de datos sensibles con campo de salud y carga de documento en multipart/form-data.",
+  "routes": {
+    "entry": "/sitio-e",
+    "health": "/sitio-e/health",
+    "upload": "/sitio-e/upload",
+    "submissions": "/sitio-e/submissions"
+  },
+  "expectedSignals": [
+    "campo_salud",
+    "multipart_local",
+    "aviso_especifico"
+  ],
+  "assertions": {
+    "expectedForm": {
+      "method": "post",
+      "enctype": "multipart/form-data",
+      "fields": [
+        {
+          "name": "healthCondition",
+          "type": "text",
+          "required": true,
+          "sensitivityCategory": "HEALTH_DATA"
+        },
+        {
+          "name": "medicalDocument",
+          "type": "file",
+          "required": false,
+          "sensitivityCategory": "HEALTH_DATA"
+        }
+      ]
+    },
+    "expectedUploadResponse": {
+      "status": "ok",
+      "multipartDetected": true,
+      "syntheticOnly": true
+    }
+  },
+  "negativeExpectations": [
+    "rechazar_no_multipart",
+    "no_uso_de_datos_reales"
+  ]
+}

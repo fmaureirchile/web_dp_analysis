@@ -1,0 +1,19 @@
+{
+  "scenarioId": "E4-F-001",
+  "stage": "E4",
+  "site": "sitio-f-extranet",
+  "request": {
+    "method": "POST",
+    "path": "/sitio-f/auth/login",
+    "payload": {
+      "username": "cliente_sintetico",
+      "password": "clave_sintetica",
+      "role": "cliente"
+    }
+  },
+  "expected": {
+    "status": 200,
+    "signal": "rol_cliente"
+  },
+  "manifestRef": "test-lab/golden-results/sitio-f-extranet/expected-manifest.json"
+}

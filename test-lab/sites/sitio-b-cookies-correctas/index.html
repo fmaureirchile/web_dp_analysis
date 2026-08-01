@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sitio B - Cookies correctas</title>
+    <style>
+      body { font-family: Segoe UI, sans-serif; margin: 2rem; }
+      .banner { border: 1px solid #d0d7de; border-radius: 8px; padding: 1rem; max-width: 720px; }
+      .row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
+      .state { margin-top: 1rem; padding: 0.75rem; background: #f6f8fa; border-radius: 6px; }
+      .custom { margin-top: 0.75rem; }
+      label { margin-right: 1rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Sitio B - Cookies correctas</h1>
+    <p>Banner sintetico con control explicito de consentimiento.</p>
+
+    <section class="banner" aria-label="consent-banner">
+      <p>Usamos cookies necesarias y analitica opcional.</p>
+      <div class="row">
+        <button id="accept-all">Aceptar</button>
+        <button id="reject-all">Rechazar</button>
+        <button id="customize">Guardar configuracion</button>
+        <button id="revoke">Revocar</button>
+      </div>
+
+      <div class="custom">
+        <label><input id="analytics-opt-in" type="checkbox" /> Analitica</label>
+        <label><input id="marketing-opt-in" type="checkbox" /> Marketing</label>
+      </div>
+
+      <div class="state">
+        <strong>Estado actual:</strong>
+        <pre id="consent-state">Cargando...</pre>
+      </div>
+    </section>
+
+    <script>
+      const clientId = "sitio-b-ui";
+
+      async function refreshStatus() {
+        const response = await fetch(`/sitio-b/consent/status?clientId=${clientId}`);
+        const data = await response.json();
+        document.getElementById("consent-state").textContent = JSON.stringify(data.consent, null, 2);
+      }
+
+      async function sendAction(action, categories) {
+        await fetch(`/sitio-b/consent/action?clientId=${clientId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action, categories })
+        });
+        await refreshStatus();
+      }
+
+      document.getElementById("accept-all").addEventListener("click", async () => {
+        await sendAction("accept_all");
+      });
+
+      document.getElementById("reject-all").addEventListener("click", async () => {
+        await sendAction("reject_all");
+      });
+
+      document.getElementById("customize").addEventListener("click", async () => {
+        const analytics = document.getElementById("analytics-opt-in").checked;
+        const marketing = document.getElementById("marketing-opt-in").checked;
+        await sendAction("customize", { analytics, marketing });
+      });
+
+      document.getElementById("revoke").addEventListener("click", async () => {
+        await sendAction("revoke");
+      });
+
+      refreshStatus();
+    </script>
+  </body>
+</html>

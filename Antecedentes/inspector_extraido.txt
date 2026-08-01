@@ -1,0 +1,1239 @@
+﻿Especificación de requerimientos
+Plataforma de descubrimiento y evaluación de captura de datos personales en sitios y aplicaciones web
+Nombre provisional:Web Data Discovery & Consent InspectorVersión:0.1Marco principal:Ley chilena N.º 21.719Ámbito:Sitios públicos, portales privados, extranets, intranets, aplicaciones web y APIs asociadas.
+1. Antecedentes
+La Ley N.º 21.719 considera dato personal cualquier información vinculada o referida a una persona natural identificada o identificable. Asimismo, entiende por tratamiento cualquier operación que permita recolectar, procesar, almacenar, comunicar, transmitir o utilizar datos personales.
+Desde la perspectiva de una aplicación web, la captura de datos puede producirse mediante:
+Formularios visibles.
+Campos ocultos.
+Parámetros en URL.
+Cookies.
+Identificadores de sesión.
+Datos del navegador o dispositivo.
+Dirección IP.
+Geolocalización.
+Scripts de analítica o publicidad.
+Chatbots.
+Carga de archivos.
+APIs.
+Eventos de interacción.
+Logs técnicos.
+Integraciones con terceros.
+Datos inferidos o perfiles generados a partir de la conducta del usuario.
+La ley exige que los datos se recolecten con fines específicos, explícitos y lícitos; que se limiten a aquellos necesarios, adecuados y pertinentes; y que el responsable pueda acreditar la licitud del tratamiento. También exige transparencia respecto de los datos tratados, sus finalidades, bases de licitud, destinatarios, conservación, transferencias y decisiones automatizadas.
+Cuando se utilice el consentimiento como fundamento, este debe ser libre, informado, específico, previo e inequívoco, expresado mediante una acción afirmativa. El responsable debe ser capaz de acreditar que obtuvo dicho consentimiento.
+2. Propósito del sistema
+El sistema tendrá como propósito:
+Descubrir, clasificar, documentar y correlacionar los datos personales que una aplicación web solicita, genera, almacena o transmite, junto con la evidencia observable de información, consentimiento o autorización presentada al usuario.
+La plataforma deberá funcionar en distintos niveles de profundidad, desde una evaluación externa no autenticada hasta una revisión interna autorizada de código fuente, APIs, bases de datos, configuraciones e infraestructura.
+3. Principio fundamental de la solución
+El software deberá distinguir claramente entre:
+3.1 Hechos técnicamente observados
+Por ejemplo:
+El formulario solicita un RUT.
+La página registra una cookie.
+El navegador transmite una dirección de correo a una API.
+Un píxel de terceros se ejecuta antes de aceptar cookies.
+Una librería almacena un identificador enlocalStorage.
+Un endpoint recibe nombre, correo y teléfono.
+El backend guarda esos datos en una tabla.
+El código envía información a una plataforma externa.
+3.2 Evidencia de información o consentimiento
+Por ejemplo:
+Existe una casilla de consentimiento.
+La casilla se encuentra premarcada.
+El sitio muestra una política de privacidad.
+El texto menciona la finalidad.
+El consentimiento es general o específico.
+El usuario puede rechazar cookies.
+Las etiquetas de analítica se ejecutan antes o después de la elección.
+Existe una función para retirar el consentimiento.
+Se registra la versión del texto aceptado.
+3.3 Conclusión jurídica
+La plataformano deberá afirmar automáticamenteque un tratamiento es legal o ilegal.
+Deberá emitir conclusiones limitadas, tales como:
+“No se observó evidencia de información previa”.
+“El dato fue transmitido antes de que el usuario realizara una acción afirmativa”.
+“Se detectó una solicitud de consentimiento”.
+“La finalidad no fue encontrada en el texto analizado”.
+“Existe una posible discrepancia entre el comportamiento técnico y la política publicada”.
+“La base de licitud no puede determinarse mediante observación externa”.
+“Se requiere validación jurídica y operacional”.
+La licitud puede fundarse en consentimiento, ejecución contractual, obligación legal, interés legítimo u otra fuente reconocida por la ley. Por eso, la ausencia de una casilla de consentimiento no implica necesariamente que el tratamiento sea ilícito.
+4. Objetivos específicos
+El sistema deberá permitir:
+Identificar los puntos de captura de datos de una aplicación web.
+Clasificar los datos encontrados conforme a una taxonomía legal y técnica.
+Observar datos capturados automáticamente por el navegador.
+detectar transmisiones hacia APIs propias y de terceros.
+Analizar cookies, almacenamiento local, sesiones e IndexedDB.
+Detectar formularios, campos visibles y campos ocultos.
+Detectar elementos de información y consentimiento.
+Comparar el comportamiento antes y después de aceptar o rechazar.
+Identificar discrepancias entre políticas declaradas y comportamiento observado.
+Analizar código fuente frontend y backend cuando exista autorización.
+Construir trazabilidad desde la interfaz hasta el almacenamiento o destinatario.
+Mantener evidencia reproducible y auditable.
+Facilitar la revisión humana legal, funcional y técnica.
+Generar planes de remediación y seguimiento.
+Repetir evaluaciones para detectar cambios.
+5. Alcance funcional por fases
+Fase 0 — Autorización, delimitación y salvaguardas
+Antes de ejecutar una evaluación, el sistema deberá registrar:
+Titular o responsable del sitio.
+Solicitante de la evaluación.
+Dominios y subdominios autorizados.
+Direcciones IP autorizadas, si corresponde.
+Ambientes autorizados.
+URLs excluidas.
+Fecha de inicio y término de la autorización.
+Tipo de evaluación permitida.
+Uso o no de credenciales.
+Uso o no de formularios.
+Operaciones HTTP autorizadas.
+Límites de concurrencia.
+Ventanas horarias.
+Datos sintéticos permitidos.
+Contacto técnico de emergencia.
+Responsable de detener la prueba.
+Evidencia documental de autorización.
+El sistema no deberá iniciar una exploración activa sin un alcance aprobado.
+Controles obligatorios
+Lista blanca de dominios.
+Lista de rutas prohibidas.
+Límite de profundidad de navegación.
+Límite de peticiones por segundo.
+Límite de concurrencia.
+Botón de detención inmediata.
+Tiempo máximo por evaluación.
+Registro completo de las actividades ejecutadas.
+Identificación configurable del agente medianteUser-Agent.
+Opción de utilizar una dirección IP previamente informada al cliente.
+Fase 1 — Exploración externa pasiva
+Esta fase deberá ejecutarse sin autenticación y sin enviar formularios.
+Capacidades mínimas
+RF-101. Descubrimiento de superficie
+El sistema deberá identificar:
+Dominio principal.
+Subdominios expresamente incluidos en el alcance.
+Redirecciones.
+Páginas públicas.
+sitemap.xml.
+robots.txt.
+Manifiestos de aplicación.
+Archivos JavaScript.
+Hojas de estilo.
+Service workers.
+Formularios.
+Enlaces internos.
+Endpoints visibles en código cliente.
+Archivos de configuración expuestos.
+Políticas de privacidad.
+Políticas de cookies.
+Términos y condiciones.
+Formularios para ejercicio de derechos.
+El descubrimiento de superficie y puntos de entrada es consistente con las prácticas de levantamiento de superficie descritas por OWASP WSTG.
+RF-102. Inventario de formularios
+Por cada formulario deberá registrarse:
+URL.
+Nombre o identificador.
+Método HTTP.
+Endpoint de destino.
+Tipo de codificación.
+Campos visibles.
+Campos ocultos.
+Campos obligatorios.
+Campos opcionales.
+Etiquetas.
+Texto de ayuda.
+Valores por defecto.
+Atributos HTML.
+Atributoautocomplete.
+Validaciones del navegador.
+Texto legal asociado.
+Casillas de aceptación.
+Enlaces a políticas.
+Captchas.
+Botón o evento que provoca el envío.
+RF-103. Detección semántica de campos
+El sistema deberá inferir el tipo de dato utilizando:
+Etiqueta visible.
+Nombre del campo.
+ID HTML.
+Placeholder.
+Tipo de input.
+Atributoautocomplete.
+Texto circundante.
+Validaciones.
+Patrones del valor esperado.
+Contexto de la página.
+Nombre del formulario.
+Endpoint relacionado.
+Ejemplos:
+Evidencia
+Clasificación probable
+rut,run,tax_id
+RUT o identificador nacional
+email,correo
+Correo electrónico
+phone,mobile,whatsapp
+Teléfono
+dob,birthdate
+Fecha de nacimiento
+lat,lng,location
+Geolocalización
+medical_condition
+Dato de salud
+fingerprint,face_id,voiceprint
+Dato biométrico
+Cada clasificación deberá incluir:
+Categoría propuesta.
+Nivel de confianza.
+Evidencia que sustentó la clasificación.
+Posibilidad de corrección manual.
+RF-104. Identificación de tecnologías de terceros
+El sistema deberá identificar scripts, SDK, iframes y recursos externos asociados a:
+Analítica.
+Publicidad.
+Redes sociales.
+Chat.
+Atención al cliente.
+Mapas.
+CAPTCHA.
+Pagos.
+Personalización.
+Experimentación A/B.
+Grabación de sesiones.
+Gestión de consentimiento.
+Autenticación.
+Monitoreo de errores.
+CDN y seguridad.
+No deberá concluir que una herramienta efectivamente procesa datos personales sólo por encontrarse instalada. Deberá diferenciar:
+Tecnología detectada.
+Tecnología cargada.
+Tecnología ejecutada.
+Datos efectivamente transmitidos.
+Fase 2 — Exploración externa activa no destructiva
+Esta fase utilizará un navegador automatizado y datos sintéticos.
+El motor podrá apoyarse en Playwright o una tecnología equivalente. Playwright permite trabajar con contextos aislados, cargar estados autenticados y obtener cookies, almacenamiento local e IndexedDB. Chrome DevTools Protocol permite observar solicitudes, respuestas, encabezados, cuerpos y tiempos de red.
+RF-201. Navegación automatizada
+El sistema deberá:
+Ejecutar JavaScript.
+Esperar contenido dinámico.
+Interactuar con componentes SPA.
+Expandir menús.
+Navegar por pasos.
+Detectar modales.
+Operar componentes dentro de iframes permitidos.
+Capturar estados de la página.
+Mantener trazabilidad de cada acción.
+RF-202. Uso exclusivo de datos sintéticos
+El sistema deberá generar datos ficticios inequívocamente identificables, por ejemplo:
+Nombre:PRUEBA PRIVACIDAD 000123.
+Correo: dominio controlado o reservado.
+Teléfono: rango acordado.
+RUT sintético definido para pruebas.
+Dirección ficticia.
+Documentos de prueba sin datos reales.
+Los datos sintéticos deberán contener un identificador único de ejecución que permita rastrear dónde aparecieron.
+El sistema no deberá:
+Utilizar datos reales de personas.
+Crear obligaciones financieras.
+Confirmar compras.
+Realizar pagos.
+Enviar comunicaciones a terceros reales.
+Crear reservas efectivas.
+Publicar contenidos.
+Eliminar información.
+Modificar datos productivos, salvo autorización expresa y controlada.
+RF-203. Captura de tráfico de red
+Para cada solicitud deberá registrarse:
+Fecha y hora.
+URL de origen.
+URL de destino.
+Dominio receptor.
+Método HTTP.
+Encabezados.
+Parámetros de consulta.
+Cookies enviadas.
+Tipo de contenido.
+Cuerpo de la solicitud.
+Campos detectados.
+Estado de consentimiento.
+Página y acción que originaron la solicitud.
+Clasificación primera o tercera parte.
+País probable del destinatario, cuando pueda determinarse.
+Resultado HTTP.
+Redirecciones.
+El almacenamiento de cuerpos deberá aplicar enmascaramiento para:
+Contraseñas.
+Tokens.
+Credenciales.
+Datos reales.
+Números completos de medios de pago.
+Secretos de aplicación.
+RF-204. Protocolos soportados
+El sistema deberá soportar inicialmente:
+HTTP y HTTPS.
+Formularios URL encoded.
+JSON.
+XML.
+Multipart.
+GraphQL.
+Beacon API.
+Fetch.
+XMLHttpRequest.
+WebSocket, al menos a nivel de eventos y mensajes cuando técnicamente sea posible.
+Como extensión posterior:
+gRPC-Web.
+Server-Sent Events.
+Protocol Buffers con esquema disponible.
+WebRTC.
+Aplicaciones móviles híbridas.
+RF-205. Análisis de almacenamiento del navegador
+Se deberá inspeccionar:
+Cookies.
+localStorage.
+sessionStorage.
+IndexedDB.
+Cache Storage.
+Service workers.
+Tokens almacenados en el navegador.
+Identificadores publicitarios.
+Objetos de configuración de gestores de consentimiento.
+Por cada elemento se registrará:
+Nombre.
+Valor enmascarado.
+Dominio.
+Ruta.
+Fecha de creación.
+Expiración.
+Secure.
+HttpOnly.
+SameSite.
+Categoría probable.
+Estado de consentimiento en que apareció.
+Script o respuesta que lo originó, cuando sea identificable.
+RF-206. Estados de consentimiento
+El sistema deberá ejecutar, cuando corresponda, sesiones separadas:
+Sin interacción.
+Rechazar todo.
+Aceptar sólo elementos necesarios.
+Aceptar analítica.
+Aceptar marketing.
+Aceptar todo.
+Configuración personalizada.
+Retirar o revocar el consentimiento.
+Volver a visitar el sitio después de la elección.
+Cada sesión deberá ejecutarse en un contexto de navegador aislado.
+RF-207. Comparación entre estados
+El sistema deberá comparar:
+Solicitudes de red.
+Cookies.
+Storage.
+Scripts ejecutados.
+Píxeles.
+Dominios externos.
+Identificadores creados.
+Datos transmitidos.
+Diferencias posteriores a la revocación.
+Hallazgos posibles:
+Transmisión antes de cualquier elección.
+Cookie no esencial creada antes de la aceptación.
+Tráfico de marketing después de rechazar.
+Rechazo que no modifica el comportamiento.
+Revocación que no elimina o deshabilita el identificador.
+Categorías activadas distintas de las seleccionadas.
+Consentimiento recordado durante un período no informado.
+RF-208. Captura de evidencia visual
+El sistema deberá generar:
+Captura de pantalla inicial.
+Captura del banner.
+Captura de opciones.
+Captura de textos legales.
+Captura antes de enviar un formulario.
+Captura de confirmación.
+Video opcional de la navegación.
+Snapshot del DOM.
+Hash de integridad de cada evidencia.
+Fase 3 — Evaluación autenticada
+Esta fase estará dirigida a extranets, intranets, portales de clientes y funcionalidades privadas.
+RF-301. Gestión segura de credenciales
+Las credenciales deberán:
+Ser proporcionadas por el responsable del sitio.
+Corresponder preferentemente a usuarios de prueba.
+Almacenarse en una bóveda de secretos.
+No mostrarse en reportes.
+Tener vigencia limitada.
+Ser eliminadas al finalizar el trabajo.
+No quedar incorporadas en videos ni capturas.
+RF-302. Evaluación por roles
+El sistema deberá permitir evaluar distintos perfiles:
+Usuario anónimo.
+Cliente.
+Proveedor.
+Trabajador.
+Operador.
+Supervisor.
+Administrador.
+Auditor.
+Soporte.
+La finalidad será descubrir si distintas interfaces capturan o muestran categorías diferentes de datos.
+RF-303. Flujos autenticados
+El responsable del sitio deberá poder proporcionar flujos autorizados, por ejemplo:
+Registro.
+Inicio de sesión.
+Recuperación de contraseña.
+Actualización de perfil.
+Carga de documentos.
+Solicitud de servicio.
+Creación de ticket.
+Compra o reserva en ambiente de prueba.
+Gestión de datos laborales.
+Ejercicio de derechos.
+Cada flujo deberá indicar qué acciones pueden o no completarse.
+RF-304. Verificación de segregación de captura
+Sin transformarse necesariamente en una prueba de penetración, el sistema deberá identificar:
+Datos solicitados a cada rol.
+Endpoints utilizados por cada rol.
+Datos incorporados en URLs.
+Archivos cargados.
+Uso de identificadores de otros usuarios.
+Exposición accidental en interfaces compartidas.
+Datos copiados al portapapeles.
+Descargas generadas.
+Metadatos presentes en documentos.
+Fase 4 — Análisis autorizado de código fuente
+Esta fase deberá funcionar con acceso de sólo lectura.
+RF-401. Fuentes soportadas
+El sistema deberá poder recibir:
+Repositorio Git.
+Archivo comprimido.
+Integración con GitHub.
+Integración con GitLab.
+Integración con Azure DevOps.
+Imagen de contenedor.
+Artefacto de compilación.
+Código frontend.
+Código backend.
+Infraestructura como código.
+Especificaciones OpenAPI.
+Esquemas GraphQL.
+Scripts de base de datos.
+Configuraciones de Tag Manager.
+Definiciones de pipelines.
+RF-402. Análisis frontend
+El análisis deberá buscar:
+Formularios.
+Modelos de datos.
+Validadores.
+Objetos de estado.
+fetch.
+XMLHttpRequest.
+Clientes GraphQL.
+SDK de analítica.
+SDK publicitarios.
+Cookies.
+Storage.
+Parámetros de URL.
+Captura del portapapeles.
+Geolocalización.
+Cámara.
+Micrófono.
+Biometría.
+Carga de archivos.
+Logs de consola.
+Sistemas de monitoreo de errores.
+Feature flags.
+Source maps.
+Textos de consentimiento.
+Versiones de políticas.
+RF-403. Análisis backend
+El sistema deberá identificar:
+Rutas y controladores.
+DTO.
+Modelos.
+Entidades ORM.
+Validaciones.
+Serializadores.
+Servicios.
+Repositorios.
+Consultas SQL.
+Eventos.
+Colas.
+Webhooks.
+Logs.
+Archivos temporales.
+Cachés.
+Correos.
+Exportaciones.
+Integraciones externas.
+Herramientas de IA.
+Servicios de analítica.
+Proveedores de almacenamiento.
+Procesos de eliminación o anonimización.
+RF-404. Análisis de APIs
+Por cada endpoint deberá obtenerse:
+Ruta.
+Método.
+Tipo de autenticación.
+Roles admitidos.
+Parámetros.
+Cuerpo de entrada.
+Campos de salida.
+Categorías de datos.
+Terceros invocados.
+Persistencia probable.
+Evidencia de logging.
+Validaciones.
+Plazos o procesos de eliminación, si aparecen definidos.
+RF-405. Análisis de base de datos
+Cuando se proporcionen esquemas o acceso de lectura a metadatos, deberá analizarse:
+Bases.
+Esquemas.
+Tablas.
+Columnas.
+Tipos.
+Relaciones.
+Índices.
+Comentarios.
+Datos de ejemplo únicamente cuando exista autorización.
+Tablas históricas.
+Auditorías.
+Respaldos.
+Tablas temporales.
+Procedimientos almacenados.
+Procesos de depuración.
+Indicadores de cifrado o tokenización.
+RF-406. Análisis de logs
+El sistema deberá buscar evidencia de datos personales en:
+Logs de aplicación.
+Logs del servidor web.
+Logs de API.
+Logs de autenticación.
+Logs de auditoría.
+Monitoreo de errores.
+Trazas distribuidas.
+APM.
+Telemetría.
+Mensajes de cola.
+Dead-letter queues.
+Se deberá prestar especial atención a:
+RUT.
+Correos.
+Teléfonos.
+Tokens.
+Cuerpos completos de formularios.
+URLs con datos.
+Cabeceras de autorización.
+Datos sensibles.
+Datos financieros.
+Contraseñas.
+OWASP ASVS 5.0 incluye requisitos específicos de documentación, protección y logging de datos sensibles, por lo que puede utilizarse como referencia técnica complementaria.
+RF-407. Análisis de infraestructura
+Se deberá analizar:
+Recursos cloud.
+Regiones.
+Bases de datos.
+Buckets.
+Cuentas de almacenamiento.
+CDN.
+WAF.
+Gestores de secretos.
+Herramientas de monitoreo.
+Sistemas de backup.
+Réplicas.
+Servicios SaaS.
+Variables de entorno.
+Configuraciones de retención.
+Servicios desplegados en otros países.
+6. Taxonomía de datos
+El sistema deberá contar con una taxonomía configurable.
+6.1 Identificadores directos
+Nombre.
+Apellido.
+RUT o RUN.
+Pasaporte.
+Número de documento.
+Firma.
+Identificador interno.
+Matrícula.
+Número de trabajador.
+Número de cliente.
+6.2 Datos de contacto
+Correo.
+Teléfono.
+WhatsApp.
+Dirección.
+Comuna.
+Ciudad.
+Código postal.
+6.3 Identificadores digitales
+Dirección IP.
+Cookie ID.
+Session ID.
+Device ID.
+Advertising ID.
+Fingerprint del navegador.
+Identificador de cuenta.
+Identificador de autenticación.
+ID de redes sociales.
+6.4 Datos demográficos y personales
+Edad.
+Fecha de nacimiento.
+Nacionalidad.
+Estado civil.
+Profesión.
+Educación.
+Composición familiar.
+6.5 Datos económicos, financieros y comerciales
+Ingresos.
+Patrimonio.
+Situación socioeconómica.
+Cuenta bancaria.
+Datos de pago.
+Historial de compras.
+Obligaciones.
+Evaluación comercial.
+Historial de deuda.
+6.6 Datos laborales
+Empleador.
+Cargo.
+Remuneración.
+Jornada.
+Asistencia.
+Evaluación de desempeño.
+Licencias.
+Sanciones.
+Afiliaciones laborales.
+6.7 Datos sensibles
+La taxonomía deberá contemplar las categorías señaladas por la ley, incluyendo:
+Origen étnico o racial.
+Afiliación política.
+Afiliación sindical o gremial.
+Situación socioeconómica.
+Convicciones ideológicas o filosóficas.
+Creencias religiosas.
+Datos de salud.
+Perfil biológico.
+Datos biométricos.
+Vida sexual.
+Orientación sexual.
+Identidad de género.
+6.8 Categorías especialmente controladas
+Datos de niños, niñas y adolescentes.
+Geolocalización.
+Datos biométricos.
+Datos de salud.
+Datos sobre infracciones.
+Credenciales.
+Datos de autenticación.
+Perfiles e inferencias.
+Decisiones automatizadas.
+6.9 Datos no personales pero críticos
+El sistema deberá separar los datos personales de:
+Contraseñas.
+Secretos.
+Claves API.
+Tokens.
+Certificados.
+Llaves privadas.
+Datos confidenciales de empresas.
+Aunque estos elementos no siempre correspondan a datos personales, deberán generar alertas de seguridad.
+7. Análisis de información y consentimiento
+RF-701. Detección de avisos de privacidad
+El sistema deberá detectar:
+Política de privacidad.
+Aviso breve en formularios.
+Política de cookies.
+Términos y condiciones.
+Textos de autorización.
+Enlaces a información adicional.
+Identificación del responsable.
+Canal de contacto.
+Canal para ejercer derechos.
+Fecha y versión del documento.
+RF-702. Extracción de declaraciones
+Mediante reglas y procesamiento de lenguaje, deberá extraerse evidencia sobre:
+Categorías de datos.
+Finalidades.
+Base de licitud declarada.
+Destinatarios.
+Proveedores.
+Transferencias internacionales.
+Plazo de conservación.
+Uso de cookies.
+Analítica.
+Marketing.
+Perfilamiento.
+Decisiones automatizadas.
+Derechos.
+Retiro del consentimiento.
+La ley exige mantener públicamente disponible información sobre las categorías de datos, titulares, destinatarios, finalidades, base de legitimidad, transferencias, conservación y decisiones automatizadas.
+RF-703. Evaluación formal del consentimiento
+El sistema deberá observar:
+Existencia de acción afirmativa.
+Casilla premarcada.
+Consentimientos agrupados.
+Consentimientos separados por finalidad.
+Texto visible antes de la acción.
+Opción de rechazo.
+Opción de configuración.
+Equivalencia visual entre aceptar y rechazar.
+Acceso a la política.
+Mecanismo de revocación.
+Funcionamiento técnico de la revocación.
+Versión del consentimiento.
+Fecha y hora.
+Registro técnico del evento.
+RF-704. Matriz de correlación
+Para cada dato observado deberá construirse una matriz:
+Dato
+Punto de captura
+Finalidad declarada
+Base declarada
+Consentimiento observado
+Destino
+Estado
+Correo
+Formulario contacto
+Responder consulta
+No encontrada
+No requerido
+API propia
+Revisar
+Cookie ID
+Navegación inicial
+Analítica
+Consentimiento
+Banner presente
+Tercero
+Ejecutada antes de aceptar
+Teléfono
+Registro
+Crear cuenta
+Contrato
+Casilla adicional de marketing
+Backend
+Parcialmente explicado
+RF-705. Tipos de discrepancia
+Dato capturado pero no informado.
+Categoría informada pero no observada.
+Tercero observado pero no declarado.
+Finalidad demasiado genérica.
+Consentimiento posterior a la captura.
+Consentimiento premarcado.
+Datos transmitidos tras rechazo.
+Revocación inefectiva.
+Política sin fecha o versión.
+Política inaccesible.
+Política distinta entre páginas.
+Campos obligatorios no diferenciados de opcionales.
+Captura de dato sensible sin aviso específico.
+Base de licitud no identificada.
+Retención no informada.
+Transferencia internacional no informada.
+Estas discrepancias deberán presentarse comoindicadores para revisión, no como determinaciones definitivas de infracción.
+8. Modelo de evidencia
+Cada observación deberá generar un objeto de evidencia con:
+ID único.
+Proyecto.
+Ejecución.
+Fecha y hora.
+URL.
+Página de origen.
+Acción del navegador.
+Estado de consentimiento.
+Tipo de evidencia.
+Dato detectado.
+Valor enmascarado.
+Método de detección.
+Nivel de confianza.
+Destino.
+Captura de pantalla.
+DOM relacionado.
+Solicitud de red relacionada.
+Fragmento de código relacionado.
+Archivo y línea, si corresponde.
+Hash de integridad.
+Evaluador que confirmó o rechazó la observación.
+Niveles de evidencia
+E0 — No observado
+No se encontró evidencia en la cobertura ejecutada.
+E1 — Evidencia estática
+El dato aparece en HTML, JavaScript, código o documentación, pero no fue observado en ejecución.
+E2 — Evidencia de captura
+El dato fue ingresado, generado o almacenado en el navegador.
+E3 — Evidencia de transmisión
+El dato fue observado en una solicitud de red.
+E4 — Evidencia de procesamiento
+El dato aparece en lógica backend, integración, cola o servicio.
+E5 — Evidencia de persistencia
+El dato aparece en una base de datos, repositorio, archivo, log o respaldo.
+La plataforma deberá evitar expresiones como“el sitio no captura el dato”cuando sólo corresponda decir:
+“El dato no fue observado en las rutas y estados evaluados”.
+9. Motor de clasificación
+El motor deberá combinar:
+9.1 Reglas determinísticas
+Diccionarios.
+Expresiones regulares.
+Atributos HTML.
+Nombres de variables.
+Esquemas.
+Tipos de datos.
+Dominio receptor.
+Firmas de SDK conocidos.
+9.2 Análisis estructural
+Árbol DOM.
+AST de código fuente.
+Esquemas API.
+Modelos ORM.
+Flujo de variables.
+Dependencias.
+Relaciones de base de datos.
+9.3 Clasificación estadística o de lenguaje
+Podrá utilizarse IA para:
+Interpretar etiquetas ambiguas.
+Clasificar textos legales.
+Inferir finalidades declaradas.
+Relacionar conceptos equivalentes.
+Explicar discrepancias.
+Proponer clasificaciones.
+La IA no deberá ser la única fuente para hallazgos críticos.
+Cada inferencia deberá incluir:
+Modelo utilizado.
+Versión.
+Prompt o regla.
+Evidencia suministrada.
+Confianza.
+Posibilidad de validación humana.
+9.4 Revisión humana
+Un analista deberá poder:
+Confirmar.
+Rechazar.
+Reclasificar.
+Añadir contexto.
+Unir duplicados.
+Marcar falsos positivos.
+Definir una excepción.
+Asignar un responsable.
+Incorporar una base de licitud conocida.
+Documentar una justificación.
+10. Linaje y trazabilidad
+La plataforma deberá construir un grafo:
+Elemento de interfaz → variable frontend → solicitud → endpoint → servicio → tabla o tercero
+Ejemplo:
+Campo “Correo”   ↓customer.email   ↓POST /api/contact   ↓ContactController   ↓CRM SaaS   ↓Tabla Leads   ↓Plataforma de email marketing
+Cada nodo deberá contener:
+Tipo.
+Sistema.
+Propietario.
+Evidencia.
+Categoría de dato.
+País o región.
+Estado de revisión.
+La trazabilidad deberá distinguir:
+Recolección.
+Generación.
+Transmisión.
+Almacenamiento.
+Comunicación.
+Cesión.
+Eliminación.
+Anonimización.
+11. Resultados y reportes
+RF-1101. Informe ejecutivo
+Deberá incluir:
+Alcance.
+Modalidad de evaluación.
+Cobertura.
+Principales datos detectados.
+Presencia de datos sensibles.
+Terceros observados.
+Indicadores de consentimiento.
+Principales discrepancias.
+Riesgos prioritarios.
+Limitaciones de la evaluación.
+Recomendaciones.
+RF-1102. Inventario de captura
+Por cada dato:
+Categoría.
+Fuente.
+Página.
+Formulario.
+Campo.
+Estado de consentimiento.
+Endpoint.
+Destino.
+Tercero.
+Finalidad declarada.
+Base declarada.
+Evidencia.
+Confianza.
+Revisión requerida.
+RF-1103. Mapa de terceros
+Dominio.
+Organización probable.
+Función.
+Páginas donde aparece.
+Datos transmitidos.
+Estado de consentimiento.
+País o región probable.
+Política que lo menciona.
+Nivel de confianza.
+RF-1104. Reporte técnico
+URLs analizadas.
+Formularios.
+Endpoints.
+Cookies.
+Storage.
+Scripts.
+Tráfico.
+Código relacionado.
+Hallazgos.
+Evidencias.
+Pasos de reproducción.
+RF-1105. Paquete de evidencia
+Deberá poder exportarse:
+PDF.
+CSV.
+JSON.
+HAR sanitizado.
+Capturas.
+DOM.
+Inventario de cookies.
+Inventario de endpoints.
+Grafo de linaje.
+Fragmentos de código autorizados.
+Hashes de integridad.
+RF-1106. Tickets de remediación
+Los hallazgos deberán exportarse a:
+Jira.
+Azure DevOps.
+GitHub Issues.
+CSV.
+API.
+Cada ticket deberá incluir:
+Descripción.
+Evidencia.
+Riesgo.
+Sistema afectado.
+Recomendación.
+Responsable.
+Prioridad.
+Criterio de aceptación.
+12. Priorización de hallazgos
+El sistema deberá combinar:
+Sensibilidad del dato.
+Cantidad de titulares potencialmente afectados.
+Evidencia de transmisión.
+Presencia de terceros.
+Captura previa a información o elección.
+Persistencia.
+Accesibilidad.
+Autenticación requerida.
+Exposición pública.
+Transferencia internacional.
+Uso en perfilamiento.
+Participación de niños o adolescentes.
+Posibilidad de daño.
+Nivel de confianza.
+Clasificación recomendada
+Crítico
+Datos sensibles transmitidos a un tercero no identificado.
+Credenciales o tokens expuestos.
+Captura de datos de menores con alta exposición.
+Datos reales incluidos en URLs públicas.
+Persistencia pública de archivos con datos personales.
+Alto
+Tracking no esencial posterior al rechazo.
+Datos sensibles solicitados sin información contextual.
+Campos personales registrados íntegramente en logs.
+Discrepancia clara entre política y comportamiento.
+Datos enviados a terceros antes de la elección.
+Medio
+Finalidad genérica.
+Política sin versión.
+Retención no informada.
+Campos obligatorios no diferenciados.
+Consentimientos agrupados.
+Bajo o informativo
+Tecnología instalada pero no ejecutada.
+Campo potencialmente personal con baja confianza.
+Política localizada, pero difícil de encontrar.
+Recomendación de mejora documental.
+La severidad deberá ser editable por el analista.
+13. Requerimientos no funcionales
+RNF-01. Seguridad
+Cifrado en tránsito y reposo.
+MFA para usuarios administrativos.
+Control basado en roles.
+Segregación por cliente.
+Bóveda de secretos.
+Logs inmutables.
+Enmascaramiento de datos.
+Gestión de vulnerabilidades.
+Análisis de dependencias.
+Pruebas de seguridad.
+Respaldos cifrados.
+Eliminación segura.
+La seguridad del producto deberá basarse en OWASP ASVS 5.0 y en prácticas de desarrollo seguro. ASVS proporciona una base para verificar controles técnicos de aplicaciones y una lista de requerimientos para desarrollo seguro.
+Como referencia de ciclo de desarrollo, NIST mantiene como versión final del SSDF la 1.1, mientras que la versión 1.2 se encontraba como borrador inicial.
+RNF-02. Privacidad del propio escáner
+La plataforma deberá aplicar minimización:
+No conservar valores completos cuando no sean necesarios.
+Enmascarar automáticamente.
+Permitir capturar sólo nombres de campos.
+Configurar retención por proyecto.
+Eliminar evidencias al terminar el contrato.
+No utilizar evidencias de un cliente para entrenar modelos.
+Mantener separación estricta entre organizaciones.
+Permitir despliegue privado.
+El NIST Privacy Framework puede utilizarse como referencia complementaria para gestión de riesgos de privacidad, al ser un marco voluntario orientado a identificar y gestionar dichos riesgos.
+RNF-03. Despliegue
+Deberán contemplarse:
+SaaS multicliente.
+Instancia dedicada.
+Despliegue en nube del cliente.
+Despliegue on-premise.
+Worker temporal dentro de la red del cliente.
+Ejecución aislada sin salida a internet, salvo destinos autorizados.
+RNF-04. Rendimiento
+El sistema deberá permitir configurar:
+Máximo de páginas.
+Máximo de profundidad.
+Máximo de solicitudes.
+Concurrencia.
+Espera entre acciones.
+Tamaño máximo de respuestas.
+Duración máxima.
+Cantidad de roles.
+Cantidad de estados de consentimiento.
+RNF-05. Reproducibilidad
+Dos ejecuciones con la misma versión, configuración y estado deberán producir resultados comparables.
+Deberá registrarse:
+Versión del motor.
+Navegador.
+Sistema operativo.
+Fecha.
+Región.
+Configuración.
+Reglas.
+Modelo de IA.
+Estado inicial.
+Datos sintéticos utilizados.
+RNF-06. Explicabilidad
+Todo hallazgo deberá mostrar:
+Qué se observó.
+Dónde.
+Cuándo.
+Cómo se detectó.
+Por qué fue clasificado.
+Qué parte requiere revisión humana.
+Qué limitaciones existen.
+RNF-07. Accesibilidad
+La interfaz deberá cumplir estándares de accesibilidad y permitir:
+Navegación por teclado.
+Lectores de pantalla.
+Contraste suficiente.
+Exportaciones legibles.
+Descripciones alternativas de evidencias.
+RNF-08. Idiomas
+Inicialmente:
+Español de Chile.
+Inglés técnico.
+Las taxonomías y textos deberán ser configurables.
+14. Arquitectura lógica propuesta
+Portal de gestión       │       ▼Gestor de alcance y autorizaciones       │       ▼Orquestador de evaluaciones       │       ├── Crawler pasivo       ├── Navegador automatizado       ├── Capturador de red       ├── Analizador de cookies y storage       ├── Analizador de políticas       ├── Escáner frontend       ├── Escáner backend       ├── Escáner API       └── Escáner de infraestructura                │                ▼Normalizador de evidencias                │                ▼Motor de clasificación                │                ▼Motor de correlación y linaje                │                ▼Revisión humana                │                ▼Reportes, dashboards y tickets
+Componentes
+A. Gestor de proyectos
+Clientes.
+Sitios.
+Alcances.
+Autorizaciones.
+Usuarios.
+Roles.
+Ejecuciones.
+B. Orquestador
+Programación.
+Colas.
+Prioridades.
+Reintentos.
+Timeout.
+Detención.
+Aislamiento.
+C. Browser workers
+Navegación.
+Consentimiento.
+Formularios.
+Capturas.
+Red.
+Storage.
+D. Source scanners
+Análisis de AST.
+Reglas Semgrep o equivalentes.
+Tree-sitter o equivalente.
+Detección de dependencias.
+Detección de flujos.
+E. Motor legal-técnico
+Taxonomía chilena.
+Reglas de evidencia.
+Extracción documental.
+Correlación.
+Clasificación.
+F. Repositorio
+PostgreSQL para metadatos.
+Almacenamiento de objetos para evidencia.
+Índice de búsqueda.
+Grafo para linaje, opcional.
+Bóveda de secretos.
+15. Restricciones de seguridad y uso ético
+El sistema no deberá incluir en su modalidad estándar:
+Fuerza bruta.
+Ataques de contraseñas.
+Explotación de vulnerabilidades.
+SQL injection activa.
+XSS activo.
+Denegación de servicio.
+Evasión de controles.
+Escalada de privilegios.
+Extracción masiva.
+Enumeración indiscriminada de usuarios.
+Modificación de registros.
+Compra o pago real.
+Publicación real.
+Envío masivo de formularios.
+Acceso fuera del alcance autorizado.
+La plataforma no debe convertirse accidentalmente en una herramienta de pentesting ofensivo. Las pruebas de seguridad profunda deberán constituir un módulo independiente, sujeto a una autorización distinta.
+16. Criterios de aceptación principales
+CA-01. Campo personal visible
+Dado un formulario con nombre, RUT, correo y teléfono, el sistema deberá:
+Detectar los cuatro campos.
+Clasificarlos correctamente.
+Identificar cuáles son obligatorios.
+Asociarlos al endpoint.
+Capturar el texto informativo cercano.
+Generar evidencia reproducible.
+CA-02. Campo oculto
+Dado un campo oculto con un identificador de usuario, deberá:
+Detectarlo.
+Clasificarlo.
+Mostrar que no es visible.
+Identificar cuándo se transmite.
+CA-03. Tracking previo
+Dado un sitio que ejecuta analítica antes del consentimiento, deberá:
+Capturar la solicitud.
+Identificar el dominio.
+Asociarla al estado“sin interacción”.
+Compararla con el estado“rechazar”.
+Emitir un indicador de revisión.
+CA-04. Rechazo efectivo
+Dado un sitio que deshabilita correctamente el tracking al rechazar, deberá:
+Mostrar la diferencia.
+No generar un falso hallazgo de ejecución posterior.
+Conservar evidencia de ambas sesiones.
+CA-05. Política incompleta
+Dado un dato observado que no aparece en la política, deberá:
+Relacionar la evidencia técnica.
+Mostrar la ausencia de coincidencia.
+Indicar que puede existir información en otra fuente no analizada.
+Solicitar revisión humana.
+CA-06. Código fuente
+Dado un endpoint que recibe un correo y lo guarda en una tabla:
+Deberá identificar el DTO.
+Identificar el controlador.
+Identificar el servicio.
+Identificar la entidad.
+Construir el linaje.
+Relacionarlo con el campo frontend cuando sea posible.
+CA-07. Protección de evidencia
+Dada una solicitud con contraseña o token:
+El reporte no deberá mostrar el valor completo.
+La evidencia deberá almacenarse cifrada o enmascarada.
+El acceso deberá quedar auditado.
+17. Indicadores de calidad
+El producto deberá medir:
+Cobertura de páginas.
+Cobertura de flujos.
+Cobertura de roles.
+Formularios descubiertos.
+Endpoints descubiertos.
+Porcentaje de campos clasificados.
+Precisión confirmada por analistas.
+Falsos positivos.
+Falsos negativos conocidos.
+Terceros detectados.
+Porcentaje de hallazgos con evidencia.
+Porcentaje de linajes completos.
+Diferencias entre evaluaciones.
+Para el MVP se recomienda buscar:
+Precisión superior al 90 % para campos explícitos.
+Evidencia técnica en el 100 % de los hallazgos de alta severidad.
+Cero exposición de secretos en reportes.
+Repetibilidad de resultados sobre un corpus controlado.
+Posibilidad de corrección humana en todas las clasificaciones.
+18. Roadmap recomendado
+MVP 1 — Descubrimiento externo
+Gestión de alcance.
+Crawler.
+Formularios.
+Clasificación de campos.
+Browser automation.
+Cookies.
+Storage.
+Captura de red.
+Terceros.
+Evidencias.
+Reporte básico.
+MVP 2 — Consentimiento y políticas
+Estados de consentimiento.
+Comparación aceptar/rechazar.
+Detección de CMP.
+Análisis de política.
+Matriz dato–finalidad–consentimiento.
+Revisión humana.
+Dashboard.
+MVP 3 — Evaluación autenticada
+Credenciales seguras.
+Flujos por rol.
+Extranet e intranet.
+Carga de documentos.
+Sesiones autenticadas.
+Recorridos definidos por el cliente.
+MVP 4 — Código fuente
+Repositorios.
+Frontend.
+Backend.
+OpenAPI.
+GraphQL.
+Bases de datos.
+Logs.
+Linaje técnico.
+MVP 5 — Monitoreo continuo
+Revaluaciones programadas.
+Comparación entre versiones.
+Alertas por nuevas cookies.
+Alertas por nuevos campos.
+Alertas por nuevos terceros.
+Integración CI/CD.
+Bloqueo de despliegues según políticas configuradas.
+19. Recomendación de producto
+La primera versión no debería intentar“leer toda la aplicación”ni resolver jurídicamente todos los casos.
+El producto inicial debería especializarse en cuatro resultados confiables:
+Qué datos solicita la interfaz.
+Qué datos genera o almacena el navegador.
+Qué datos transmite realmente la aplicación y hacia dónde.
+Qué información o consentimiento se muestra antes de esa captura.
+La capacidad más diferenciadora sería la comparación empírica entre estados:
+Sin interactuarvs.Rechazarvs.Aceptarvs.Revocar
+Esto permitiría pasar de una revisión meramente documental a una evaluación basada en evidencia técnica.
+20. Definición final del producto
+La plataforma deberá presentarse como:
+Una herramienta de apoyo al levantamiento, diagnóstico y auditoría de tratamientos de datos personales en aplicaciones web, que combina observación externa, automatización de navegador, análisis de tráfico, revisión de políticas, análisis de código y construcción de trazabilidad, manteniendo evidencia verificable y revisión humana.
+No deberá presentarse como:
+Certificador automático de cumplimiento.
+Sustituto de asesoría jurídica.
+Herramienta de vigilancia de personas.
+Escáner ofensivo.
+Prueba concluyente de que un sitio cumple o incumple la ley.
+Su valor estará en reducir drásticamente el trabajo manual necesario para descubrir y documentar la captura de datos, evidenciar discrepancias y orientar la revisión legal, funcional, de procesos y de ciberseguridad.

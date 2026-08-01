@@ -1,0 +1,18 @@
+﻿
+> web-analysis@0.1.0 test:integration
+> vitest run --config vitest.integration.config.ts
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/TECH/OneDrive/Documentos/BE_AI_Consulting/Web_Analysis[39m
+
+ [32mÔ£ô[39m tests/integration/smoke.integration.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 3[2mms[22m[39m
+ [32mÔ£ô[39m tests/integration/health.integration.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 22[2mms[22m[39m
+ [32mÔ£ô[39m tests/integration/stage2-chain.integration.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 192[2mms[22m[39m
+ [32mÔ£ô[39m tests/integration/stage3-safeguards.integration.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 294[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m   Start at [22m 17:16:35
+[2m   Duration [22m 1.38s[2m (transform 193ms, setup 0ms, collect 1.91s, tests 511ms, environment 1ms, prepare 668ms)[22m
+

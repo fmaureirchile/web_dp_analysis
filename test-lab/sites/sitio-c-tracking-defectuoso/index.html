@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sitio C - Tracking defectuoso</title>
+    <style>
+      body { font-family: Segoe UI, sans-serif; margin: 2rem; }
+      .panel { border: 1px solid #d0d7de; border-radius: 8px; padding: 1rem; max-width: 760px; }
+      .row { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+      pre { background: #f6f8fa; padding: 0.75rem; border-radius: 6px; overflow: auto; }
+    </style>
+  </head>
+  <body>
+    <h1>Sitio C - Tracking defectuoso</h1>
+    <p>Escenario sintetico con tracking previo y posterior al rechazo.</p>
+
+    <div class="panel">
+      <div class="row">
+        <button id="reject">Rechazar cookies</button>
+        <button id="manual-ping">Forzar ping tracking</button>
+      </div>
+
+      <p>Estado y eventos:</p>
+      <pre id="tracking-state">Cargando...</pre>
+    </div>
+
+    <script>
+      const clientId = "sitio-c-ui";
+
+      async function refreshState() {
+        const response = await fetch(`/sitio-c/tracking/events?clientId=${clientId}`);
+        const data = await response.json();
+        document.getElementById("tracking-state").textContent = JSON.stringify(data, null, 2);
+      }
+
+      async function bootTracking() {
+        await fetch(`/sitio-c/tracking/boot?clientId=${clientId}`, { method: "POST" });
+      }
+
+      document.getElementById("reject").addEventListener("click", async function () {
+        await fetch(`/sitio-c/consent/reject?clientId=${clientId}`, { method: "POST" });
+        await refreshState();
+      });
+
+      document.getElementById("manual-ping").addEventListener("click", async function () {
+        await fetch(`/sitio-c/tracking/ping?clientId=${clientId}`, { method: "POST" });
+        await refreshState();
+      });
+
+      bootTracking().then(refreshState);
+    </script>
+  </body>
+</html>

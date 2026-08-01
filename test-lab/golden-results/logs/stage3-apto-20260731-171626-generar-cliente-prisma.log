@@ -1,0 +1,16 @@
+﻿
+> web-analysis@0.1.0 db:generate
+> prisma generate
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+System.Management.Automation.RemoteException
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+
+Ô£ö Generated Prisma Client (v6.19.3) to .\node_modules\@prisma\client in 227ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Need your database queries to be 1000x faster? Accelerate offers you that and more: https://pris.ly/tip-2-accelerate
+

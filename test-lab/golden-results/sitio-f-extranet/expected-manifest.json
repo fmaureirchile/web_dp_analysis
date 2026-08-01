@@ -1,0 +1,48 @@
+{
+  "manifestVersion": "1.0.0",
+  "stage": "E4",
+  "meta": {
+    "siteId": "F",
+    "slug": "sitio-f-extranet",
+    "name": "Sitio F - extranet",
+    "scenarioType": "role-based-extranet"
+  },
+  "description": "Escenario de extranet sintetica con autenticacion local y diferenciacion de flujos por rol cliente/supervisor.",
+  "routes": {
+    "entry": "/sitio-f",
+    "health": "/sitio-f/health",
+    "login": "/sitio-f/auth/login",
+    "logout": "/sitio-f/auth/logout",
+    "sessionStatus": "/sitio-f/session/status",
+    "profile": "/sitio-f/profile"
+  },
+  "expectedSignals": [
+    "login_sintetico",
+    "rol_cliente",
+    "rol_supervisor"
+  ],
+  "assertions": {
+    "expectedInitialSession": {
+      "authenticated": false,
+      "lastAction": "initial"
+    },
+    "expectedRoleFlows": [
+      {
+        "role": "cliente",
+        "panel": "cliente",
+        "sections": ["mis-datos", "mis-tramites"],
+        "syntheticDataAccess": "own_only"
+      },
+      {
+        "role": "supervisor",
+        "panel": "supervisor",
+        "sections": ["dashboard", "reporte-agregado"],
+        "syntheticDataAccess": "aggregated"
+      }
+    ]
+  },
+  "negativeExpectations": [
+    "acceso_profile_sin_autenticacion_debe_fallar",
+    "rol_no_soportado_debe_fallar"
+  ]
+}

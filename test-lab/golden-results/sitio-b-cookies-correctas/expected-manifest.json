@@ -1,0 +1,67 @@
+{
+  "manifestVersion": "1.0.0",
+  "stage": "E4",
+  "meta": {
+    "siteId": "B",
+    "slug": "sitio-b-cookies-correctas",
+    "name": "Sitio B - cookies correctas",
+    "scenarioType": "consent-correct"
+  },
+  "description": "Escenario de consentimiento correcto con estado inicial desactivado para analitica.",
+  "routes": {
+    "entry": "/sitio-b",
+    "health": "/sitio-b/health",
+    "status": "/sitio-b/consent/status",
+    "action": "/sitio-b/consent/action"
+  },
+  "expectedSignals": [
+    "analytics_desactivada_por_defecto",
+    "aceptar_habilita_analytics",
+    "rechazar_bloquea_analytics",
+    "revocar_restablece_preferencias"
+  ],
+  "assertions": {
+    "initialConsent": {
+      "necessary": true,
+      "analytics": false,
+      "marketing": false,
+      "revoked": false,
+      "lastAction": "initial"
+    },
+    "transitions": [
+      {
+        "action": "accept_all",
+        "analytics": true,
+        "marketing": true,
+        "revoked": false,
+        "lastAction": "accept_all"
+      },
+      {
+        "action": "reject_all",
+        "analytics": false,
+        "marketing": false,
+        "revoked": false,
+        "lastAction": "reject_all"
+      },
+      {
+        "action": "customize",
+        "input": { "analytics": true, "marketing": false },
+        "analytics": true,
+        "marketing": false,
+        "revoked": false,
+        "lastAction": "customize"
+      },
+      {
+        "action": "revoke",
+        "analytics": false,
+        "marketing": false,
+        "revoked": true,
+        "lastAction": "revoke"
+      }
+    ]
+  },
+  "negativeExpectations": [
+    "analytics_no_activa_sin_accion",
+    "acciones_invalidas_deben_fallar"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "scenarioId": "E4-A-001",
+  "stage": "E4",
+  "site": "sitio-a-formulario-simple",
+  "request": {
+    "method": "POST",
+    "path": "/sitio-a/submit",
+    "payload": {
+      "name": "Persona Sintetica",
+      "email": "persona@example.test",
+      "phone": "+56911111111",
+      "campaign": "synthetic-a",
+      "privacyAccepted": true
+    }
+  },
+  "expected": {
+    "status": 200,
+    "signal": "submit_local_disponible"
+  },
+  "manifestRef": "test-lab/golden-results/sitio-a-formulario-simple/expected-manifest.json"
+}

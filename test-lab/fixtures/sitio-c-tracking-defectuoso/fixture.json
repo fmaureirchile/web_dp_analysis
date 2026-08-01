@@ -1,0 +1,15 @@
+{
+  "scenarioId": "E4-C-001",
+  "stage": "E4",
+  "site": "sitio-c-tracking-defectuoso",
+  "request": {
+    "method": "POST",
+    "path": "/sitio-c/consent/reject",
+    "payload": {}
+  },
+  "expected": {
+    "status": 200,
+    "signal": "tracking_post_rechazo"
+  },
+  "manifestRef": "test-lab/golden-results/sitio-c-tracking-defectuoso/expected-manifest.json"
+}

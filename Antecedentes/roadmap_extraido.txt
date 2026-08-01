@@ -1,0 +1,994 @@
+﻿Roadmap de desarrollo
+Plataforma de descubrimiento y evaluación de captura de datos personales en aplicaciones web
+Versión:0.1Objetivo:establecer una secuencia de construcción coherente, posteriormente descomponible en épicas, historias y tareas pequeñas para desarrollo asistido mediante vibe coding.
+1. Principio rector del roadmap
+El producto deberá desarrollarse desde el núcleo hacia las capacidades especializadas, siguiendo esta progresión:
+Autorización y alcance        ↓Modelo común de datos y evidencias        ↓Exploración externa pasiva        ↓Observación dinámica del navegador        ↓Clasificación de datos        ↓Análisis de consentimiento        ↓Revisión y reportes        ↓Evaluación autenticada        ↓Análisis de código y sistemas internos        ↓Linaje integral        ↓Monitoreo continuo
+La regla principal será:
+Ninguna fase deberá crear una estructura paralela para representar datos, evidencias, ejecuciones o hallazgos.
+Todas las capacidades deberán utilizar el mismo modelo de dominio, repositorio de evidencias, mecanismo de clasificación y proceso de revisión.
+La plataforma entregará evidencia técnica y documental, pero no determinará automáticamente la licitud jurídica definitiva del tratamiento. La Ley N.º 21.719 exige considerar finalidad, proporcionalidad, transparencia, base de licitud y consentimiento cuando corresponda.
+2. Estrategia general de construcción
+2.1 Construcción mediante cortes verticales
+No se recomienda desarrollar primero toda la interfaz, luego todo el backend y finalmente los escáneres.
+Cada incremento deberá recorrer una funcionalidad completa:
+Configuración    ↓Ejecución    ↓Captura    ↓Persistencia    ↓Clasificación    ↓Evidencia    ↓Visualización    ↓Prueba automatizada
+Ejemplo de primer corte vertical:
+Ingresar una URL, ejecutar una exploración de una sola página, detectar un formulario, guardar sus campos y mostrarlos en pantalla con una captura de evidencia.
+Este enfoque permite probar tempranamente que la arquitectura es funcional.
+2.2 Modularidad progresiva
+La primera versión debe construirse como unmonolito modular con workers desacoplados, evitando microservicios prematuros.
+Separación lógica inicial:
+Portal web.
+API de gestión.
+Orquestador.
+Worker de crawling.
+Worker de navegador.
+Motor de clasificación.
+Repositorio de evidencias.
+Generador de reportes.
+Los módulos podrán separarse físicamente más adelante cuando existan razones operacionales reales.
+2.3 Contratos antes que implementación
+Antes de programar cada fase deberán definirse:
+Entidades.
+Estados.
+Eventos.
+APIs.
+Formatos de evidencia.
+Códigos de error.
+Criterios de aceptación.
+Casos de prueba.
+El vibe coding deberá implementar contratos previamente establecidos, no inventarlos durante cada tarea.
+3. Arquitectura de referencia inicial
+La arquitectura definitiva deberá documentarse mediante una decisión formal, pero como punto de partida se recomienda:
+Aplicación web
+React o Next.js.
+TypeScript.
+Diseño basado en componentes.
+Autenticación centralizada.
+Separación por organización y proyecto.
+Backend y orquestación
+Node.js con NestJS o framework equivalente.
+API REST documentada mediante OpenAPI.
+Procesamiento asíncrono mediante colas.
+Workers independientes para tareas de larga duración.
+Automatización web
+Playwright.
+Navegadores Chromium inicialmente.
+Firefox y WebKit en una fase posterior.
+Chrome DevTools Protocol para captura de red cuando sea necesario.
+Persistencia
+PostgreSQL para metadatos.
+Almacenamiento de objetos compatible con S3 para evidencias.
+Redis para colas, locks y estado temporal.
+Bóveda de secretos para credenciales y tokens.
+Observabilidad
+Logs estructurados.
+OpenTelemetry.
+Métricas de ejecución.
+Correlation ID.
+Auditoría de acciones humanas y automáticas.
+Análisis especializado
+TypeScript para reglas iniciales.
+Servicios Python opcionales para NLP, clasificación o análisis avanzado.
+Semgrep, Tree-sitter o herramientas equivalentes en fases de código fuente.
+La selección final deberá quedar formalizada enADR-001 — Arquitectura tecnológica base.
+4. Artefactos transversales obligatorios
+Antes de entrar en las fases funcionales, deberán mantenerse los siguientes artefactos:
+4.1 Registro de decisiones de arquitectura
+Directorio sugerido:
+/docs/adr/
+Ejemplos:
+ADR-001: stack tecnológico.
+ADR-002: estrategia multicliente.
+ADR-003: almacenamiento de evidencias.
+ADR-004: enmascaramiento de datos.
+ADR-005: motor de reglas.
+ADR-006: estrategia de workers.
+ADR-007: clasificación automática y revisión humana.
+4.2 Glosario del dominio
+Debe definir de forma única:
+Responsable.
+Titular.
+Dato personal.
+Categoría de dato.
+Captura.
+Transmisión.
+Evidencia.
+Observación.
+Hallazgo.
+Discrepancia.
+Consentimiento observado.
+Estado de consentimiento.
+Ejecución.
+Flujo.
+Tercero.
+Fuente.
+Destino.
+4.3 Modelo de estados
+Toda entidad con ciclo de vida deberá tener estados documentados.
+Ejemplo de ejecución:
+DRAFT→ VALIDATED→ QUEUED→ RUNNING→ PAUSED→ COMPLETED→ COMPLETED_WITH_WARNINGS→ FAILED→ CANCELLED
+4.4 Contratos API
+Toda funcionalidad deberá exponerse mediante contratos versionados.
+4.5 Corpus de pruebas
+Deberá existir un conjunto controlado de sitios sintéticos que reproduzcan:
+Formularios simples.
+Formularios dinámicos.
+Cookies.
+LocalStorage.
+Tracking previo.
+Tracking posterior.
+Rechazo efectivo.
+Rechazo inefectivo.
+Formularios con datos sensibles.
+APIs.
+Aplicaciones autenticadas.
+Cargas de archivos.
+Este corpus será crítico para evitar regresiones provocadas por cambios generados mediante IA.
+5. Roadmap detallado
+Etapa 0 — Constitución del producto
+Objetivo
+Definir qué es y qué no es la plataforma antes de escribir código productivo.
+Actividades
+Confirmar alcance funcional.
+Definir usuarios objetivo.
+Identificar modalidades de evaluación.
+Definir límites éticos y técnicos.
+Establecer niveles de evidencia.
+Formalizar que la plataforma no certificará automáticamente cumplimiento.
+Definir categorías iniciales de datos.
+Definir severidades.
+Crear glosario.
+Crear registro inicial de riesgos.
+Entregables
+Documento de visión.
+Alcance y exclusiones.
+Glosario.
+Mapa de actores.
+Casos de uso.
+Matriz de modalidades de evaluación.
+Política de uso autorizado.
+ADR iniciales.
+Criterio de salida
+No deberá iniciarse el desarrollo funcional mientras existan ambigüedades sobre:
+Qué acciones puede ejecutar el escáner.
+Qué evidencia conservará.
+Qué constituye un hallazgo.
+Qué representa una conclusión jurídica.
+Etapa 1 — Fundación del repositorio y gobierno técnico
+Objetivo
+Crear una estructura de desarrollo estable para personas y agentes de IA.
+Actividades
+Crear monorepo.
+Definir estructura de carpetas.
+Configurar linting y formateo.
+Configurar tipado estricto.
+Configurar pruebas unitarias.
+Configurar pruebas de integración.
+Configurar pipeline CI.
+Configurar análisis de dependencias.
+Configurar gestión de variables de entorno.
+Crear plantillas de pull request.
+Crear plantillas de ADR.
+Crear convenciones de commits.
+Configurar generación de OpenAPI.
+Definir estrategia de migraciones de base de datos.
+Estructura sugerida
+/apps  /web  /api  /worker-crawler  /worker-browser/packages  /domain  /contracts  /evidence  /classification  /security  /shared/database  /migrations  /seeds/docs  /adr  /architecture  /requirements  /testing/test-lab  /sites  /fixtures  /golden-results
+Entregables
+Repositorio inicial.
+Pipeline operativo.
+Aplicaciones mínimas ejecutables.
+Base de datos local.
+Documentación de instalación.
+Convenciones para vibe coding.
+Criterio de salida
+Un desarrollador nuevo o agente de código deberá poder:
+Clonar el repositorio.
+Levantar el sistema.
+Ejecutar pruebas.
+Crear una migración.
+Consultar la API documentada.
+Etapa 2 — Modelo de dominio y evidencia
+Objetivo
+Crear el lenguaje y las estructuras que utilizarán todas las fases posteriores.
+Entidades iniciales
+Organization.
+User.
+Project.
+Authorization.
+Target.
+ScanProfile.
+Execution.
+BrowserSession.
+Page.
+Form.
+FormField.
+DataObservation.
+DataCategory.
+NetworkRequest.
+StorageArtifact.
+ThirdParty.
+ConsentState.
+PolicyDocument.
+Evidence.
+Finding.
+ReviewDecision.
+Report.
+Actividades
+Diseñar diagrama entidad-relación.
+Definir identificadores.
+Definir relaciones.
+Definir estados.
+Crear migraciones.
+Crear repositorios.
+Crear servicios de dominio.
+Crear contratos API.
+Crear auditoría.
+Crear pruebas de integridad.
+Decisiones críticas
+Una observación no es un hallazgo.
+Una evidencia puede respaldar múltiples observaciones.
+Un hallazgo puede relacionar varias evidencias.
+La clasificación automática debe ser revisable.
+El valor capturado debe poder almacenarse enmascarado o no almacenarse.
+Toda evidencia debe pertenecer a una ejecución.
+Criterio de salida
+Debe ser posible crear manualmente mediante API:
+Un proyecto.
+Un objetivo.
+Una ejecución.
+Una página.
+Un campo detectado.
+Una evidencia.
+Un hallazgo.
+Una decisión humana.
+Etapa 3 — Módulo de autorización, alcance y salvaguardas
+Objetivo
+Impedir que el sistema ejecute acciones fuera de un alcance autorizado.
+Funcionalidades
+Registro de autorización.
+Dominios permitidos.
+Subdominios permitidos.
+Rutas excluidas.
+Operaciones permitidas.
+Fechas de vigencia.
+Límite de peticiones.
+Límite de concurrencia.
+Profundidad máxima.
+Tiempo máximo.
+Identificación del agente.
+Contacto de emergencia.
+Botón de detención.
+Lista de acciones prohibidas.
+Actividades
+Implementar validación de alcance.
+Implementar normalización de URLs.
+Bloquear redirecciones fuera del alcance.
+Implementar rate limiting.
+Implementar kill switch.
+Crear auditoría de solicitudes.
+Crear validaciones previas a una ejecución.
+Crear simulación de alcance sin ejecutar el scan.
+Criterio de salida
+El sistema deberá rechazar automáticamente:
+Dominios no autorizados.
+URLs fuera de vigencia.
+Rutas excluidas.
+Ejecuciones sin autorización.
+Redirecciones hacia dominios no permitidos.
+Esta etapa es prerrequisito para cualquier crawler o navegador automatizado.
+Etapa 4 — Laboratorio sintético y pruebas doradas
+Objetivo
+Disponer de sitios controlados que permitan probar cada comportamiento esperado.
+Sitios iniciales
+Sitio A — Formulario simple
+Nombre.
+Correo.
+Teléfono.
+Casilla de privacidad.
+Sitio B — Cookies y analítica
+Cookie necesaria.
+Cookie de analítica.
+Aceptar.
+Rechazar.
+Sitio C — Tracking defectuoso
+Ejecuta tracking antes de cualquier elección.
+Sitio D — Aplicación dinámica
+React.
+Formularios generados en tiempo de ejecución.
+API JSON.
+Sitio E — Datos sensibles
+Campo de salud.
+Carga de documento.
+Texto informativo específico.
+Sitio F — Extranet
+Inicio de sesión.
+Dos roles.
+Flujos diferenciados.
+Actividades
+Crear sitios sintéticos.
+Crear resultados esperados.
+Crear fixtures.
+Crear snapshots.
+Configurar ejecución en CI.
+Crear casos positivos y negativos.
+Criterio de salida
+Cada nueva capacidad del escáner deberá probarse contra un sitio controlado antes de probarse en sitios reales.
+Etapa 5 — Crawler externo pasivo
+Objetivo
+Descubrir la superficie pública sin enviar formularios ni realizar acciones transaccionales.
+Incremento 5.1 — Una página
+Ingresar URL.
+Obtener HTML.
+Guardar estado HTTP.
+Detectar título.
+Guardar evidencia.
+Mostrar resultado.
+Incremento 5.2 — Enlaces internos
+Extraer enlaces.
+Normalizar URLs.
+Evitar duplicados.
+Respetar profundidad.
+Respetar alcance.
+Incremento 5.3 — Recursos
+JavaScript.
+CSS.
+Manifest.
+Sitemap.
+Robots.
+Service workers.
+Incremento 5.4 — Formularios
+Campos visibles.
+Campos ocultos.
+Etiquetas.
+Métodos.
+Endpoints.
+Validaciones.
+Campos obligatorios.
+Incremento 5.5 — Documentos legales
+Política de privacidad.
+Política de cookies.
+Términos.
+Formularios de derechos.
+Entregables
+Inventario de páginas.
+Inventario de formularios.
+Inventario de recursos.
+Evidencias HTML.
+Resumen de cobertura.
+Criterio de salida
+La ejecución deberá poder recorrer un sitio sintético completo sin:
+Salir del dominio permitido.
+Enviar formularios.
+Duplicar páginas.
+Sobrepasar límites.
+Perder trazabilidad.
+Etapa 6 — Navegador automatizado y observación dinámica
+Objetivo
+Observar comportamientos que no son visibles mediante crawling HTTP tradicional.
+Incremento 6.1 — Renderizado
+Ejecutar JavaScript.
+Esperar carga.
+Capturar DOM.
+Capturar screenshot.
+Incremento 6.2 — Red
+Solicitudes.
+Respuestas.
+Encabezados.
+Query strings.
+Cuerpos permitidos.
+Dominios receptores.
+Correlación con página y acción.
+Incremento 6.3 — Storage
+Cookies.
+LocalStorage.
+SessionStorage.
+IndexedDB.
+Cache Storage.
+Incremento 6.4 — Eventos
+Clics.
+Cambios de página.
+Apertura de modales.
+Formularios dinámicos.
+Navegación SPA.
+Incremento 6.5 — Protocolos
+Fetch.
+XHR.
+Beacon.
+GraphQL.
+WebSocket básico.
+Criterio de salida
+Una ejecución deberá poder responder:
+Qué página fue visitada.
+Qué scripts se ejecutaron.
+Qué datos se almacenaron.
+Qué solicitudes se realizaron.
+Qué acción originó cada solicitud.
+Etapa 7 — Clasificación inicial de datos
+Objetivo
+Transformar campos y transmisiones técnicas en observaciones comprensibles.
+Secuencia recomendada
+7.1 Reglas determinísticas
+Diccionario de nombres.
+Atributos HTML.
+Tipos de input.
+Autocomplete.
+Expresiones regulares.
+Patrones de endpoints.
+7.2 Clasificación contextual
+Etiqueta.
+Placeholder.
+Texto circundante.
+Nombre del formulario.
+Página.
+Destino.
+7.3 Confianza
+Cada resultado deberá indicar:
+Categoría.
+Confianza.
+Evidencia.
+Regla aplicada.
+Versión del clasificador.
+7.4 Revisión humana
+Confirmar.
+Rechazar.
+Reclasificar.
+Comentar.
+Marcar falso positivo.
+Criterio de salida
+El sistema deberá clasificar correctamente, en el laboratorio:
+Nombre.
+Correo.
+Teléfono.
+RUT.
+Dirección.
+Fecha de nacimiento.
+Geolocalización.
+Datos de salud.
+Campos desconocidos.
+No deberán incorporarse modelos generativos antes de contar con una línea base determinística medible.
+Etapa 8 — Motor de escenarios de consentimiento
+Objetivo
+Comparar el comportamiento técnico del sitio bajo distintos estados de elección.
+Escenarios iniciales
+Sin interacción.
+Rechazar todo.
+Aceptar todo.
+Configuración personalizada.
+Revocar consentimiento.
+Segunda visita.
+Actividades
+Detectar banners.
+Identificar botones.
+Guardar texto visible.
+Ejecutar escenarios aislados.
+Comparar cookies.
+Comparar storage.
+Comparar tráfico.
+Comparar terceros.
+Comparar identificadores.
+Detectar persistencia de elecciones.
+Resultado esperado
+El motor deberá producir diferencias como:
+Google Analytics- Sin interacción: ejecutado- Rechazar: ejecutado- Aceptar: ejecutado
+o:
+Marketing Pixel- Sin interacción: no ejecutado- Rechazar: no ejecutado- Aceptar: ejecutado- Revocar: no ejecutado
+Criterio de salida
+El sistema deberá poder diferenciar:
+Consentimiento visible.
+Acción afirmativa.
+Casilla premarcada.
+Rechazo efectivo.
+Rechazo inefectivo.
+Revocación efectiva.
+Transmisión previa.
+Etapa 9 — Repositorio de evidencias y consola de revisión
+Objetivo
+Convertir observaciones automáticas en resultados auditables y revisables.
+Funcionalidades
+Visualizador de capturas.
+Visualizador de DOM.
+Visualizador de solicitudes.
+Valores enmascarados.
+Línea de tiempo.
+Filtros.
+Confirmación humana.
+Comentarios.
+Clasificación.
+Historial de cambios.
+Hash de evidencia.
+Exportación.
+Flujo
+Observación automática→ Pendiente de revisión→ Confirmada→ Rechazada→ Convertida en hallazgo→ Cerrada
+Criterio de salida
+Ningún hallazgo crítico deberá emitirse sin:
+Evidencia.
+Regla.
+Confianza.
+Posibilidad de revisión.
+Registro del analista que tomó la decisión.
+Etapa 10 — Reportes e inventarios
+Objetivo
+Transformar resultados técnicos en entregables útiles para privacidad, legal, seguridad y desarrollo.
+Reportes iniciales
+Resumen ejecutivo.
+Inventario de formularios.
+Inventario de datos.
+Inventario de cookies.
+Inventario de terceros.
+Matriz dato–captura–destino.
+Evidencia de consentimiento.
+Discrepancias.
+Limitaciones de cobertura.
+Exportaciones
+PDF.
+CSV.
+JSON.
+HAR sanitizado.
+Capturas.
+Evidencias comprimidas.
+Criterio de salida
+Toda afirmación incluida en un reporte deberá permitir navegar hasta su evidencia de origen.
+Etapa 11 — Evaluación autenticada
+Objetivo
+Extender la plataforma a extranets, intranets y portales privados.
+Capacidades
+Bóveda de credenciales.
+Usuarios de prueba.
+Sesiones autenticadas.
+Flujos predefinidos.
+Roles.
+MFA asistido.
+Captura de páginas privadas.
+Carga de archivos sintéticos.
+Baja de credenciales al finalizar.
+Secuencia
+Un rol.
+Un flujo autenticado.
+Múltiples flujos.
+Múltiples roles.
+Comparación entre roles.
+Reutilización controlada de sesiones.
+Criterio de salida
+La plataforma deberá poder ejecutar un recorrido autenticado sin:
+Exponer credenciales.
+Registrar contraseñas.
+Reutilizar sesiones entre clientes.
+Ejecutar acciones irreversibles.
+Acceder fuera del flujo autorizado.
+Etapa 12 — Análisis de código fuente frontend
+Objetivo
+Encontrar capturas potenciales que no fueron activadas durante una ejecución dinámica.
+Alcance inicial
+Formularios.
+Variables.
+Clientes HTTP.
+Cookies.
+Storage.
+Geolocalización.
+Cámara.
+Micrófono.
+Analytics.
+SDK externos.
+Textos de consentimiento.
+Feature flags.
+Logs de consola.
+Secuencia
+Ingesta de repositorio.
+Indexación.
+Detección de framework.
+Reglas simples.
+AST.
+Referencias cruzadas.
+Asociación archivo-línea.
+Vinculación con observaciones dinámicas.
+Criterio de salida
+Cada detección deberá indicar:
+Archivo.
+Línea.
+Regla.
+Fragmento mínimo.
+Categoría probable.
+Estado estático o dinámico.
+Etapa 13 — Análisis backend, APIs, bases y logs
+Objetivo
+Extender el descubrimiento desde la captura visible hasta el procesamiento y persistencia.
+Orden recomendado
+13.1 APIs
+OpenAPI.
+GraphQL.
+Rutas.
+DTO.
+Entradas.
+Salidas.
+13.2 Backend
+Controladores.
+Servicios.
+Integraciones.
+Colas.
+Webhooks.
+Correos.
+Exportaciones.
+13.3 Persistencia
+Entidades ORM.
+Tablas.
+Columnas.
+Archivos.
+Cachés.
+Históricos.
+13.4 Logs
+Logs de aplicación.
+Trazas.
+APM.
+Dead-letter queues.
+Cuerpos completos.
+Tokens.
+Datos personales.
+13.5 Infraestructura
+Regiones.
+Almacenamiento.
+Backups.
+SaaS.
+Réplicas.
+Configuraciones de retención.
+Criterio de salida
+El sistema deberá poder representar:
+Dato solicitado→ Endpoint→ Servicio→ Base de datos
+aunque parte del recorrido requiera confirmación humana.
+Etapa 14 — Correlación y linaje integral
+Objetivo
+Unificar evidencia externa, dinámica y de código.
+Grafo esperado
+Campo del formulario→ Variable frontend→ Solicitud HTTP→ DTO→ Controlador→ Servicio→ Tabla→ Integración externa
+Actividades
+Definir nodos.
+Definir aristas.
+Crear reglas de correlación.
+Correlacionar por nombre.
+Correlacionar por esquema.
+Correlacionar por endpoint.
+Correlacionar por valor sintético.
+Mostrar confianza.
+Permitir correcciones humanas.
+Criterio de salida
+El linaje no deberá ocultar incertidumbre.
+Cada vínculo será:
+Confirmado.
+Inferido con alta confianza.
+Inferido con baja confianza.
+Rechazado.
+Pendiente.
+Etapa 15 — Motor legal-técnico y discrepancias
+Objetivo
+Relacionar comportamiento observado con información declarada.
+Capacidades
+Extraer finalidades declaradas.
+Identificar categorías mencionadas.
+Identificar terceros.
+Identificar transferencias.
+Identificar plazos.
+Identificar derechos.
+Identificar decisiones automatizadas.
+Comparar política con comportamiento.
+Tipos de salida
+Dato observado y no declarado.
+Tercero observado y no declarado.
+Finalidad no encontrada.
+Captura anterior a información.
+Consentimiento premarcado.
+Tracking posterior al rechazo.
+Revocación no efectiva.
+Retención no informada.
+Base de licitud no identificada.
+Restricción
+El lenguaje del producto deberá decir:
+“No se observó”.
+“No se encontró”.
+“Existe una posible discrepancia”.
+“Requiere validación”.
+No deberá decir automáticamente:
+“Es ilegal”.
+“Cumple”.
+“No cumple”.
+“El consentimiento es inválido jurídicamente”.
+Etapa 16 — Monitoreo continuo y comparación de versiones
+Objetivo
+Detectar cambios después de la evaluación inicial.
+Capacidades
+Ejecuciones programadas.
+Comparación entre versiones.
+Nuevos campos.
+Nuevas cookies.
+Nuevos terceros.
+Nuevos endpoints.
+Cambio en políticas.
+Cambio de comportamiento.
+Alertas.
+Integración CI/CD.
+Comparación
+Versión anteriorvs.Versión actual
+El sistema deberá distinguir:
+Cambio técnico.
+Cambio documental.
+Cambio de clasificación.
+Cambio de regla del escáner.
+Cambio real del sitio.
+Criterio de salida
+Toda alerta deberá identificar la causa probable de la diferencia y evitar atribuir al sitio cambios producidos sólo por una nueva versión del clasificador.
+Etapa 17 — Hardening y productización
+Objetivo
+Preparar la plataforma para clientes reales.
+Áreas
+Seguridad
+MFA.
+RBAC.
+Segregación por tenant.
+Cifrado.
+Bóveda de secretos.
+Auditoría.
+Pruebas de penetración.
+Gestión de vulnerabilidades.
+Operación
+Backups.
+Restauración.
+Escalabilidad.
+Colas.
+Reintentos.
+Timeouts.
+Observabilidad.
+Runbooks.
+Privacidad
+Retención configurable.
+Eliminación por cliente.
+Enmascaramiento.
+Minimización.
+Exportación.
+Restricción de acceso.
+No entrenamiento con datos de clientes.
+Comercialización
+Planes.
+Límites de uso.
+Instancia dedicada.
+SaaS.
+On-premise.
+Cloud del cliente.
+Contratos y SLA.
+Criterio de salida
+La plataforma deberá completar una evaluación piloto de extremo a extremo con:
+Alcance autorizado.
+Ejecución controlada.
+Evidencia.
+Revisión.
+Reporte.
+Eliminación de credenciales.
+Cierre formal.
+6. Releases recomendadas
+Release 0 — Fundación
+Incluye etapas 0 a 4.
+Resultado:arquitectura, modelo, seguridad de alcance y laboratorio.
+Release 1 — Descubrimiento externo
+Incluye etapas 5 a 7.
+Resultado:inventario de páginas, formularios, campos, cookies y transmisiones básicas.
+Release 2 — Consentimiento y evidencia
+Incluye etapas 8 a 10.
+Resultado:comparación de estados, revisión humana y reportes.
+Release 3 — Aplicaciones privadas
+Incluye etapa 11.
+Resultado:evaluación autenticada de extranets e intranets.
+Release 4 — Acceso interno autorizado
+Incluye etapas 12 a 14.
+Resultado:análisis de código, backend, persistencia y linaje.
+Release 5 — Evaluación legal-técnica asistida
+Incluye etapa 15.
+Resultado:discrepancias entre comportamiento y documentación.
+Release 6 — Operación continua
+Incluye etapas 16 y 17.
+Resultado:monitoreo, CI/CD, seguridad, escalabilidad y producto comercial.
+7. Camino crítico
+La secuencia mínima obligatoria será:
+Etapa 0→ Etapa 1→ Etapa 2→ Etapa 3→ Etapa 4→ Etapa 5→ Etapa 6→ Etapa 7→ Etapa 8→ Etapa 9→ Etapa 10
+No deberá desarrollarse:
+Consentimiento antes del navegador automatizado.
+Linaje antes del modelo de evidencia.
+Análisis backend antes de estabilizar la taxonomía.
+Monitoreo continuo antes de contar con resultados reproducibles.
+IA generativa antes de disponer de reglas determinísticas y corpus de evaluación.
+Las etapas 12 y 13 podrán avanzar parcialmente en paralelo, una vez estabilizados el modelo de dominio y el repositorio de evidencia.
+8. Reglas para descomponer el roadmap en vibe coding
+Cada tarea entregada a un agente de código deberá contener:
+8.1 Objetivo único
+Ejemplo:
+Implementar la entidadFormFieldy sus migraciones.
+No:
+Implementar el módulo de formularios completo.
+8.2 Contexto explícito
+Fase.
+Módulo.
+Entidades relacionadas.
+Contratos existentes.
+ADR aplicables.
+8.3 Archivos permitidos
+Se deberá indicar qué carpetas puede modificar el agente.
+8.4 Archivos prohibidos
+Especialmente:
+Migraciones anteriores.
+Contratos publicados.
+Configuración de seguridad.
+Módulos fuera del alcance.
+8.5 Entradas y salidas
+Payload.
+Respuesta.
+Errores.
+Eventos.
+Estados.
+8.6 Criterios de aceptación verificables
+Ejemplo:
+Crea una migración.
+Agrega pruebas.
+No rompe contratos anteriores.
+El lint pasa.
+La API aparece en OpenAPI.
+8.7 Pruebas obligatorias
+Unitarias.
+Integración.
+Regresión.
+Sitio sintético cuando corresponda.
+8.8 Restricciones
+No crear dependencias nuevas sin autorización.
+No cambiar el modelo de dominio.
+No duplicar utilidades.
+No guardar secretos.
+No desactivar pruebas.
+No utilizaranysalvo excepción justificada.
+No modificar contratos sin ADR.
+9. Tamaño recomendado de las tareas
+Para vibe coding, cada tarea debería representar entre medio día y dos días de trabajo humano equivalente.
+Ejemplos adecuados:
+Crear normalizador de URLs.
+Detectar campos obligatorios.
+Persistir screenshot.
+Capturar LocalStorage.
+Enmascarar encabezado Authorization.
+Comparar cookies entre dos sesiones.
+Agregar revisión manual de una clasificación.
+Exportar inventario a CSV.
+Ejemplos demasiado grandes:
+Construir el crawler.
+Implementar consentimiento.
+Crear análisis de código.
+Implementar reportes.
+Hacer la plataforma segura.
+Las funcionalidades grandes deberán dividirse por comportamiento observable.
+10. Definition of Ready
+Una tarea estará lista para vibe coding sólo cuando tenga:
+Objetivo.
+Dependencias.
+Contrato.
+Modelo de datos.
+Casos de prueba.
+Criterios de aceptación.
+Archivos afectados.
+Restricciones.
+Ejemplo de entrada.
+Ejemplo de salida.
+11. Definition of Done
+Una tarea se considerará terminada cuando:
+El código compile.
+El lint pase.
+Las pruebas pasen.
+Existan pruebas nuevas.
+No existan secretos.
+Las migraciones sean reversibles.
+La documentación esté actualizada.
+OpenAPI esté actualizado.
+La funcionalidad esté observable.
+Los errores estén controlados.
+No se rompa el corpus dorado.
+El código haya sido revisado.
+El resultado corresponda exactamente al alcance de la tarea.
+12. Mecanismos para mantener coherencia
+12.1 Modelo de dominio único
+Las entidades centrales vivirán en un paquete compartido y no deberán duplicarse.
+12.2 API versionada
+Toda integración utilizará contratos definidos.
+12.3 Migraciones obligatorias
+No se permitirán cambios manuales de esquema.
+12.4 Eventos normalizados
+Ejemplos:
+execution.created
+execution.started
+page.discovered
+form.detected
+data.observed
+evidence.created
+finding.confirmed
+execution.completed
+12.5 Correlation ID
+Toda ejecución, sesión, solicitud y evidencia deberá estar correlacionada.
+12.6 Versionamiento de clasificadores
+Cada clasificación deberá registrar la versión de reglas o modelo.
+12.7 Pruebas doradas
+Los resultados esperados del laboratorio deberán almacenarse y compararse automáticamente.
+12.8 Feature flags
+Las capacidades experimentales deberán activarse por configuración.
+12.9 Revisión arquitectónica
+Todo cambio que afecte más de un módulo requerirá ADR o revisión explícita.
+12.10 Evitar correcciones locales
+Cuando una tarea revele una limitación del modelo común, deberá corregirse el modelo central y no introducir excepciones ocultas en un módulo.
+13. Riesgos principales del desarrollo con vibe coding
+Fragmentación del modelo
+Distintos agentes pueden crear estructuras equivalentes con nombres diferentes.
+Mitigación:contratos y paquete de dominio único.
+Sobreingeniería
+La IA puede incorporar patrones innecesarios.
+Mitigación:monolito modular y dependencias controladas.
+Funcionalidades sin pruebas
+La generación rápida puede producir componentes aparentemente terminados.
+Mitigación:ninguna tarea se cierra sin pruebas.
+Pérdida de seguridad
+Los agentes pueden registrar tokens, cuerpos completos o credenciales.
+Mitigación:librería central de redacción y pruebas de no exposición.
+Cambios incompatibles
+Una tarea puede modificar contratos utilizados por otras fases.
+Mitigación:API versionada, migraciones y pruebas de contrato.
+Falsos positivos crecientes
+La incorporación rápida de reglas puede reducir la precisión.
+Mitigación:corpus dorado, métricas y revisión humana.
+Dependencia excesiva de IA generativa
+La IA puede entregar conclusiones difíciles de reproducir.
+Mitigación:reglas determinísticas primero, IA como apoyo y evidencia explicable.
+14. Primer hito funcional recomendado
+El primer hito demostrable no debería ser un dashboard general.
+Debería ser este flujo completo:
+Crear proyecto.
+Registrar autorización.
+Ingresar una URL.
+Validar alcance.
+Visitar una página.
+Detectar un formulario.
+Detectar sus campos.
+Clasificar nombre y correo.
+Capturar screenshot.
+Guardar evidencia.
+Mostrar resultados.
+Exportar CSV.
+Ejecutar pruebas contra un sitio sintético.
+Este hito validará:
+Arquitectura.
+Modelo de dominio.
+Orquestación.
+Persistencia.
+Evidencia.
+Clasificación.
+Interfaz.
+Reportería.
+Seguridad de alcance.
+15. Segundo hito funcional recomendado
+El segundo hito deberá demostrar la capacidad diferenciadora:
+Abrir un sitio con banner.
+Ejecutar una sesión sin interacción.
+Ejecutar otra sesión rechazando.
+Ejecutar otra aceptando.
+Capturar cookies y tráfico.
+Comparar resultados.
+Mostrar diferencias.
+Generar un hallazgo revisable.
+Vincularlo con evidencia.
+Exportar un reporte.
+Este hito materializa la principal propuesta de valor del producto.
+16. Resultado esperado del roadmap
+Al completar las etapas, la plataforma deberá poder responder, con distintos niveles de evidencia:
+Qué datos solicita un sitio.
+Qué datos genera automáticamente.
+Qué datos guarda en el navegador.
+Qué datos transmite.
+A qué dominios los transmite.
+En qué estado de consentimiento ocurre.
+Qué información se muestra al usuario.
+Qué código participa en la captura.
+Dónde se procesa o almacena.
+Qué diferencias existen entre lo declarado y lo observado.
+Qué elementos requieren revisión humana.
+La secuencia propuesta permite que cada release sea utilizable por sí sola, pero que sus resultados sigan alimentando el mismo modelo de datos y evidencia, evitando reconstrucciones profundas en las fases posteriores.

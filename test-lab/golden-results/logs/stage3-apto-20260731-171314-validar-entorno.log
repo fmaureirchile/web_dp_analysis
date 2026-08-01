@@ -1,0 +1,6 @@
+﻿
+> web-analysis@0.1.0 env:validate
+> tsx tools/validate-env.ts
+
+[env:validate] OK
+

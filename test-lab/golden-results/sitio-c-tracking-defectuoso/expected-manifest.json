@@ -1,0 +1,38 @@
+{
+  "manifestVersion": "1.0.0",
+  "stage": "E4",
+  "meta": {
+    "siteId": "C",
+    "slug": "sitio-c-tracking-defectuoso",
+    "name": "Sitio C - tracking defectuoso",
+    "scenarioType": "consent-defective-tracking"
+  },
+  "description": "Escenario negativo controlado donde el tracking se ejecuta antes del consentimiento y persiste tras rechazo.",
+  "routes": {
+    "entry": "/sitio-c",
+    "health": "/sitio-c/health",
+    "events": "/sitio-c/tracking/events",
+    "boot": "/sitio-c/tracking/boot",
+    "reject": "/sitio-c/consent/reject",
+    "ping": "/sitio-c/tracking/ping"
+  },
+  "expectedSignals": [
+    "tracking_previo",
+    "tracking_post_rechazo"
+  ],
+  "assertions": {
+    "expectedEventSequence": [
+      "tracking_before_choice",
+      "consent_rejected",
+      "tracking_after_reject"
+    ],
+    "defectFlagsExpected": {
+      "trackingBeforeConsent": true,
+      "trackingAfterReject": true
+    }
+  },
+  "negativeExpectations": [
+    "rechazo_no_detiene_tracking",
+    "tracking_ocurre_sin_opt_in"
+  ]
+}

@@ -1,0 +1,15 @@
+﻿
+> web-analysis@0.1.0 db:migrate:deploy
+> prisma migrate deploy
+
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+System.Management.Automation.RemoteException
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "web_analysis", schema "public" at "localhost:5432"
+
+3 migrations found in prisma/migrations
+
+
+No pending migrations to apply.

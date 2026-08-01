@@ -1,0 +1,96 @@
+import { EvidenceLevel, ExecutionState, ReviewState } from "../../domain/src";
+
+export interface CreateOrganizationDto {
+  name: string;
+}
+
+export interface CreateProjectDto {
+  organizationId: string;
+  name: string;
+}
+
+export interface CreateAuthorizationDto {
+  projectId: string;
+  validFrom: string;
+  validTo: string;
+  allowedDomains?: string[];
+  allowSubdomains?: boolean;
+  excludedPaths?: string[];
+  permittedOperations?: string[];
+  prohibitedActions?: string[];
+  maxRequestsPerMinute?: number;
+  maxConcurrentExecutions?: number;
+  maxDepth?: number;
+  maxDurationSeconds?: number;
+  agentId?: string;
+  emergencyContact?: string;
+}
+
+export interface CreateTargetDto {
+  projectId: string;
+  authorizationId: string;
+  baseUrl: string;
+}
+
+export interface CreateExecutionDto {
+  projectId: string;
+  authorizationId: string;
+  targetId: string;
+  state?: ExecutionState;
+  operation?: string;
+  entryUrl?: string;
+  redirectUrl?: string;
+}
+
+export interface ToggleKillSwitchDto {
+  active: boolean;
+}
+
+export interface ScopeSimulationDto {
+  authorizationId: string;
+  url: string;
+  operation: string;
+  redirectUrl?: string;
+}
+
+export interface CreatePageDto {
+  executionId: string;
+  url: string;
+  title?: string;
+}
+
+export interface CreateFormFieldDto {
+  pageId: string;
+  formId?: string;
+  name: string;
+  type: string;
+  required: boolean;
+}
+
+export interface CreateObservationDto {
+  executionId: string;
+  pageId?: string;
+  formFieldId?: string;
+  description: string;
+  reviewState?: ReviewState;
+}
+
+export interface CreateEvidenceDto {
+  executionId: string;
+  level: EvidenceLevel;
+  kind: string;
+  location: string;
+}
+
+export interface CreateFindingDto {
+  projectId: string;
+  summary: string;
+  evidenceIds: string[];
+  reviewState?: ReviewState;
+}
+
+export interface CreateReviewDecisionDto {
+  findingId: string;
+  reviewState: ReviewState;
+  comment: string;
+}

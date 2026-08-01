@@ -1,0 +1,372 @@
+openapi: 3.0.3
+info:
+  title: Web Analysis API
+  description: Contrato inicial de API para gestion de plataforma de analisis web.
+  version: 0.1.0
+  license:
+    name: Proprietary
+    url: https://example.com/legal/license
+servers:
+  - url: https://api.web-analysis.local
+paths:
+  /health:
+    get:
+      summary: Health check del servicio API
+      operationId: getHealth
+      security: []
+      tags:
+        - system
+      responses:
+        '200':
+          description: Servicio disponible
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                  - service
+                  - version
+                  - startedAt
+                  - timestamp
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  service:
+                    type: string
+                    example: web-analysis-api
+                  version:
+                    type: string
+                    example: 0.1.0
+                  startedAt:
+                    type: string
+                    format: date-time
+                  timestamp:
+                    type: string
+                    format: date-time
+        '400':
+          description: Solicitud invalida
+  /api/v1/crawler/passive/single-page:
+    post:
+      summary: Ejecutar crawler pasivo de una sola pagina (E5.1)
+      operationId: runPassiveSinglePageCrawl
+      security: []
+      tags:
+        - crawler
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartPassiveSinglePageCrawlDto'
+      responses:
+        '200':
+          description: Resultado de ejecucion pasiva una pagina
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassiveSinglePageCrawlResultDto'
+        '400':
+          description: Request invalido o URL invalida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassiveSinglePageCrawlErrorDto'
+        '403':
+          description: URL fuera de alcance autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassiveSinglePageCrawlErrorDto'
+        '422':
+          description: Error controlado de ejecucion pasiva
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassiveSinglePageCrawlErrorDto'
+  /api/v1/crawler/passive/single-page/{executionId}/result:
+    get:
+      summary: Consultar resultado de crawler pasivo de una sola pagina (E5.1)
+      operationId: getPassiveSinglePageCrawlResult
+      security: []
+      tags:
+        - crawler
+      parameters:
+        - in: path
+          name: executionId
+          required: true
+          schema:
+            type: string
+          description: Identificador de ejecucion del crawler pasivo.
+      responses:
+        '200':
+          description: Resultado disponible para la ejecucion indicada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassiveSinglePageCrawlResultDto'
+        '400':
+          description: executionId no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassiveSinglePageCrawlErrorDto'
+        '422':
+          description: Resultado todavia no disponible para la ejecucion
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassiveSinglePageCrawlErrorDto'
+  /api/v1/crawler/passive/executions/operational:
+    get:
+      summary: Consultar ejecuciones operativas por estado y ventana temporal (E5.2)
+      operationId: listOperationalPassiveCrawlExecutions
+      security: []
+      tags:
+        - crawler
+      parameters:
+        - in: query
+          name: states
+          required: false
+          schema:
+            type: string
+          description: Lista de estados separados por coma. Valores permitidos COMPLETED, COMPLETED_WITH_WARNINGS, FAILED.
+          example: COMPLETED,FAILED
+        - in: query
+          name: from
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Inicio de ventana temporal (ISO 8601) sobre updatedAt.
+        - in: query
+          name: to
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Fin de ventana temporal (ISO 8601) sobre updatedAt.
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+          description: Maximo de ejecuciones a devolver.
+      responses:
+        '200':
+          description: Lista operativa de ejecuciones filtradas
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OperationalExecutionListDto'
+        '400':
+          description: Filtros invalidos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+components:
+  schemas:
+    StartPassiveSinglePageCrawlDto:
+      type: object
+      required:
+        - executionId
+        - entryUrl
+      properties:
+        executionId:
+          type: string
+          description: Identificador de ejecucion ya creada en el sistema.
+          example: 6aa5684f-6d3d-4f1f-9d47-5c6c8f8f2fd6
+        entryUrl:
+          type: string
+          format: uri
+          description: URL inicial autorizada para fetch pasivo.
+          example: https://lab.local/sitio-a
+        correlationId:
+          type: string
+          description: Correlation ID opcional para trazabilidad.
+          example: corr-20260731-001
+        timeoutMs:
+          type: integer
+          minimum: 100
+          maximum: 120000
+          description: Timeout de red en milisegundos.
+          example: 15000
+        maxResponseBytes:
+          type: integer
+          minimum: 1024
+          maximum: 5242880
+          description: Limite maximo de tamano de respuesta para HTML.
+          example: 1048576
+
+    PassiveSinglePageCrawlSuccessDto:
+      type: object
+      required:
+        - executionId
+        - entryUrl
+        - statusHttp
+        - evidenceId
+        - fetchedAt
+      properties:
+        executionId:
+          type: string
+        entryUrl:
+          type: string
+          format: uri
+        statusHttp:
+          type: integer
+          minimum: 100
+          maximum: 599
+          example: 200
+        title:
+          type: string
+          nullable: true
+          example: Sitio A - Formulario simple
+        evidenceId:
+          type: string
+          description: Identificador de evidencia HTML persistida.
+          example: 8eb4e5a6-bf7c-4c84-84cf-ef82a9d63c65
+        fetchedAt:
+          type: string
+          format: date-time
+        contentType:
+          type: string
+          nullable: true
+          example: text/html; charset=utf-8
+        contentLength:
+          type: integer
+          minimum: 0
+          nullable: true
+          example: 17234
+
+    PassiveSinglePageCrawlErrorDto:
+      type: object
+      required:
+        - executionId
+        - entryUrl
+        - errorCode
+        - message
+      properties:
+        executionId:
+          type: string
+        entryUrl:
+          type: string
+          format: uri
+        errorCode:
+          type: string
+          enum:
+            - authorization_scope_rejected
+            - invalid_entry_url
+            - http_timeout
+            - http_non_html_content
+            - http_fetch_failed
+            - response_size_limit_exceeded
+            - internal_error
+        message:
+          type: string
+          example: URL fuera del alcance autorizado para esta ejecucion.
+
+    PassiveSinglePageCrawlResultDto:
+      type: object
+      required:
+        - ok
+      properties:
+        ok:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/PassiveSinglePageCrawlSuccessDto'
+        error:
+          $ref: '#/components/schemas/PassiveSinglePageCrawlErrorDto'
+
+    OperationalExecutionItemDto:
+      type: object
+      required:
+        - executionId
+        - state
+        - updatedAt
+        - resultAvailable
+      properties:
+        executionId:
+          type: string
+        state:
+          type: string
+          enum:
+            - COMPLETED
+            - COMPLETED_WITH_WARNINGS
+            - FAILED
+        entryUrl:
+          type: string
+          format: uri
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+        resultAvailable:
+          type: boolean
+        statusHttp:
+          type: integer
+          minimum: 100
+          maximum: 599
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        evidenceId:
+          type: string
+          nullable: true
+        errorCode:
+          type: string
+          nullable: true
+          enum:
+            - authorization_scope_rejected
+            - invalid_entry_url
+            - http_timeout
+            - http_non_html_content
+            - http_fetch_failed
+            - response_size_limit_exceeded
+            - internal_error
+
+    OperationalExecutionListDto:
+      type: object
+      required:
+        - states
+        - limit
+        - items
+      properties:
+        states:
+          type: array
+          items:
+            type: string
+            enum:
+              - COMPLETED
+              - COMPLETED_WITH_WARNINGS
+              - FAILED
+        from:
+          type: string
+          format: date-time
+          nullable: true
+        to:
+          type: string
+          format: date-time
+          nullable: true
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OperationalExecutionItemDto'

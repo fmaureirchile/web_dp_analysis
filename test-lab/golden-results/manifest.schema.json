@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://web-analysis.local/test-lab/golden-results/manifest.schema.json",
+  "title": "Synthetic Site Expected Manifest",
+  "type": "object",
+  "required": [
+    "manifestVersion",
+    "stage",
+    "meta",
+    "description",
+    "routes",
+    "expectedSignals",
+    "assertions",
+    "negativeExpectations"
+  ],
+  "properties": {
+    "manifestVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "stage": {
+      "const": "E4"
+    },
+    "meta": {
+      "type": "object",
+      "required": ["siteId", "slug", "name", "scenarioType"],
+      "properties": {
+        "siteId": {
+          "type": "string",
+          "pattern": "^[A-F]$"
+        },
+        "slug": {
+          "type": "string",
+          "minLength": 3
+        },
+        "name": {
+          "type": "string",
+          "minLength": 3
+        },
+        "scenarioType": {
+          "type": "string",
+          "minLength": 3
+        }
+      },
+      "additionalProperties": true
+    },
+    "description": {
+      "type": "string",
+      "minLength": 10
+    },
+    "routes": {
+      "type": "object",
+      "required": ["entry", "health"],
+      "properties": {
+        "entry": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "health": {
+          "type": "string",
+          "pattern": "^/"
+        }
+      },
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^/"
+      }
+    },
+    "expectedSignals": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 3
+      },
+      "minItems": 1
+    },
+    "assertions": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": true
+    },
+    "negativeExpectations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 3
+      }
+    }
+  },
+  "additionalProperties": false
+}
