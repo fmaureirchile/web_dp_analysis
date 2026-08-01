@@ -4,7 +4,7 @@ import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { app } from "../../apps/api/src/server";
-import { resetStore } from "../../apps/api/src/stage2/in-memory-store";
+import { resetStore, store } from "../../apps/api/src/stage2/in-memory-store";
 import { buildLaboratoryServer } from "../../test-lab/sites/lab-server";
 
 let labServer: ReturnType<ReturnType<typeof buildLaboratoryServer>["listen"]> | undefined;
@@ -278,5 +278,95 @@ describe("Etapa 5.2 T03 consulta operativa", () => {
     expect(limited.body.data.states).toEqual(["FAILED"]);
     expect(limited.body.data.items).toHaveLength(1);
     expect(limited.body.data.items[0].executionId).toBe(failedExecution.body.data.id);
+  });
+
+  it("mantiene orden determinista cuando updatedAt empata", async () => {
+    const org = await request(app).post("/api/v1/organizations").send({ name: "Org T03-Tie" });
+    const project = await request(app).post("/api/v1/projects").send({ organizationId: org.body.data.id, name: "Project T03-Tie" });
+
+    const authorization = await request(app)
+      .post("/api/v1/authorizations")
+      .send({
+        projectId: project.body.data.id,
+        validFrom: isoNowPlus(-60),
+        validTo: isoNowPlus(60),
+        allowedDomains: ["127.0.0.1"],
+        allowSubdomains: false,
+        excludedPaths: ["/sitio-a/private"],
+        permittedOperations: ["SCAN_PASSIVE"]
+      });
+
+    const target = await request(app)
+      .post("/api/v1/targets")
+      .send({
+        projectId: project.body.data.id,
+        authorizationId: authorization.body.data.id,
+        baseUrl: `${labBaseUrl}/sitio-a`
+      });
+
+    const firstExecution = await request(app)
+      .post("/api/v1/executions")
+      .send({
+        projectId: project.body.data.id,
+        authorizationId: authorization.body.data.id,
+        targetId: target.body.data.id,
+        state: "VALIDATED",
+        operation: "SCAN_PASSIVE",
+        entryUrl: `${labBaseUrl}/sitio-a`
+      });
+
+    const secondExecution = await request(app)
+      .post("/api/v1/executions")
+      .send({
+        projectId: project.body.data.id,
+        authorizationId: authorization.body.data.id,
+        targetId: target.body.data.id,
+        state: "VALIDATED",
+        operation: "SCAN_PASSIVE",
+        entryUrl: `${labBaseUrl}/sitio-a`
+      });
+
+    const firstRun = await request(app)
+      .post("/api/v1/crawler/passive/single-page")
+      .send({
+        executionId: firstExecution.body.data.id,
+        entryUrl: `${labBaseUrl}/sitio-a/private/form`
+      });
+    const secondRun = await request(app)
+      .post("/api/v1/crawler/passive/single-page")
+      .send({
+        executionId: secondExecution.body.data.id,
+        entryUrl: `${labBaseUrl}/sitio-a/private/form`
+      });
+
+    expect(firstRun.status).toBe(403);
+    expect(secondRun.status).toBe(403);
+
+    const tieUpdatedAt = new Date().toISOString();
+    const firstRecord = store.executions.get(firstExecution.body.data.id);
+    const secondRecord = store.executions.get(secondExecution.body.data.id);
+
+    expect(firstRecord).toBeDefined();
+    expect(secondRecord).toBeDefined();
+
+    firstRecord!.updatedAt = tieUpdatedAt;
+    secondRecord!.updatedAt = tieUpdatedAt;
+
+    const operational = await request(app)
+      .get("/api/v1/crawler/passive/executions/operational")
+      .query({
+        projectId: project.body.data.id,
+        states: "FAILED",
+        from: new Date(Date.now() - 5 * 60_000).toISOString(),
+        to: new Date(Date.now() + 5 * 60_000).toISOString(),
+        limit: 2
+      });
+
+    expect(operational.status).toBe(200);
+    const items = operational.body.data.items as Array<{ executionId: string }>;
+    expect(items).toHaveLength(2);
+
+    const expectedOrder = [firstExecution.body.data.id, secondExecution.body.data.id].sort((a, b) => b.localeCompare(a));
+    expect(items.map((item) => item.executionId)).toEqual(expectedOrder);
   });
 });
