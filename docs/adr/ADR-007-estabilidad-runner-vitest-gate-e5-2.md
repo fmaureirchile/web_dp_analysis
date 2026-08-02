@@ -15,7 +15,7 @@ Durante la ejecucion del gate E5.2 se observo inestabilidad intermitente en el r
 ## Decision
 
 1. Forzar el pool de ejecucion de Vitest a forks para el comando baseline/gate E5.2.
-2. Mantener el control estricto de cobertura esperada en CI (9/9 archivos y 23/23 tests).
+2. Mantener el control estricto de cobertura esperada en CI (9/9 archivos y 25/25 tests).
 
 Implementacion de la decision:
 

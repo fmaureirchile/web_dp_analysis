@@ -28,7 +28,7 @@ El comando ejecuta 2 controles encadenados:
 
 1. Gate funcional Stage 5 (E5.2)
 - Comando interno: npm run lab:e5-2:gate
-- Cobertura esperada: 9 archivos y 23 tests en verde.
+- Cobertura esperada: 9 archivos y 25 tests en verde.
 - Proposito: asegurar que la base funcional Stage 5 no se degrada.
 
 2. Regresion de observabilidad E5.3
@@ -70,7 +70,7 @@ Evidencia recomendada para cierre E5.3:
 2. Referencia a commit/PR donde se ejecuto el gate.
 3. En CI, presencia de pasos Stage 5.3 gate coverage, Stage 5.3 gate E5-3 y Stage 5.3 gate result.
 4. Linea final esperada en CI:
-   E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3
+  E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=25/25; obs_regression_files=1/1; obs_regression_tests=3/3
 
 ## Criterio de aceptacion de E5-3-T04
 
