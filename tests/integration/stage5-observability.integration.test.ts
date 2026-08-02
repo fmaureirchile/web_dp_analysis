@@ -17,6 +17,35 @@ function isoNowPlus(minutes: number): string {
   return new Date(Date.now() + minutes * 60_000).toISOString();
 }
 
+function expectMinimalOperationalEventShape(
+  event: {
+    executionId: string;
+    correlationId: string;
+    event: string;
+    timestamp: string;
+    detail?: string;
+  },
+  expected: { executionId: string; correlationId: string }
+): void {
+  expect(Object.prototype.hasOwnProperty.call(event, "executionId")).toBe(true);
+  expect(Object.prototype.hasOwnProperty.call(event, "correlationId")).toBe(true);
+  expect(Object.prototype.hasOwnProperty.call(event, "event")).toBe(true);
+  expect(Object.prototype.hasOwnProperty.call(event, "timestamp")).toBe(true);
+
+  expect(event.executionId).toBe(expected.executionId);
+  expect(event.correlationId).toBe(expected.correlationId);
+
+  expect(event.event).toBeTypeOf("string");
+  expect(event.event.length).toBeGreaterThan(0);
+
+  expect(event.timestamp).toBeTypeOf("string");
+  expect(Number.isNaN(Date.parse(event.timestamp))).toBe(false);
+
+  if (event.detail !== undefined) {
+    expect(event.detail).toBeTypeOf("string");
+  }
+}
+
 beforeEach(async () => {
   resetStore();
 
@@ -102,6 +131,7 @@ describe("Etapa 5.2 T06 observabilidad minima", () => {
     const events = listCrawlerOperationalEventsByExecutionId(executionId);
 
     expect(events.length).toBeGreaterThanOrEqual(2);
+    events.forEach((event) => expectMinimalOperationalEventShape(event, { executionId, correlationId: correlation }));
     expect(events.map((event) => event.event)).toEqual(["crawl_started", "crawl_result_success"]);
     expect(events[0].detail).toBe(`${labBaseUrl}/sitio-a`);
     expect(events[1].detail).toBeTypeOf("string");
@@ -128,6 +158,7 @@ describe("Etapa 5.2 T06 observabilidad minima", () => {
     const events = listCrawlerOperationalEventsByExecutionId(executionId);
 
     expect(events.length).toBeGreaterThanOrEqual(2);
+    events.forEach((event) => expectMinimalOperationalEventShape(event, { executionId, correlationId: correlation }));
     expect(events.map((event) => event.event)).toEqual(["crawl_started", "crawl_result_error"]);
     expect(events[0].detail).toBe(`${labBaseUrl}/sitio-a/non-html`);
     expect(events[1].detail).toBe("http_non_html_content");
