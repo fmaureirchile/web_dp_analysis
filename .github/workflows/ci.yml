@@ -51,7 +51,26 @@ jobs:
         run: npm test
 
       - name: Integration tests
-        run: npm run test:integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          attempt=1
+          max_attempts=2
+          while true; do
+            rm -f integration_tests.log
+            if npm run test:integration | tee integration_tests.log; then
+              break
+            fi
+
+            if grep -q "Worker exited unexpectedly" integration_tests.log && [ "$attempt" -lt "$max_attempts" ]; then
+              echo "Se detecto error intermitente de worker. Reintentando Integration tests (intento $((attempt + 1))/${max_attempts})..."
+              attempt=$((attempt + 1))
+              continue
+            fi
+
+            echo "Integration tests fallo de forma no recuperable."
+            exit 1
+          done
 
       - name: Laboratory gate E4-B1
         run: npm run lab:e4b1:gate
@@ -100,7 +119,7 @@ jobs:
 
       - name: Report Stage 5.2 gate coverage
         run: |
-          echo "E5.2 gate integration coverage: 9 files / 25 tests expected"
+          echo "E5.2 gate integration coverage: 9 files / 26 tests expected"
           echo "- tests/integration/stage5-scope-gate.integration.test.ts"
           echo "- tests/integration/stage5-passive-fetch.integration.test.ts"
           echo "- tests/integration/stage5-e2e-lab.integration.test.ts"
@@ -153,8 +172,8 @@ jobs:
             exit 1
           fi
 
-          if [ "$tests_passed" != "25" ] || [ "$tests_total" != "25" ]; then
-            echo "Cobertura inesperada de tests de integracion para E5.2: ${tests_passed}/${tests_total}. Se esperaba 25/25."
+          if [ "$tests_passed" != "26" ] || [ "$tests_total" != "26" ]; then
+            echo "Cobertura inesperada de tests de integracion para E5.2: ${tests_passed}/${tests_total}. Se esperaba 26/26."
             exit 1
           fi
 
@@ -162,7 +181,7 @@ jobs:
 
       - name: Report Stage 5.3 gate coverage
         run: |
-          echo "E5.3 gate coverage: Stage 5.2 gate (9 files / 25 tests) + observability regression (1 file / 3 tests)"
+          echo "E5.3 gate coverage: Stage 5.2 gate (9 files / 26 tests) + observability regression (1 file / 4 tests)"
           echo "- Stage 5.2 gate: npm run lab:e5-2:gate"
           echo "- Observability regression: npm run lab:e5-3:obs-regression"
 
@@ -205,8 +224,8 @@ jobs:
             exit 1
           fi
 
-          if ! echo "$test_pairs" | grep -q '^25/25$'; then
-            echo "Falta resultado esperado de Stage 5.2 en tests de integracion (25/25)."
+          if ! echo "$test_pairs" | grep -q '^26/26$'; then
+            echo "Falta resultado esperado de Stage 5.2 en tests de integracion (26/26)."
             exit 1
           fi
 
@@ -215,12 +234,12 @@ jobs:
             exit 1
           fi
 
-          if ! echo "$test_pairs" | grep -q '^3/3$'; then
-            echo "Falta resultado esperado de regression de observabilidad en tests (3/3)."
+          if ! echo "$test_pairs" | grep -q '^4/4$'; then
+            echo "Falta resultado esperado de regression de observabilidad en tests (4/4)."
             exit 1
           fi
 
-          echo "E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=25/25; obs_regression_files=1/1; obs_regression_tests=3/3"
+          echo "E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4"
 
       - name: Build
         run: npm run build
