@@ -28,9 +28,9 @@ APTO PARA SIGUIENTE SUBCORTE DE ETAPA 5.
 3. Gate unico E5.3 en verde con npm run lab:e5-3:gate.
 4. Resultado de cobertura validado para cierre E5.3:
 - stage5_gate_files=9/9
-- stage5_gate_tests=23/23
+- stage5_gate_tests=26/26
 - obs_regression_files=1/1
-- obs_regression_tests=3/3
+- obs_regression_tests=4/4
 5. Guia operativa de cierre disponible en docs/etapa-5/guia-gate-cierre-e5-3.md.
 
 ## Criterio de salida E5.3
@@ -60,8 +60,8 @@ Se registra mantenimiento correctivo menor posterior al cierre formal, sin cambi
 
 Validaciones ejecutadas tras publicacion de cambios:
 
-1. corepack pnpm run lab:e5-2:gate -> 9/9 archivos y 23/23 tests en verde.
-2. corepack pnpm run lab:e5-3:obs-regression -> 1/1 archivo y 3/3 tests en verde.
+1. corepack pnpm run lab:e5-2:gate -> 9/9 archivos y 26/26 tests en verde.
+2. corepack pnpm run lab:e5-3:obs-regression -> 1/1 archivo y 4/4 tests en verde.
 3. corepack pnpm run lab:e5-3:gate -> verificacion compuesta en verde.
 
 Conclusion: se mantiene estado APTO para continuidad de Stage 5 con evidencia operativa actualizada.

@@ -50,7 +50,7 @@ Verificar coherencia entre backlog E5.2, implementacion tecnica, pruebas automat
 
 1. validate mantiene pasos generales y gates previos (E4-B1, E5.1).
 2. Se integra gate E5.2 con pasos dedicados: coverage, ejecucion y resumen final validado.
-3. El pipeline exige resultado esperado de cobertura E5.2: 9/9 archivos y 23/23 tests.
+3. El pipeline exige resultado esperado de cobertura E5.2: 9/9 archivos y 26/26 tests.
 
 ## Desalineaciones detectadas
 

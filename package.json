@@ -11,6 +11,7 @@
     "build": "tsc -p tsconfig.json",
     "env:validate": "tsx tools/validate-env.ts",
     "secret:check": "tsx tools/check-hardcoded-secrets.ts",
+    "docs:stage5:coherence": "tsx tools/validate-stage5-doc-coherence.ts",
     "api:start": "tsx apps/api/src/server.ts",
     "db:generate": "prisma generate",
     "db:migrate:dev": "prisma migrate dev",
@@ -26,7 +27,8 @@
     "lab:e5-2:baseline": "corepack pnpm run openapi:validate && corepack pnpm run typecheck && vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage5-scope-gate.integration.test.ts tests/integration/stage5-passive-fetch.integration.test.ts tests/integration/stage5-e2e-lab.integration.test.ts tests/integration/stage5-e2e-lab-extended.integration.test.ts tests/integration/stage5-evidence-recovery.integration.test.ts tests/integration/stage5-operational-query.integration.test.ts tests/integration/stage5-fetch-errors.integration.test.ts tests/integration/stage5-result-recovery.integration.test.ts tests/integration/stage5-observability.integration.test.ts",
     "lab:e5-2:gate": "corepack pnpm run lab:e5-2:baseline",
     "lab:e5-3:obs-regression": "vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage5-observability.integration.test.ts",
-    "lab:e5-3:gate": "corepack pnpm run lab:e5-2:gate && corepack pnpm run lab:e5-3:obs-regression"
+    "lab:e5-3:gate": "corepack pnpm run lab:e5-2:gate && corepack pnpm run lab:e5-3:obs-regression",
+    "lab:e5-4:gate": "corepack pnpm run lab:e5-3:gate && corepack pnpm run docs:stage5:coherence"
   },
   "prisma": {
     "seed": "tsx database/seeds/stage2.seed.ts"

@@ -101,4 +101,4 @@ Paquete documental de cierre generado y versionado:
 Evidencia administrativa asociada:
 
 1. Gate local ejecutado en verde: npm run lab:e5-3:gate.
-2. Resumen esperado para CI: E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3.
+2. Resumen esperado para CI: E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4.

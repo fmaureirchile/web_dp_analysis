@@ -41,9 +41,9 @@ Verificar coherencia entre backlog E5.3, implementacion tecnica, pruebas automat
 2. Se integra gate E5.3 con pasos dedicados de coverage, ejecucion y resumen.
 3. El resumen de CI exige cobertura esperada:
 - stage5_gate_files=9/9
-- stage5_gate_tests=23/23
+- stage5_gate_tests=26/26
 - obs_regression_files=1/1
-- obs_regression_tests=3/3
+- obs_regression_tests=4/4
 
 ## Desalineaciones detectadas
 

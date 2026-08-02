@@ -26,11 +26,11 @@ Aplicar la seccion de lectura rapida en docs/etapa-5/guia-gate-cierre-e5-2.md pa
 - Stage 5.2 gate E5-2
 - Report Stage 5.2 gate result
 3. Linea final del resumen CI con formato:
-E5.2 gate result: integration_files_passed=9/9; integration_tests_passed=23/23
+E5.2 gate result: integration_files_passed=9/9; integration_tests_passed=26/26
 
 ## Plantilla corta de comentario post-merge
 
 E5.2 post-merge validado: run CI en estado Success.
 Se ejecutaron pasos de coverage, gate y summary para E5.2 sin fallos.
-Resumen final: E5.2 gate result: integration_files_passed=9/9; integration_tests_passed=23/23.
+Resumen final: E5.2 gate result: integration_files_passed=9/9; integration_tests_passed=26/26.
 Evidencia y cierre documental en docs/etapa-5/nota-release-e5-2.md.

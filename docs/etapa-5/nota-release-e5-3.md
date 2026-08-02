@@ -24,9 +24,9 @@ Resultado observado:
 
 - OpenAPI: valido (dentro de gate funcional Stage 5).
 - Typecheck: sin errores (dentro de gate funcional Stage 5).
-- Gate funcional Stage 5: 9 archivos en verde y 23 tests en verde.
-- Observability regression: 1 archivo en verde y 3 tests en verde.
-- Resumen esperado E5.3: stage5_gate_files=9/9; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3.
+- Gate funcional Stage 5: 9 archivos en verde y 26 tests en verde.
+- Observability regression: 1 archivo en verde y 4 tests en verde.
+- Resumen esperado E5.3: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4.
 - Exit code: 0.
 
 ## Impacto operativo

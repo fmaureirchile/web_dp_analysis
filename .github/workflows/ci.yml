@@ -10,6 +10,20 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: web_analysis_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d web_analysis_ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
     env:
       NODE_ENV: test
       APP_PORT: 3000
@@ -34,6 +48,9 @@ jobs:
       - name: Generate Prisma client
         run: npm run db:generate
 
+      - name: Apply migrations (validate job)
+        run: npm run db:migrate:deploy
+
       - name: Validate OpenAPI contract
         run: npm run openapi:validate
 
@@ -42,6 +59,9 @@ jobs:
 
       - name: Check hardcoded secrets
         run: npm run secret:check
+
+      - name: Validate Stage 5 docs coherence
+        run: npm run docs:stage5:coherence
 
       - name: Lint
         run: npm run lint
@@ -226,6 +246,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          gate_start_epoch="$(date +%s)"
           attempt=1
           max_attempts=2
           while true; do
@@ -243,6 +264,11 @@ jobs:
             echo "Gate E5.3 fallo de forma no recuperable."
             exit 1
           done
+
+          gate_end_epoch="$(date +%s)"
+          gate_duration_seconds="$((gate_end_epoch - gate_start_epoch))"
+          echo "E5_3_GATE_DURATION_SECONDS=${gate_duration_seconds}" >> "$GITHUB_ENV"
+          echo "duration_seconds=${gate_duration_seconds}" > e5_3_gate_timing.log
 
       - name: Report Stage 5.3 gate result
         shell: bash
@@ -277,6 +303,83 @@ jobs:
           fi
 
           echo "E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4"
+          echo "E5.3 gate duration: ${E5_3_GATE_DURATION_SECONDS}s"
+
+      - name: Report Stage 5.3 gate timing trend
+        shell: bash
+        run: |
+          set -euo pipefail
+          duration_seconds="${E5_3_GATE_DURATION_SECONDS:-}"
+          warning_threshold_seconds=480
+
+          if [ -z "$duration_seconds" ]; then
+            echo "No se pudo leer E5_3_GATE_DURATION_SECONDS para reporte de tendencia."
+            exit 1
+          fi
+
+          if ! [[ "$duration_seconds" =~ ^[0-9]+$ ]]; then
+            echo "Valor invalido para E5_3_GATE_DURATION_SECONDS: ${duration_seconds}"
+            exit 1
+          fi
+
+          if [ "$duration_seconds" -gt "$warning_threshold_seconds" ]; then
+            echo "::warning::E5.3 gate timing trend: ${duration_seconds}s (umbral operativo ${warning_threshold_seconds}s). Revisar cambios recientes en suites, runner y fixtures."
+            echo "E5.3 gate timing trend: status=warning; duration_seconds=${duration_seconds}; threshold_seconds=${warning_threshold_seconds}"
+          else
+            echo "E5.3 gate timing trend: status=ok; duration_seconds=${duration_seconds}; threshold_seconds=${warning_threshold_seconds}"
+          fi
+
+      - name: Report Stage 5.4 gate coverage
+        run: |
+          echo "E5.4 gate coverage: Stage 5.3 gate + Stage 5 docs coherence"
+          echo "- Stage 5.3 gate: npm run lab:e5-3:gate"
+          echo "- Stage 5 docs coherence: npm run docs:stage5:coherence"
+
+      - name: Stage 5.4 gate E5-4
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run lab:e5-4:gate | tee e5_4_gate.log
+
+      - name: Report Stage 5.4 gate result
+        shell: bash
+        run: |
+          set -euo pipefail
+          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e5_4_gate.log)"
+          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e5_4_gate.log)"
+
+          if [ -z "$file_pairs" ] || [ -z "$test_pairs" ]; then
+            echo "No se pudieron extraer resultados de integracion del gate E5.4 desde e5_4_gate.log"
+            exit 1
+          fi
+
+          if ! echo "$file_pairs" | grep -q '^9/9$'; then
+            echo "Falta resultado esperado de Stage 5.2 en archivos de integracion (9/9)."
+            exit 1
+          fi
+
+          if ! echo "$test_pairs" | grep -q '^26/26$'; then
+            echo "Falta resultado esperado de Stage 5.2 en tests de integracion (26/26)."
+            exit 1
+          fi
+
+          if ! echo "$file_pairs" | grep -q '^1/1$'; then
+            echo "Falta resultado esperado de regression de observabilidad en archivos (1/1)."
+            exit 1
+          fi
+
+          if ! echo "$test_pairs" | grep -q '^4/4$'; then
+            echo "Falta resultado esperado de regression de observabilidad en tests (4/4)."
+            exit 1
+          fi
+
+          if ! grep -Fq "[docs:stage5:coherence] OK" e5_4_gate.log; then
+            echo "No se detecto confirmacion de coherencia documental Stage 5 en gate E5.4."
+            exit 1
+          fi
+
+          duration_seconds="${E5_3_GATE_DURATION_SECONDS:-na}"
+          echo "E5.4 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds=${duration_seconds}"
 
       - name: Build
         run: npm run build

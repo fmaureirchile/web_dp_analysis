@@ -9,7 +9,7 @@
 
 E5.3 post-merge validado en CI: run {{URL_RUN}} en estado Success.
 Steps confirmados: Report Stage 5.3 gate coverage, Stage 5.3 gate E5-3, Report Stage 5.3 gate result.
-Resumen final observado: E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3.
+Resumen final observado: E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4.
 Evidencia registrada y consistente con guia operativa + ADR-007 (decision --pool=forks y criterio de rollback).
 
 ## Verificacion rapida antes de publicar

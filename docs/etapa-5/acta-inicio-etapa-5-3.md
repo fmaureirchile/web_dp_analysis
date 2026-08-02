@@ -21,7 +21,7 @@ Consolidar la operacion de Stage 5 para continuidad: robustez de ejecucion, obse
 
 ## Restricciones obligatorias de E5.3
 
-1. No degradar cobertura funcional lograda en E5.2 (9 archivos, 23 tests).
+1. No degradar cobertura funcional lograda en E5.2 (9 archivos, 26 tests).
 2. Mantener cumplimiento de salvaguardas de alcance autorizado.
 3. Mantener comando unico de gate como punto oficial de validacion.
 
