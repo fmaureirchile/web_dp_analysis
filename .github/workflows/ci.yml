@@ -16,6 +16,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/web_analysis_ci?schema=public
       REDIS_URL: redis://localhost:6379
       VITEST_MAX_FORKS: 2
+      VITEST_UNIT_MAX_FORKS: 1
 
     steps:
       - name: Checkout
