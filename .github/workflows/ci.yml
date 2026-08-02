@@ -15,6 +15,7 @@ jobs:
       APP_PORT: 3000
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/web_analysis_ci?schema=public
       REDIS_URL: redis://localhost:6379
+      VITEST_MAX_FORKS: 2
 
     steps:
       - name: Checkout
@@ -71,6 +72,14 @@ jobs:
             echo "Integration tests fallo de forma no recuperable."
             exit 1
           done
+
+      - name: Upload integration tests log on failure
+        if: ${{ failure() && always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-tests-log
+          path: integration_tests.log
+          if-no-files-found: ignore
 
       - name: Laboratory gate E4-B1
         run: npm run lab:e4b1:gate

@@ -52,3 +52,4 @@ Revertir a configuracion sin --pool=forks solo si se cumplen todas las condicion
 1. Se endurece configuracion base de integracion en vitest.integration.config.ts con pool=forks y limites min/max de forks (1..4).
 2. Se mantiene ejecucion de gates E5.2/E5.3 en verde tras el ajuste.
 3. Se conserva criterio de rollback vigente de esta ADR para futuros cambios de runner.
+4. En CI se fija VITEST_MAX_FORKS=2 para reducir probabilidad de caidas de workers en el paso general de integration tests.
