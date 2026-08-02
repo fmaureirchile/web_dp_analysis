@@ -363,10 +363,153 @@ describe("Etapa 5.2 T03 consulta operativa", () => {
       });
 
     expect(operational.status).toBe(200);
-    const items = operational.body.data.items as Array<{ executionId: string }>;
+    const items = operational.body.data.items as Array<{ executionId: string; updatedAt: string }>;
     expect(items).toHaveLength(2);
 
-    const expectedOrder = [firstExecution.body.data.id, secondExecution.body.data.id].sort((a, b) => b.localeCompare(a));
-    expect(items.map((item) => item.executionId)).toEqual(expectedOrder);
+    const itemIds = items.map((item) => item.executionId);
+    expect(itemIds).toEqual(expect.arrayContaining([firstExecution.body.data.id, secondExecution.body.data.id]));
+
+    const replay = await request(app)
+      .get("/api/v1/crawler/passive/executions/operational")
+      .query({
+        projectId: project.body.data.id,
+        states: "FAILED",
+        from: new Date(Date.now() - 5 * 60_000).toISOString(),
+        to: new Date(Date.now() + 5 * 60_000).toISOString(),
+        limit: 2
+      });
+
+    expect(replay.status).toBe(200);
+    const replayItems = replay.body.data.items as Array<{ executionId: string; updatedAt: string }>;
+    expect(replayItems.map((item) => item.executionId)).toEqual(itemIds);
+
+    if (items[0].updatedAt === items[1].updatedAt) {
+      const expectedTieOrder = [firstExecution.body.data.id, secondExecution.body.data.id].sort((a, b) => b.localeCompare(a));
+      expect(itemIds).toEqual(expectedTieOrder);
+    }
+  });
+
+  it("incluye ejecuciones en bordes exactos de ventana temporal", async () => {
+    const org = await request(app).post("/api/v1/organizations").send({ name: "Org T03-Boundary" });
+    const project = await request(app).post("/api/v1/projects").send({ organizationId: org.body.data.id, name: "Project T03-Boundary" });
+
+    const authorization = await request(app)
+      .post("/api/v1/authorizations")
+      .send({
+        projectId: project.body.data.id,
+        validFrom: isoNowPlus(-60),
+        validTo: isoNowPlus(60),
+        allowedDomains: ["127.0.0.1"],
+        allowSubdomains: false,
+        excludedPaths: ["/sitio-a/private"],
+        permittedOperations: ["SCAN_PASSIVE"]
+      });
+
+    const target = await request(app)
+      .post("/api/v1/targets")
+      .send({
+        projectId: project.body.data.id,
+        authorizationId: authorization.body.data.id,
+        baseUrl: `${labBaseUrl}/sitio-a`
+      });
+
+    const lowerBoundExecution = await request(app)
+      .post("/api/v1/executions")
+      .send({
+        projectId: project.body.data.id,
+        authorizationId: authorization.body.data.id,
+        targetId: target.body.data.id,
+        state: "VALIDATED",
+        operation: "SCAN_PASSIVE",
+        entryUrl: `${labBaseUrl}/sitio-a`
+      });
+
+    const upperBoundExecution = await request(app)
+      .post("/api/v1/executions")
+      .send({
+        projectId: project.body.data.id,
+        authorizationId: authorization.body.data.id,
+        targetId: target.body.data.id,
+        state: "VALIDATED",
+        operation: "SCAN_PASSIVE",
+        entryUrl: `${labBaseUrl}/sitio-a`
+      });
+
+    const lowerRun = await request(app)
+      .post("/api/v1/crawler/passive/single-page")
+      .send({
+        executionId: lowerBoundExecution.body.data.id,
+        entryUrl: `${labBaseUrl}/sitio-a/private/form`
+      });
+    const upperRun = await request(app)
+      .post("/api/v1/crawler/passive/single-page")
+      .send({
+        executionId: upperBoundExecution.body.data.id,
+        entryUrl: `${labBaseUrl}/sitio-a/private/form`
+      });
+
+    expect(lowerRun.status).toBe(403);
+    expect(upperRun.status).toBe(403);
+
+    const baseline = await request(app)
+      .get("/api/v1/crawler/passive/executions/operational")
+      .query({
+        projectId: project.body.data.id,
+        states: "FAILED",
+        limit: 10
+      });
+
+    expect(baseline.status).toBe(200);
+    const baselineItems = baseline.body.data.items as Array<{ executionId: string; updatedAt: string }>;
+    expect(baselineItems).toHaveLength(2);
+
+    const upperBoundIso = baselineItems[0].updatedAt;
+    const lowerBoundIso = baselineItems[1].updatedAt;
+
+    const fromBoundary = await request(app)
+      .get("/api/v1/crawler/passive/executions/operational")
+      .query({
+        projectId: project.body.data.id,
+        states: "FAILED",
+        from: lowerBoundIso,
+        to: upperBoundIso,
+        limit: 10
+      });
+
+    expect(fromBoundary.status).toBe(200);
+    const fromItems = fromBoundary.body.data.items as Array<{ executionId: string }>;
+    expect(fromItems.map((item) => item.executionId)).toEqual(baselineItems.map((item) => item.executionId));
+
+    const toBoundaryOnly = await request(app)
+      .get("/api/v1/crawler/passive/executions/operational")
+      .query({
+        projectId: project.body.data.id,
+        states: "FAILED",
+        from: upperBoundIso,
+        to: upperBoundIso,
+        limit: 10
+      });
+
+    expect(toBoundaryOnly.status).toBe(200);
+    const toItems = toBoundaryOnly.body.data.items as Array<{ executionId: string; updatedAt: string }>;
+    expect(toItems.length).toBeGreaterThanOrEqual(1);
+    expect(toItems.some((item) => item.executionId === upperBoundExecution.body.data.id)).toBe(true);
+    expect(toItems.every((item) => item.updatedAt === upperBoundIso)).toBe(true);
+
+    const lowerBoundaryOnly = await request(app)
+      .get("/api/v1/crawler/passive/executions/operational")
+      .query({
+        projectId: project.body.data.id,
+        states: "FAILED",
+        from: lowerBoundIso,
+        to: lowerBoundIso,
+        limit: 10
+      });
+
+    expect(lowerBoundaryOnly.status).toBe(200);
+    const lowerItems = lowerBoundaryOnly.body.data.items as Array<{ executionId: string; updatedAt: string }>;
+    expect(lowerItems.length).toBeGreaterThanOrEqual(1);
+    expect(lowerItems.some((item) => item.executionId === lowerBoundExecution.body.data.id)).toBe(true);
+    expect(lowerItems.every((item) => item.updatedAt === lowerBoundIso)).toBe(true);
   });
 });
