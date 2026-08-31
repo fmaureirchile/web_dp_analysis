@@ -13,26 +13,6 @@ E5.2 se considera apta cuando:
 3. Existen pruebas E2E ampliadas (exito, fuera de alcance, timeout, non-html, size-limit).
 4. Existe gate unico E5.2 reproducible local y CI.
 
-## Inicio operativo recomendado E5.2
-
-1. Confirmar baseline de E5.1 en verde con npm run lab:e5-1:gate antes de abrir ramas E5.2.
-2. Ejecutar tareas en este orden: E5-2-T01 -> E5-2-T02 -> E5-2-T03 -> E5-2-T04 -> E5-2-T05 -> E5-2-T06 -> E5-2-T07.
-3. Exigir pruebas de integracion por tarea desde el primer commit para evitar deuda de validacion.
-
-## Gate minimo inicial propuesto para E5.2
-
-Objetivo: validar no regresion temprana mientras se construye el gate final E5-2-T07.
-
-Comando recomendado provisional:
-
-npm run lab:e5-2:baseline
-
-Cuando usarlo:
-
-1. Antes de mergear cualquier PR que toque API, worker-crawler, contratos o tests de Stage 5.
-2. Antes de promover cambios de persistencia u observabilidad a ramas compartidas.
-3. Como precondicion para declarar completa cada tarea E5-2-T01..T06.
-
 ## E5-2-T01 - Persistencia durable de resultado E5.1
 
 - Objetivo unico: mover resultado de crawl de memoria a almacenamiento persistente del proyecto.
@@ -41,10 +21,6 @@ Cuando usarlo:
 - Criterio de aceptacion: GET de resultado sobrevive reinicio de proceso.
 - Pruebas desde inicio:
   - Integracion: resultado disponible luego de reinicio simulado.
-
-Estado de arranque:
-
-- Prueba inicial implementada en tests/integration/stage5-result-recovery.integration.test.ts.
 
 ## E5-2-T02 - Persistencia durable de evidencia HTML minima
 
@@ -64,10 +40,6 @@ Estado de arranque:
 - Pruebas desde inicio:
   - Integracion: filtros devuelven subconjunto correcto.
 
-Estado de arranque:
-
-- Pruebas implementadas en tests/integration/stage5-operational-query.integration.test.ts (estado, ventana temporal, limite y validaciones de filtros).
-
 ## E5-2-T04 - Endurecimiento de errores controlados de fetch
 
 - Objetivo unico: estabilizar respuestas para timeout, non-html y size-limit con mensajes consistentes.
@@ -76,10 +48,6 @@ Estado de arranque:
 - Criterio de aceptacion: errores mapeados de forma deterministica.
 - Pruebas desde inicio:
   - Integracion: casos dedicados por tipo de error.
-
-Estado de arranque:
-
-- Cobertura integrada en tests/integration/stage5-fetch-errors.integration.test.ts para timeout, non-html, size-limit, fetch-failed e invalid-entry-url con verificacion de mensaje deterministico y resultado persistido.
 
 ## E5-2-T05 - E2E laboratorio ampliada
 
@@ -90,10 +58,6 @@ Estado de arranque:
 - Pruebas desde inicio:
   - stage5-e2e-lab-extended.integration.test.ts en verde.
 
-Estado de arranque:
-
-- Prueba implementada en tests/integration/stage5-e2e-lab-extended.integration.test.ts con matriz de escenarios: exito, fuera de alcance, timeout, non-html y size-limit.
-
 ## E5-2-T06 - Observabilidad minima de pipeline crawler
 
 - Objetivo unico: registrar trazas operativas minimas por executionId y correlationId.
@@ -102,11 +66,6 @@ Estado de arranque:
 - Criterio de aceptacion: logs estructurados permiten reconstruir ciclo de ejecucion.
 - Pruebas desde inicio:
   - Integracion: presencia de eventos de inicio, resultado y error.
-
-Estado de arranque:
-
-- Eventos estructurados en apps/api/src/stage2/in-memory-store.ts por executionId y correlationId.
-- Prueba implementada en tests/integration/stage5-observability.integration.test.ts para validar inicio+resultado exitoso e inicio+error.
 
 ## E5-2-T07 - Gate de cierre E5.2
 
@@ -117,9 +76,3 @@ Estado de arranque:
 - Pruebas desde inicio:
   - Ejecucion de gate completo en local.
   - Paso dedicado en workflow validate.
-
-Estado de arranque:
-
-- Comando unico definido: npm run lab:e5-2:gate.
-- CI actualizado con pasos de cobertura, ejecucion y resumen validado del gate E5.2.
-- Guia operativa disponible en docs/etapa-5/guia-gate-cierre-e5-2.md.

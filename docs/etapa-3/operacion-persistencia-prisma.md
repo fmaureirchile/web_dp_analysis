@@ -2,12 +2,6 @@
 
 Esta guia explica cuando activar la persistencia real de salvaguardas, que comando ejecutar y que salida esperar.
 
-## Guia complementaria de cierre APTO
-
-- Para una corrida reproducible de certificacion en menos de 10 minutos, usar: docs/etapa-3/guia-validacion-apto-etapa-3-prisma-local.md
-- Para validacion en pipeline compartido, usar: docs/etapa-3/guia-validacion-apto-etapa-3-prisma-ci.md
-- Para corrida one-shot con reporte automatico, usar: docs/etapa-3/manual-script-validacion-apto-etapa-3.md
-
 ## Cuando usar este modo
 
 - Usar cuando se requiere que autorizaciones, ejecuciones y auditoria de alcance sobrevivan reinicios.

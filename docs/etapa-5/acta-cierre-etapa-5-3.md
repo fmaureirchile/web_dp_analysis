@@ -1,4 +1,7 @@
-# Acta de cierre - Etapa 5.3
+﻿# Acta de cierre - Etapa 5.3
+
+**Estado documental:** historico de subcorte cerrado (E5.3). No normativo para ejecucion actual.
+**Fuente operativa vigente:** docs/etapa-5/guia-gate-cierre-e5-5.md y .github/workflows/ci.yml.
 
 Fecha: 2026-07-31
 
@@ -51,17 +54,3 @@ Se considera cumplido cuando:
 
 Se declara cierre formal de Etapa 5.3 y habilitacion para iniciar el siguiente subcorte de Etapa 5.
 
-## Actualizacion operativa post-cierre (2026-08-01)
-
-Se registra mantenimiento correctivo menor posterior al cierre formal, sin cambio de alcance funcional de E5.3.
-
-1. Commit ddc403c: aislamiento de consulta operativa por projectId para evitar interferencia entre pruebas paralelas.
-2. Commit d070266: ajuste de scripts de gate para compatibilidad corepack+pnpm en Windows y eliminacion de warnings de npm por config desconocida.
-
-Validaciones ejecutadas tras publicacion de cambios:
-
-1. corepack pnpm run lab:e5-2:gate -> 9/9 archivos y 26/26 tests en verde.
-2. corepack pnpm run lab:e5-3:obs-regression -> 1/1 archivo y 4/4 tests en verde.
-3. corepack pnpm run lab:e5-3:gate -> verificacion compuesta en verde.
-
-Conclusion: se mantiene estado APTO para continuidad de Stage 5 con evidencia operativa actualizada.

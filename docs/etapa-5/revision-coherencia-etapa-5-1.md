@@ -13,7 +13,6 @@ Verificar coherencia entre backlog E5.1, implementacion tecnica, pruebas automat
 3. Contrato API: docs/contracts/openapi.yaml.
 4. Workflow CI: .github/workflows/ci.yml.
 5. Pruebas de integracion Stage 5 bajo tests/integration.
-6. Nota de release corta E5.1: docs/etapa-5/nota-release-e5-1.md.
 
 ## Matriz de coherencia backlog -> implementacion
 
@@ -54,7 +53,6 @@ Verificar coherencia entre backlog E5.1, implementacion tecnica, pruebas automat
 
 1. validate incluye pasos generales (openapi/typecheck/tests) y gate de laboratorio E4.
 2. Se integra gate E5.1 en validate para garantizar no dependencia de ejecucion local.
-3. El pipeline registra una linea de resumen final con resultado real de archivos/tests del gate E5.1, en coherencia con la evidencia operativa de la nota de release.
 
 ## Desalineaciones detectadas
 

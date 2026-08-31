@@ -1,5 +1,8 @@
 # Acta de cierre - Etapa 5.4
 
+**Estado documental:** historico de subcorte cerrado (E5.4). No normativo para ejecucion actual.
+**Fuente operativa vigente:** docs/etapa-5/guia-gate-cierre-e5-5.md y .github/workflows/ci.yml.
+
 Fecha: 2026-08-02
 
 ## Estado
@@ -32,7 +35,7 @@ APTO PARA SIGUIENTE SUBCORTE DE ETAPA 5.
 - Report Stage 5.3 gate timing trend.
 - Umbral operativo documentado: 480 segundos.
 5. Resumen esperado de cierre en CI:
-E5.4 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds={valor}.
+E5.4 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds=15.
 
 ## Criterio de salida E5.4
 

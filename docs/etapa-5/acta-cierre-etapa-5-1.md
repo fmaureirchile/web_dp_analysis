@@ -34,13 +34,10 @@ APTO PARA SIGUIENTE SUBCORTE DE ETAPA 5.
 
 1. Contrato OpenAPI validado con npm run openapi:validate.
 2. Typecheck global en verde con npm run typecheck.
-3. Integracion Stage 5 en verde (cobertura ampliada):
+3. Integracion Stage 5 en verde:
 - tests/integration/stage5-scope-gate.integration.test.ts
 - tests/integration/stage5-passive-fetch.integration.test.ts
 - tests/integration/stage5-e2e-lab.integration.test.ts
-- tests/integration/stage5-evidence-recovery.integration.test.ts
-- tests/integration/stage5-operational-query.integration.test.ts
-- tests/integration/stage5-fetch-errors.integration.test.ts
 4. Gate unico E5.1 en verde con npm run lab:e5-1:gate.
 5. Guia operativa del gate disponible en docs/etapa-5/guia-gate-cierre-e5-1.md.
 

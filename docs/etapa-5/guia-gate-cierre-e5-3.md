@@ -1,4 +1,4 @@
-# Guia Operativa - Gate de cierre E5.3
+﻿# Guia Operativa - Gate de cierre E5.3
 
 ## Objetivo
 
@@ -70,7 +70,7 @@ Evidencia recomendada para cierre E5.3:
 2. Referencia a commit/PR donde se ejecuto el gate.
 3. En CI, presencia de pasos Stage 5.3 gate coverage, Stage 5.3 gate E5-3 y Stage 5.3 gate result.
 4. Linea final esperada en CI:
-  E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4
+   E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4
 
 ## Criterio de aceptacion de E5-3-T04
 
@@ -95,5 +95,4 @@ E5-3-T04 se considera cumplida cuando:
 3. Falla por estabilidad de runner
 - Verificar decision y criterio de rollback en docs/adr/ADR-007-estabilidad-runner-vitest-gate-e5-2.md.
 - Mantener configuracion --pool=forks mientras no se cumpla criterio de rollback.
-- En CI, los pasos Stage 5.2 gate E5-2 y Stage 5.3 gate E5-3 aplican un reintento automatico unico solo si aparece el error "Worker exited unexpectedly".
-- Si el segundo intento falla o el error no corresponde a worker intermitente, el pipeline falla de forma explicita.
+

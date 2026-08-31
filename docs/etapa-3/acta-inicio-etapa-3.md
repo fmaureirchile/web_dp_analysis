@@ -14,14 +14,8 @@ Precondicion: Etapa 2 cerrada con gate aprobado.
 
 ## Pendientes para completar Etapa 3
 
-1. Completar validacion en ambiente con USE_PRISMA_PERSISTENCE=true y migraciones aplicadas.
-
-## Actualizacion de avance
-
-Fecha: 2026-07-31
-
-1. Se implementa limitacion de concurrencia efectiva considerando solo estados QUEUED y RUNNING para el gate previo de ejecucion.
-2. Se agrega prueba de integracion que valida que DRAFT no consume cupo de concurrencia y que una ejecucion QUEUED adicional se bloquea con concurrency_limit_exceeded cuando se alcanza el limite.
+1. Implementar limitacion de concurrencia efectiva sobre estados RUNNING/QUEUED gestionados por orquestador.
+2. Completar validacion en ambiente con USE_PRISMA_PERSISTENCE=true y migraciones aplicadas.
 
 ## Nota de alcance
 

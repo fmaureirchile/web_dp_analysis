@@ -1,4 +1,4 @@
-# Comentario post-merge E5.3 - listo para pegar
+﻿# Comentario post-merge E5.3 - listo para pegar
 
 ## Uso
 
@@ -17,3 +17,4 @@ Evidencia registrada y consistente con guia operativa + ADR-007 (decision --pool
 1. Confirmar que el run tiene estado Success.
 2. Confirmar presencia de los 3 steps de E5.3.
 3. Confirmar que la linea de resumen coincide exactamente con los conteos esperados.
+

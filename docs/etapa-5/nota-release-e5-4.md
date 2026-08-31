@@ -1,5 +1,8 @@
 # Nota de release corta - E5.4
 
+**Estado documental:** historico de subcorte cerrado (E5.4). No normativo para ejecucion actual.
+**Fuente operativa vigente:** docs/etapa-5/guia-gate-cierre-e5-5.md y .github/workflows/ci.yml.
+
 Fecha: 2026-08-02
 
 ## Resumen
@@ -26,7 +29,7 @@ Resultado esperado:
 - Observability regression E5.3: 1 archivo y 4 tests en verde.
 - Coherencia documental Stage 5: [docs:stage5:coherence] OK.
 - Resumen final CI E5.4:
-  E5.4 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds={valor}.
+  E5.4 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds=15.
 
 ## Impacto operativo
 

@@ -36,9 +36,9 @@ El comando ejecuta 3 validaciones en secuencia:
 - Proposito: detecta errores de tipado en apps, packages y tests incluidos por tsconfig.
 - Resultado esperado: ejecucion sin errores.
 
-3. Integracion Stage 5 (alcance, fetch, resultados, recuperacion de evidencia, consulta operacional y errores controlados)
+3. Integracion Stage 5 (alcance, fetch, resultados, E2E laboratorio)
 - Comando interno:
-  npm run test:integration -- --run tests/integration/stage5-scope-gate.integration.test.ts tests/integration/stage5-passive-fetch.integration.test.ts tests/integration/stage5-e2e-lab.integration.test.ts tests/integration/stage5-evidence-recovery.integration.test.ts tests/integration/stage5-operational-query.integration.test.ts tests/integration/stage5-fetch-errors.integration.test.ts
+  npm run test:integration -- --run tests/integration/stage5-scope-gate.integration.test.ts tests/integration/stage5-passive-fetch.integration.test.ts tests/integration/stage5-e2e-lab.integration.test.ts
 - Proposito: valida el flujo funcional E5.1 completo y casos de error controlado.
 - Resultado esperado: tests Stage 5 en verde.
 
@@ -55,9 +55,6 @@ Entradas funcionales que usa el gate:
   - tests/integration/stage5-scope-gate.integration.test.ts
   - tests/integration/stage5-passive-fetch.integration.test.ts
   - tests/integration/stage5-e2e-lab.integration.test.ts
-  - tests/integration/stage5-evidence-recovery.integration.test.ts
-  - tests/integration/stage5-operational-query.integration.test.ts
-  - tests/integration/stage5-fetch-errors.integration.test.ts
 
 ## Salidas y evidencia operativa
 
@@ -95,23 +92,3 @@ E5-1-T09 se considera cumplida cuando:
 - Identificar archivo de prueba y asercion fallida.
 - Verificar estado de transiciones de ejecucion y resultado persistido por executionId.
 - Reintentar el gate completo despues de corregir.
-
-## Checklist corto post-merge (run CI)
-
-Usar este checklist cuando el PR ya fue mergeado y se valida el run remoto en GitHub Actions.
-
-1. Confirmar que el workflow CI termino en estado exitoso.
-2. Confirmar que el step Report Stage 5.1 gate coverage aparece y lista 6 archivos esperados.
-3. Confirmar que el step Stage 5.1 gate E5-1 finaliza en Success.
-4. Confirmar que el step Report Stage 5.1 gate result imprime una sola linea con formato:
-  E5.1 gate result: integration_files_passed=X/Y; integration_tests_passed=A/B
-5. Confirmar valor esperado para E5.1: integration_files_passed=6/6 e integration_tests_passed=11/11.
-
-## Plantilla corta de comentario de PR (4 lineas)
-
-Usar esta plantilla para dejar evidencia rapida en el PR despues del merge:
-
-CI post-merge en verde: workflow validate ejecutado con estado Success.
-Gate E5.1 ejecutado correctamente, incluyendo reporte de cobertura ampliada en logs.
-Resumen final del gate: E5.1 gate result: integration_files_passed=6/6; integration_tests_passed=11/11.
-Evidencia documental actualizada en docs/etapa-5/nota-release-e5-1.md.

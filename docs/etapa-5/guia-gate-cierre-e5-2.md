@@ -1,4 +1,4 @@
-# Guia Operativa - Gate de cierre E5.2
+﻿# Guia Operativa - Gate de cierre E5.2
 
 ## Objetivo
 
@@ -114,3 +114,4 @@ Usar este flujo para validar el run remoto en menos de 1 minuto:
   E5.2 gate result: integration_files_passed=X/Y; integration_tests_passed=A/B
 5. Validar valores esperados de cierre E5.2: integration_files_passed=9/9 e integration_tests_passed=26/26.
 6. Registrar evidencia minima en PR: URL del run, linea final del resumen y referencia a docs/etapa-5/guia-gate-cierre-e5-2.md.
+

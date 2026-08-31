@@ -1,4 +1,7 @@
-# Checklist final de entrega PR - E5.2
+﻿# Checklist final de entrega PR - E5.2
+
+**Estado documental:** historico de subcorte cerrado (E5.2). No normativo para ejecucion actual.
+**Fuente operativa vigente:** docs/etapa-5/guia-gate-cierre-e5-5.md y .github/workflows/ci.yml.
 
 ## Objetivo
 
@@ -47,3 +50,4 @@ CI post-merge en verde: workflow validate ejecutado con estado Success.
 Gate E5.2 ejecutado correctamente, incluyendo reporte de cobertura y resumen validado en logs.
 Resumen final del gate: E5.2 gate result: integration_files_passed=9/9; integration_tests_passed=26/26.
 Evidencia documental actualizada en docs/etapa-5/nota-release-e5-2.md.
+

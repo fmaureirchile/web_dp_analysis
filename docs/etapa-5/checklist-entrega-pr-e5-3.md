@@ -1,4 +1,7 @@
-# Checklist final de entrega PR - E5.3
+﻿# Checklist final de entrega PR - E5.3
+
+**Estado documental:** historico de subcorte cerrado (E5.3). No normativo para ejecucion actual.
+**Fuente operativa vigente:** docs/etapa-5/guia-gate-cierre-e5-5.md y .github/workflows/ci.yml.
 
 ## Objetivo
 
@@ -48,3 +51,4 @@ CI post-merge en verde: workflow validate ejecutado con estado Success.
 Gate E5.3 ejecutado correctamente con validacion funcional Stage 5 y regresion de observabilidad.
 Resumen final del gate: E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4.
 Evidencia documental actualizada en docs/etapa-5/nota-release-e5-3.md.
+

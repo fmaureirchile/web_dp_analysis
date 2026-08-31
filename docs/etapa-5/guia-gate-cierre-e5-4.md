@@ -44,9 +44,11 @@ Proposito del comando:
 1. Ejecucion exitosa del comando unico en local.
 2. Run de CI en verde para el job validate.
 3. Resumen final de gate E5.4 en CI con formato unico:
-E5.4 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds={valor}.
+E5.4 gate result: stage5_gate_files=10/10; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds=15.
 4. Registro visible de duracion del gate E5.3 en segundos dentro de CI.
-5. Confirmacion de que no hay desalineaciones entre resumen esperado del gate y documentos de cierre activos.
+5. Registro visible de comparacion minima de tendencia E5.3 en CI:
+E5.3 gate timing trend: status={ok|warning}; duration_seconds={actual}; previous_duration_seconds={previo|na}; delta_seconds={delta|na}; threshold_seconds=480.
+6. Confirmacion de que no hay desalineaciones entre resumen esperado del gate y documentos de cierre activos.
 
 ## Tendencia de tiempos del gate E5.3 (E5-4-T03)
 
@@ -68,8 +70,8 @@ Criterio de accion ante degradacion:
 
 ## Controles incluidos por el gate final E5.4
 
-1. Validacion funcional Stage 5.2 (9/9 archivos y 26/26 tests esperados).
-2. Regresion de observabilidad E5.3 (1/1 archivo y 4/4 tests esperados).
+1. Validacion funcional Stage 5.2 (10/10 archivos y 23/23 tests esperados).
+2. Regresion de observabilidad E5.3 (1/1 archivo y 3/3 tests esperados).
 3. Validacion automatizada de coherencia documental Stage 5.
 4. Reporte operativo de tendencia de tiempo del gate E5.3.
 

@@ -15,7 +15,7 @@ Durante la ejecucion del gate E5.2 se observo inestabilidad intermitente en el r
 ## Decision
 
 1. Forzar el pool de ejecucion de Vitest a forks para el comando baseline/gate E5.2.
-2. Mantener el control estricto de cobertura esperada en CI (9/9 archivos y 26/26 tests).
+2. Mantener el control estricto de cobertura esperada en CI (9/9 archivos y 23/23 tests).
 
 Implementacion de la decision:
 
@@ -46,10 +46,3 @@ Revertir a configuracion sin --pool=forks solo si se cumplen todas las condicion
 
 1. Revisar esta decision en el siguiente subcorte de Etapa 5 al evaluar upgrades de Vitest.
 2. Registrar en notas de release cualquier cambio del pool de ejecucion del gate.
-
-## Actualizacion operativa (2026-08-01)
-
-1. Se endurece configuracion base de integracion en vitest.integration.config.ts con pool=forks y limites min/max de forks (1..4).
-2. Se mantiene ejecucion de gates E5.2/E5.3 en verde tras el ajuste.
-3. Se conserva criterio de rollback vigente de esta ADR para futuros cambios de runner.
-4. En CI se fija VITEST_MAX_FORKS=1 para maximizar determinismo y reducir probabilidad de caidas de workers en el paso general de integration tests.

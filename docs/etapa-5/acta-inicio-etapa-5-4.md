@@ -1,5 +1,8 @@
 # Acta de inicio - Etapa 5.4
 
+**Estado documental:** historico de subcorte cerrado (E5.4). No normativo para ejecucion actual.
+**Fuente operativa vigente:** docs/etapa-5/guia-gate-cierre-e5-5.md y .github/workflows/ci.yml.
+
 Fecha: 2026-08-02
 Precondicion: Etapa 5.3 cerrada con estado APTO.
 

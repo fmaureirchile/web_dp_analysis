@@ -1,4 +1,7 @@
-# Nota de release corta - E5.3
+﻿# Nota de release corta - E5.3
+
+**Estado documental:** historico de subcorte cerrado (E5.3). No normativo para ejecucion actual.
+**Fuente operativa vigente:** docs/etapa-5/guia-gate-cierre-e5-5.md y .github/workflows/ci.yml.
 
 Fecha: 2026-07-31
 
@@ -34,3 +37,4 @@ Resultado observado:
 - Mayor robustez de cierre al separar validacion funcional y control de regresion de observabilidad.
 - Mayor trazabilidad post-merge por estandar unico de evidencia para Stage 5.
 - Mayor previsibilidad del runner con decision operativa documentada y criterio de rollback claro.
+

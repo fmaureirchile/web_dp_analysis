@@ -1,4 +1,7 @@
-# Acta de inicio - Etapa 5.3
+﻿# Acta de inicio - Etapa 5.3
+
+**Estado documental:** historico de subcorte cerrado (E5.3). No normativo para ejecucion actual.
+**Fuente operativa vigente:** docs/etapa-5/guia-gate-cierre-e5-5.md y .github/workflows/ci.yml.
 
 Fecha: 2026-07-31
 Precondicion: Etapa 5.2 cerrada con estado APTO.
@@ -36,3 +39,4 @@ Consolidar la operacion de Stage 5 para continuidad: robustez de ejecucion, obse
 1. Existe backlog E5.3 con tareas, aceptacion y pruebas desde inicio.
 2. Existe gate minimo inicial E5.3 documentado y operable.
 3. Existe plan de evidencia post-merge y control de estabilidad del runner.
+

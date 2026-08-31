@@ -1,5 +1,8 @@
 # Checklist final de entrega PR - E5.4
 
+**Estado documental:** historico de subcorte cerrado (E5.4). No normativo para ejecucion actual.
+**Fuente operativa vigente:** docs/etapa-5/guia-gate-cierre-e5-5.md y .github/workflows/ci.yml.
+
 ## Objetivo
 
 Asegurar que un PR de cierre E5.4 quede listo para revision y merge sin brechas tecnicas ni documentales.
@@ -31,7 +34,7 @@ Asegurar que un PR de cierre E5.4 quede listo para revision y merge sin brechas 
 
 1. Salida exitosa de npm run lab:e5-4:gate.
 2. Resultado de CI post-merge con linea unica de resumen:
-E5.4 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds={valor}.
+E5.4 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds=15.
 3. Resultado del step Report Stage 5.3 gate timing trend (status=ok o status=warning con analisis adjunto).
 
 ## Evidencia final post-merge (lectura rapida)
@@ -47,5 +50,5 @@ E5.4 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression
 
 CI post-merge en verde: workflow validate ejecutado con estado Success.
 Gate E5.4 ejecutado correctamente con validacion funcional Stage 5, regresion de observabilidad y coherencia documental.
-Resumen final del gate: E5.4 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds={valor}.
+Resumen final del gate: E5.4 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds=15.
 Tendencia de tiempo E5.3 reportada en CI con umbral operativo de 480 segundos.

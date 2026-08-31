@@ -1,10 +1,10 @@
 # Acta de cierre - Etapa 3
 
-Fecha: 2026-07-31
+Fecha: 2026-07-27
 
 ## Estado
 
-APTO PARA ETAPA 4.
+NO APTO PARA ETAPA 4 (bloqueo de infraestructura en entorno objetivo).
 
 ## Cumplimiento por tarea
 
@@ -13,30 +13,34 @@ APTO PARA ETAPA 4.
 3. E3-T03: completada.
 4. E3-T04: completada.
 5. E3-T05: completada.
-6. E3-T06: completada y validada en entorno local in-memory y en entorno Prisma con PostgreSQL.
+6. E3-T06: completada en entorno local in-memory; no validada en entorno Prisma por indisponibilidad de DB.
 
 ## Evidencias de ejecucion
 
-1. Servicio PostgreSQL local activo y alcanzable en localhost:5432.
-2. Conectividad Prisma verificada con DATABASE_URL=postgresql://postgres:pass@localhost:5432/web_analysis?schema=public.
-3. Migraciones Prisma aplicadas en verde con npm run db:migrate:deploy.
-4. Prisma Client regenerado con npm run db:generate.
-5. Validacion de entorno ejecutada en verde con npm run env:validate (variables exportadas en sesion).
-6. Tests de integracion ejecutados con USE_PRISMA_PERSISTENCE=true: 4 archivos, 8 pruebas, todas en verde.
+1. Validacion de variables de entorno: OK con npm run env:validate.
+2. Intento de aprovisionamiento local de PostgreSQL con winget: ABORTADO por instalador (installation abandoned), sin servicio disponible.
+3. Migracion en entorno objetivo: FALLA por P1001 (no se alcanza PostgreSQL en localhost:5432).
+4. API con persistencia Prisma habilitada: OK (USE_PRISMA_PERSISTENCE=true, API listening on port 3000).
+5. Tests de integracion con persistencia Prisma habilitada: FALLAN (5/7) por dependencia de DB no disponible.
 
 ## Hallazgo bloqueante
 
-Sin hallazgos bloqueantes abiertos.
+1. No hay conectividad a base de datos objetivo declarada en DATABASE_URL.
+- Detalle tecnico: prisma migrate deploy retorna P1001: Can't reach database server at localhost:5432, incluso tras reintento con postgres://postgres:pass@localhost:5432/web_analysis.
+- Impacto: no es posible certificar comportamiento de salvaguardas sobre persistencia real.
 
 ## Riesgos residuales
 
-1. Dependencia operativa de credenciales locales de PostgreSQL para reproducir la validacion.
-2. La ejecucion de scripts en PowerShell requiere exportar variables de entorno en sesion (los scripts no cargan .env automaticamente).
+1. Gate de autorizacion/alcance no certificable end-to-end sobre DB hasta resolver conectividad.
+2. El rate limiting y la concurrencia persistente no pueden validarse en ambiente objetivo sin migracion aplicada.
 
 ## Condiciones para reintento de cierre
 
-No aplica. Condiciones satisfechas al 2026-07-31.
+1. Levantar PostgreSQL accesible desde DATABASE_URL objetivo.
+2. Ejecutar npm run db:migrate:deploy en el mismo entorno.
+3. Ejecutar tests con USE_PRISMA_PERSISTENCE=true.
+4. Reemitir acta de cierre con estado APTO si pruebas y migraciones quedan en verde.
 
 ## Decision
 
-Se declara cierre formal APTO de Etapa 3 y habilitacion para continuar con Etapa 4.
+Se pospone el cierre formal APTO de Etapa 3 hasta resolver el bloqueo de infraestructura de base de datos.

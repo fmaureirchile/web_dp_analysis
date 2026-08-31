@@ -1,5 +1,8 @@
 # Nota de release corta - E5.2
 
+**Estado documental:** historico de subcorte cerrado (E5.2). No normativo para ejecucion actual.
+**Fuente operativa vigente:** docs/etapa-5/guia-gate-cierre-e5-5.md y .github/workflows/ci.yml.
+
 Fecha: 2026-07-31
 
 ## Resumen
