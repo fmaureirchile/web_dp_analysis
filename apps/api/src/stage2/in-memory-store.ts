@@ -474,7 +474,6 @@ export async function listOperationalExecutions(input: {
   states: ExecutionState[];
   from?: string;
   to?: string;
-  projectId?: string;
   limit: number;
 }): Promise<Array<{ executionId: string; state: ExecutionState; entryUrl?: string; updatedAt: string }>> {
   if (isPrismaPersistenceEnabled()) {
@@ -492,7 +491,6 @@ export async function listOperationalExecutions(input: {
 
   return Array.from(store.executions.values())
     .filter((execution) => input.states.includes(execution.state))
-    .filter((execution) => (input.projectId ? execution.projectId === input.projectId : true))
     .filter((execution) => {
       const updatedTs = Date.parse(execution.updatedAt);
       if (fromTs !== undefined && updatedTs < fromTs) return false;
@@ -501,11 +499,8 @@ export async function listOperationalExecutions(input: {
     })
     .sort((a, b) => {
       const byUpdatedAt = Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
-      if (byUpdatedAt !== 0) {
-        return byUpdatedAt;
-      }
-
-      return b.id.localeCompare(a.id);
+      if (byUpdatedAt !== 0) return byUpdatedAt;
+      return a.id.localeCompare(b.id);
     })
     .slice(0, input.limit)
     .map((execution) => ({

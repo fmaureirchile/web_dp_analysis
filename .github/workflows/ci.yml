@@ -176,11 +176,12 @@ jobs:
 
       - name: Report Stage 5.2 gate coverage
         run: |
-          echo "E5.2 gate integration coverage: 9 files / 26 tests expected"
+          echo "E5.2 gate integration coverage: 10 files / 23 tests expected"
           echo "- tests/integration/stage5-scope-gate.integration.test.ts"
           echo "- tests/integration/stage5-passive-fetch.integration.test.ts"
           echo "- tests/integration/stage5-e2e-lab.integration.test.ts"
           echo "- tests/integration/stage5-e2e-lab-extended.integration.test.ts"
+          echo "- tests/integration/stage5-e2e-lab-failure-matrix.integration.test.ts"
           echo "- tests/integration/stage5-evidence-recovery.integration.test.ts"
           echo "- tests/integration/stage5-operational-query.integration.test.ts"
           echo "- tests/integration/stage5-fetch-errors.integration.test.ts"
@@ -224,13 +225,13 @@ jobs:
             exit 1
           fi
 
-          if [ "$files_passed" != "9" ] || [ "$files_total" != "9" ]; then
-            echo "Cobertura inesperada de archivos de integracion para E5.2: ${files_passed}/${files_total}. Se esperaba 9/9."
+          if [ "$files_passed" != "10" ] || [ "$files_total" != "10" ]; then
+            echo "Cobertura inesperada de archivos de integracion para E5.2: ${files_passed}/${files_total}. Se esperaba 10/10."
             exit 1
           fi
 
-          if [ "$tests_passed" != "26" ] || [ "$tests_total" != "26" ]; then
-            echo "Cobertura inesperada de tests de integracion para E5.2: ${tests_passed}/${tests_total}. Se esperaba 26/26."
+          if [ "$tests_passed" != "23" ] || [ "$tests_total" != "23" ]; then
+            echo "Cobertura inesperada de tests de integracion para E5.2: ${tests_passed}/${tests_total}. Se esperaba 23/23."
             exit 1
           fi
 
@@ -238,7 +239,7 @@ jobs:
 
       - name: Report Stage 5.3 gate coverage
         run: |
-          echo "E5.3 gate coverage: Stage 5.2 gate (9 files / 26 tests) + observability regression (1 file / 4 tests)"
+          echo "E5.3 gate coverage: Stage 5.2 gate (10 files / 23 tests) + observability regression (1 file / 3 tests)"
           echo "- Stage 5.2 gate: npm run lab:e5-2:gate"
           echo "- Observability regression: npm run lab:e5-3:obs-regression"
 
@@ -282,13 +283,13 @@ jobs:
             exit 1
           fi
 
-          if ! echo "$file_pairs" | grep -q '^9/9$'; then
-            echo "Falta resultado esperado de Stage 5.2 en archivos de integracion (9/9)."
+          if ! echo "$file_pairs" | grep -q '^10/10$'; then
+            echo "Falta resultado esperado de Stage 5.2 en archivos de integracion (10/10)."
             exit 1
           fi
 
-          if ! echo "$test_pairs" | grep -q '^26/26$'; then
-            echo "Falta resultado esperado de Stage 5.2 en tests de integracion (26/26)."
+          if ! echo "$test_pairs" | grep -q '^23/23$'; then
+            echo "Falta resultado esperado de Stage 5.2 en tests de integracion (23/23)."
             exit 1
           fi
 
@@ -297,12 +298,12 @@ jobs:
             exit 1
           fi
 
-          if ! echo "$test_pairs" | grep -q '^4/4$'; then
-            echo "Falta resultado esperado de regression de observabilidad en tests (4/4)."
+          if ! echo "$test_pairs" | grep -q '^3/3$'; then
+            echo "Falta resultado esperado de regression de observabilidad en tests (3/3)."
             exit 1
           fi
 
-          echo "E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4"
+          echo "E5.3 gate result: stage5_gate_files=10/10; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3"
           echo "E5.3 gate duration: ${E5_3_GATE_DURATION_SECONDS}s"
 
       - name: Report Stage 5.3 gate timing trend
@@ -353,13 +354,13 @@ jobs:
             exit 1
           fi
 
-          if ! echo "$file_pairs" | grep -q '^9/9$'; then
-            echo "Falta resultado esperado de Stage 5.2 en archivos de integracion (9/9)."
+          if ! echo "$file_pairs" | grep -q '^10/10$'; then
+            echo "Falta resultado esperado de Stage 5.2 en archivos de integracion (10/10)."
             exit 1
           fi
 
-          if ! echo "$test_pairs" | grep -q '^26/26$'; then
-            echo "Falta resultado esperado de Stage 5.2 en tests de integracion (26/26)."
+          if ! echo "$test_pairs" | grep -q '^23/23$'; then
+            echo "Falta resultado esperado de Stage 5.2 en tests de integracion (23/23)."
             exit 1
           fi
 
@@ -368,8 +369,8 @@ jobs:
             exit 1
           fi
 
-          if ! echo "$test_pairs" | grep -q '^4/4$'; then
-            echo "Falta resultado esperado de regression de observabilidad en tests (4/4)."
+          if ! echo "$test_pairs" | grep -q '^3/3$'; then
+            echo "Falta resultado esperado de regression de observabilidad en tests (3/3)."
             exit 1
           fi
 
@@ -379,7 +380,7 @@ jobs:
           fi
 
           duration_seconds="${E5_3_GATE_DURATION_SECONDS:-na}"
-          echo "E5.4 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds=${duration_seconds}"
+          echo "E5.4 gate result: stage5_gate_files=10/10; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds=${duration_seconds}"
 
       - name: Build
         run: npm run build

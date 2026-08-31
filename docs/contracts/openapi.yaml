@@ -127,12 +127,6 @@ paths:
         - crawler
       parameters:
         - in: query
-          name: projectId
-          required: false
-          schema:
-            type: string
-          description: Filtra ejecuciones por proyecto para aislar consulta operativa en contextos multi-tenant o pruebas paralelas.
-        - in: query
           name: states
           required: false
           schema:
