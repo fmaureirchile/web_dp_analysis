@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
 import {
+  type DynamicObservationErrorDto,
+  type DynamicObservationResultDto,
+  type DynamicObservationSuccessDto,
   type PassiveSinglePageCrawlErrorDto,
   type PassiveSinglePageCrawlResultDto
 } from "../../../../packages/contracts/src";
@@ -68,6 +71,29 @@ type PassiveSinglePageCrawlResultRecord = {
   executionId: string;
   result: PassiveSinglePageCrawlResultDto;
   updatedAt: string;
+};
+
+type DynamicObservationResultRecord = {
+  executionId: string;
+  result: DynamicObservationResultDto;
+  updatedAt: string;
+};
+
+type BrowserDomSnapshotRecord = {
+  evidenceId: string;
+  executionId: string;
+  pageUrl: string;
+  capturedAt: string;
+  html: string;
+  title?: string;
+};
+
+type BrowserScreenshotRecord = {
+  evidenceId: string;
+  executionId: string;
+  pageUrl: string;
+  capturedAt: string;
+  dataUrl: string;
 };
 
 type ExecutionStateTransitionRecord = {
@@ -259,7 +285,10 @@ export const store = {
   passiveHtmlEvidences: new Map<string, PassiveHtmlEvidenceRecord>(),
   executionTransitions: [] as ExecutionStateTransitionRecord[],
   crawlerOperationalEvents: [] as CrawlerOperationalEventRecord[],
-  passiveSinglePageResults: new Map<string, PassiveSinglePageCrawlResultRecord>()
+  passiveSinglePageResults: new Map<string, PassiveSinglePageCrawlResultRecord>(),
+  dynamicObservationResults: new Map<string, DynamicObservationResultRecord>(),
+  browserDomSnapshots: new Map<string, BrowserDomSnapshotRecord>(),
+  browserScreenshots: new Map<string, BrowserScreenshotRecord>()
 };
 
 export function resetStore(): void {
@@ -279,6 +308,9 @@ export function resetStore(): void {
   store.executionTransitions = [];
   store.crawlerOperationalEvents = [];
   store.passiveSinglePageResults.clear();
+  store.dynamicObservationResults.clear();
+  store.browserDomSnapshots.clear();
+  store.browserScreenshots.clear();
 }
 
 export function appendCrawlerOperationalEvent(
@@ -435,6 +467,110 @@ export async function getPassiveSinglePageCrawlResult(executionId: string): Prom
   });
 
   return hydrated;
+}
+
+export async function createBrowserDomEvidence(
+  executionId: string,
+  input: {
+    pageUrl: string;
+    capturedAt: string;
+    html: string;
+    title?: string;
+  },
+  correlationId: string
+): Promise<Evidence> {
+  const evidence = createEvidence(executionId, EvidenceLevel.E2, "BROWSER_DOM_SNAPSHOT", "memory://browser-dom/pending", correlationId);
+  const location = `memory://browser-dom/${evidence.id}`;
+  const updatedEvidence: Evidence = {
+    ...evidence,
+    location,
+    updatedAt: nowIso(),
+    correlationId
+  };
+
+  store.evidences.set(updatedEvidence.id, updatedEvidence);
+  store.browserDomSnapshots.set(updatedEvidence.id, {
+    evidenceId: updatedEvidence.id,
+    executionId,
+    pageUrl: input.pageUrl,
+    capturedAt: input.capturedAt,
+    html: input.html,
+    title: input.title
+  });
+
+  await persistEvidence(updatedEvidence);
+  return updatedEvidence;
+}
+
+export async function createBrowserScreenshotEvidence(
+  executionId: string,
+  input: {
+    pageUrl: string;
+    capturedAt: string;
+    dataUrl: string;
+  },
+  correlationId: string
+): Promise<Evidence> {
+  const evidence = createEvidence(executionId, EvidenceLevel.E2, "BROWSER_SCREENSHOT", "memory://browser-screenshot/pending", correlationId);
+  const location = `memory://browser-screenshot/${evidence.id}`;
+  const updatedEvidence: Evidence = {
+    ...evidence,
+    location,
+    updatedAt: nowIso(),
+    correlationId
+  };
+
+  store.evidences.set(updatedEvidence.id, updatedEvidence);
+  store.browserScreenshots.set(updatedEvidence.id, {
+    evidenceId: updatedEvidence.id,
+    executionId,
+    pageUrl: input.pageUrl,
+    capturedAt: input.capturedAt,
+    dataUrl: input.dataUrl
+  });
+
+  await persistEvidence(updatedEvidence);
+  return updatedEvidence;
+}
+
+export function recordDynamicObservationSuccess(
+  executionId: string,
+  data: DynamicObservationSuccessDto
+): DynamicObservationResultDto {
+  const result: DynamicObservationResultDto = {
+    ok: true,
+    data
+  };
+
+  store.dynamicObservationResults.set(executionId, {
+    executionId,
+    result,
+    updatedAt: nowIso()
+  });
+
+  return result;
+}
+
+export function recordDynamicObservationError(
+  executionId: string,
+  error: DynamicObservationErrorDto
+): DynamicObservationResultDto {
+  const result: DynamicObservationResultDto = {
+    ok: false,
+    error
+  };
+
+  store.dynamicObservationResults.set(executionId, {
+    executionId,
+    result,
+    updatedAt: nowIso()
+  });
+
+  return result;
+}
+
+export function getDynamicObservationResult(executionId: string): DynamicObservationResultDto | undefined {
+  return store.dynamicObservationResults.get(executionId)?.result;
 }
 
 export async function getExecutionByIdWithFallback(executionId: string): Promise<Execution | undefined> {

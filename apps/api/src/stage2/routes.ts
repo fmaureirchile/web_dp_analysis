@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import {
+  type DynamicObservationErrorDto,
+  type DynamicObservationResultDto,
   type OperationalExecutionItemDto,
   type OperationalExecutionListDto,
   type OperationalExecutionStateFilter,
@@ -16,6 +18,7 @@ import {
   CreatePageDto,
   CreateProjectDto,
   CreateReviewDecisionDto,
+  StartDynamicObservationDto,
   StartPassiveSinglePageCrawlDto,
   CreateTargetDto,
   ScopeSimulationDto,
@@ -26,9 +29,12 @@ import {
   extractHtmlTitle,
   fetchPassiveSinglePageHtml
 } from "../../../worker-crawler/src";
+import { captureDynamicObservation } from "../../../worker-browser/src/dynamic-observation";
 import { ExecutionState, ReviewState } from "../../../../packages/domain/src";
 import {
   appendCrawlerOperationalEvent,
+  createBrowserDomEvidence,
+  createBrowserScreenshotEvidence,
   createAuthorization,
   createEvidence,
   createExecution,
@@ -41,9 +47,12 @@ import {
   createProject,
   createReviewDecision,
   createTarget,
+  getDynamicObservationResult,
   getExecutionByIdWithFallback,
   getPassiveSinglePageCrawlResult,
   listOperationalExecutions,
+  recordDynamicObservationError,
+  recordDynamicObservationSuccess,
   recordPassiveSinglePageCrawlError,
   recordPassiveSinglePageCrawlSuccess,
   simulateScope,
@@ -81,6 +90,32 @@ function crawlerError(
 
 function crawlerErrorStatus(errorCode: PassiveSinglePageCrawlErrorDto["errorCode"]): 400 | 403 | 422 {
   if (errorCode === "invalid_entry_url") {
+    return 400;
+  }
+
+  if (errorCode === "authorization_scope_rejected") {
+    return 403;
+  }
+
+  return 422;
+}
+
+function dynamicObservationError(
+  executionId: string,
+  entryUrl: string,
+  errorCode: DynamicObservationErrorDto["errorCode"],
+  message: string
+): DynamicObservationErrorDto {
+  return {
+    executionId,
+    entryUrl,
+    errorCode,
+    message
+  };
+}
+
+function dynamicObservationErrorStatus(errorCode: DynamicObservationErrorDto["errorCode"]): 400 | 403 | 422 {
+  if (errorCode === "invalid_execution_id" || errorCode === "invalid_entry_url") {
     return 400;
   }
 
@@ -525,6 +560,181 @@ export function createStage2Router(): Router {
     };
 
     return res.status(200).setHeader("x-correlation-id", cid).json({ data: response });
+  });
+
+  router.post("/browser/observations/start", async (req, res) => {
+    const cid = correlationId(req);
+    const body = req.body as StartDynamicObservationDto;
+
+    if (!body || typeof body.executionId !== "string" || typeof body.entryUrl !== "string") {
+      return res
+        .status(400)
+        .setHeader("x-correlation-id", cid)
+        .json(dynamicObservationError(
+          body?.executionId ?? "unknown_execution",
+          body?.entryUrl ?? "unknown_entry_url",
+          "internal_error",
+          "invalid_request_payload"
+        ));
+    }
+
+    const execution = await getExecutionByIdWithFallback(body.executionId);
+    if (!execution) {
+      return res
+        .status(400)
+        .setHeader("x-correlation-id", cid)
+        .json(dynamicObservationError(body.executionId, body.entryUrl, "invalid_execution_id", "execution_id_not_found"));
+    }
+
+    if (execution.state !== ExecutionState.VALIDATED) {
+      return res
+        .status(422)
+        .setHeader("x-correlation-id", cid)
+        .json(dynamicObservationError(
+          body.executionId,
+          body.entryUrl,
+          "internal_error",
+          `execution_invalid_state_for_dynamic_observation:${execution.state}`
+        ));
+    }
+
+    try {
+      await transitionExecutionState(body.executionId, ExecutionState.QUEUED, cid, "dynamic_observation_queued");
+      await transitionExecutionState(body.executionId, ExecutionState.RUNNING, cid, "dynamic_observation_started");
+
+      const gate = await evaluatePassiveSinglePageScope(
+        {
+          request: {
+            executionId: body.executionId,
+            entryUrl: body.entryUrl,
+            correlationId: body.correlationId,
+            timeoutMs: body.timeoutMs
+          },
+          authorizationId: execution.authorizationId,
+          operation: execution.operation,
+          correlationId: body.correlationId ?? cid
+        },
+        {
+          runScopeSimulation: async (input) =>
+            simulateScope(input.authorizationId, input.entryUrl, input.operation, undefined, input.correlationId)
+        }
+      );
+
+      if (!gate.allowed) {
+        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "authorization_scope_rejected");
+        const rejected = dynamicObservationError(
+          body.executionId,
+          body.entryUrl,
+          "authorization_scope_rejected",
+          gate.error.message
+        );
+        const result = recordDynamicObservationError(body.executionId, rejected);
+        return res.status(403).setHeader("x-correlation-id", cid).json(result.error);
+      }
+
+      const observed = await captureDynamicObservation({
+        executionId: body.executionId,
+        entryUrl: body.entryUrl,
+        timeoutMs: body.timeoutMs,
+        maxEvents: body.maxEvents
+      });
+
+      if (!observed.ok) {
+        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, observed.error.errorCode);
+        const result = recordDynamicObservationError(body.executionId, observed.error);
+        return res
+          .status(dynamicObservationErrorStatus(observed.error.errorCode))
+          .setHeader("x-correlation-id", cid)
+          .json(result.error);
+      }
+
+      const domEvidence = await createBrowserDomEvidence(
+        body.executionId,
+        {
+          pageUrl: observed.data.entryUrl,
+          capturedAt: observed.data.completedAt,
+          html: observed.data.domHtml,
+          title: observed.data.title
+        },
+        cid
+      );
+
+      const screenshotEvidence = await createBrowserScreenshotEvidence(
+        body.executionId,
+        {
+          pageUrl: observed.data.entryUrl,
+          capturedAt: observed.data.completedAt,
+          dataUrl: observed.data.screenshotDataUrl
+        },
+        cid
+      );
+
+      const success: NonNullable<DynamicObservationResultDto["data"]> = {
+        executionId: body.executionId,
+        entryUrl: observed.data.entryUrl,
+        completedAt: observed.data.completedAt,
+        pageSnapshots: [
+          {
+            pageUrl: observed.data.entryUrl,
+            title: observed.data.title,
+            capturedAt: observed.data.completedAt,
+            domEvidenceId: domEvidence.id,
+            screenshotEvidenceId: screenshotEvidence.id
+          }
+        ],
+        network: [],
+        storage: [],
+        events: [
+          {
+            eventType: "PAGE_LOAD",
+            pageUrl: observed.data.entryUrl,
+            timestamp: observed.data.completedAt
+          }
+        ]
+      };
+
+      const result = recordDynamicObservationSuccess(body.executionId, success);
+      await transitionExecutionState(body.executionId, ExecutionState.COMPLETED, cid, "dynamic_observation_completed");
+
+      return res.status(200).setHeader("x-correlation-id", cid).json(result);
+    } catch (error) {
+      const currentExecution = store.executions.get(body.executionId);
+      if (currentExecution?.state === ExecutionState.RUNNING || currentExecution?.state === ExecutionState.QUEUED) {
+        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "internal_error");
+      }
+
+      const internal = dynamicObservationError(body.executionId, body.entryUrl, "internal_error", (error as Error).message);
+      const result = recordDynamicObservationError(body.executionId, internal);
+      return res.status(422).setHeader("x-correlation-id", cid).json(result.error);
+    }
+  });
+
+  router.get("/browser/observations/:executionId/result", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const execution = await getExecutionByIdWithFallback(executionId);
+
+    if (!execution) {
+      return res
+        .status(400)
+        .setHeader("x-correlation-id", cid)
+        .json(dynamicObservationError(executionId, "unknown_entry_url", "invalid_execution_id", "execution_id_not_found"));
+    }
+
+    const result = getDynamicObservationResult(executionId);
+    if (!result) {
+      return res
+        .status(422)
+        .setHeader("x-correlation-id", cid)
+        .json(dynamicObservationError(
+          executionId,
+          execution.entryUrl ?? "unknown_entry_url",
+          "internal_error",
+          "dynamic_observation_result_not_available"
+        ));
+    }
+
+    return res.status(200).setHeader("x-correlation-id", cid).json(result);
   });
 
   router.post("/pages", (req, res) => {

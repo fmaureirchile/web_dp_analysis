@@ -88,7 +88,7 @@ Etapa 6 se considera apta cuando:
 ## Estado de cumplimiento parcial
 
 1. E6-T01: completada (contrato minimo definido en contracts y OpenAPI).
-2. E6-T02: pendiente.
+2. E6-T02: completada (captura minima DOM/screenshot + endpoint start/result con prueba de integracion).
 3. E6-T03: pendiente.
 4. E6-T04: pendiente.
 5. E6-T05: pendiente.
