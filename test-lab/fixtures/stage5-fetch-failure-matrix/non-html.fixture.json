@@ -1,0 +1,15 @@
+{
+  "scenarioId": "E5-5-T03-NONHTML-001",
+  "stage": "E5.5",
+  "site": "sitio-a-formulario-simple",
+  "request": {
+    "entryPath": "/sitio-a/non-html"
+  },
+  "expected": {
+    "status": 422,
+    "ok": false,
+    "errorCode": "http_non_html_content",
+    "messageContains": "http_non_html_content:content_type_not_allowed"
+  },
+  "manifestRef": "test-lab/golden-results/sitio-a-formulario-simple/expected-manifest.json"
+}

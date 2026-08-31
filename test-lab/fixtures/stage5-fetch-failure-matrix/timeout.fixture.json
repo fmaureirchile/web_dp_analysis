@@ -1,0 +1,16 @@
+{
+  "scenarioId": "E5-5-T03-TIMEOUT-001",
+  "stage": "E5.5",
+  "site": "sitio-a-formulario-simple",
+  "request": {
+    "entryPath": "/sitio-a/slow-html",
+    "timeoutMs": 25
+  },
+  "expected": {
+    "status": 422,
+    "ok": false,
+    "errorCode": "http_timeout",
+    "messageContains": "http_timeout:request_timed_out"
+  },
+  "manifestRef": "test-lab/golden-results/sitio-a-formulario-simple/expected-manifest.json"
+}

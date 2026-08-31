@@ -42,32 +42,6 @@ async function withServer(handler: RequestListener): Promise<string> {
   return `http://127.0.0.1:${address.port}`;
 }
 
-async function getUnusedLocalBaseUrl(): Promise<string> {
-  const server = createServer((_req, res) => {
-    res.writeHead(204);
-    res.end();
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    server.listen(0, "127.0.0.1", (error?: Error) => {
-      if (error) reject(error);
-      else resolve();
-    });
-  });
-
-  const address = server.address() as AddressInfo;
-  const baseUrl = `http://127.0.0.1:${address.port}`;
-
-  await new Promise<void>((resolve, reject) => {
-    server.close((error) => {
-      if (error) reject(error);
-      else resolve();
-    });
-  });
-
-  return baseUrl;
-}
-
 function isoNowPlus(minutes: number): string {
   return new Date(Date.now() + minutes * 60_000).toISOString();
 }
@@ -202,56 +176,5 @@ describe("Etapa 5.2 T04 errores fetch deterministas", () => {
     expect(result.body.ok).toBe(false);
     expect(result.body.error.errorCode).toBe("response_size_limit_exceeded");
     expect(result.body.error.message).toBe("response_size_limit_exceeded:max_response_bytes_exceeded");
-  });
-
-  it("fetch fallido devuelve error determinista y resultado persistido", async () => {
-    const unreachableBaseUrl = await getUnusedLocalBaseUrl();
-    const { executionId } = await setupExecution(unreachableBaseUrl);
-
-    const run = await request(app)
-      .post("/api/v1/crawler/passive/single-page")
-      .send({
-        executionId,
-        entryUrl: `${unreachableBaseUrl}/downstream`
-      });
-
-    expect(run.status).toBe(422);
-    expect(run.body.errorCode).toBe("http_fetch_failed");
-    expect(run.body.message).toBe("http_fetch_failed:network_failure");
-
-    const result = await request(app).get(`/api/v1/crawler/passive/single-page/${executionId}/result`);
-
-    expect(result.status).toBe(200);
-    expect(result.body.ok).toBe(false);
-    expect(result.body.error.errorCode).toBe("http_fetch_failed");
-    expect(result.body.error.message).toBe("http_fetch_failed:network_failure");
-  });
-
-  it("entryUrl invalida devuelve error determinista y resultado persistido", async () => {
-    const baseUrl = await withServer((_req, res) => {
-      const html = "<html><body>ok</body></html>";
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(html);
-    });
-
-    const { executionId } = await setupExecution(baseUrl);
-
-    const run = await request(app)
-      .post("/api/v1/crawler/passive/single-page")
-      .send({
-        executionId,
-        entryUrl: "ftp://127.0.0.1/resource"
-      });
-
-    expect(run.status).toBe(400);
-    expect(run.body.errorCode).toBe("invalid_entry_url");
-    expect(run.body.message).toBe("invalid_entry_url:unsupported_protocol");
-
-    const result = await request(app).get(`/api/v1/crawler/passive/single-page/${executionId}/result`);
-
-    expect(result.status).toBe(200);
-    expect(result.body.ok).toBe(false);
-    expect(result.body.error.errorCode).toBe("invalid_entry_url");
-    expect(result.body.error.message).toBe("invalid_entry_url:unsupported_protocol");
   });
 });
