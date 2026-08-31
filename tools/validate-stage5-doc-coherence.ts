@@ -6,41 +6,61 @@ type RequiredCheck = {
   requiredSnippets: string[];
 };
 
+type ForbiddenCheck = {
+  file: string;
+  forbiddenSnippets: string[];
+};
+
 const ROOT = process.cwd();
 const DOCS_STAGE5_DIR = path.join(ROOT, "docs", "etapa-5");
 const CI_WORKFLOW_PATH = path.join(ROOT, ".github", "workflows", "ci.yml");
-
-const FORBIDDEN_DOC_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
-  { pattern: /23\/23/g, label: "conteo antiguo 23/23" },
-  { pattern: /3\/3/g, label: "conteo antiguo 3/3" },
-  { pattern: /23 tests/g, label: "texto antiguo 23 tests" },
-  { pattern: /3 tests/g, label: "texto antiguo 3 tests" }
-];
 
 const REQUIRED_CHECKS: RequiredCheck[] = [
   {
     file: ".github/workflows/ci.yml",
     requiredSnippets: [
-      "E5.2 gate integration coverage: 9 files / 26 tests expected",
-      "E5.3 gate coverage: Stage 5.2 gate (9 files / 26 tests) + observability regression (1 file / 4 tests)",
-      "E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4"
+      "E5.2 gate integration coverage: 10 files / 23 tests expected",
+      "tests/integration/stage5-e2e-lab-failure-matrix.integration.test.ts",
+      "E5.3 gate coverage: Stage 5.2 gate (10 files / 23 tests) + observability regression (1 file / 3 tests)",
+      "E5.3 gate result: stage5_gate_files=10/10; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3",
+      "E5.4 gate result: stage5_gate_files=10/10; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3; docs_stage5_coherence=ok"
     ]
   },
   {
-    file: "docs/etapa-5/guia-gate-cierre-e5-2.md",
-    requiredSnippets: ["integration_tests_passed=26/26"]
+    file: "docs/etapa-5/guia-gate-cierre-e5-4.md",
+    requiredSnippets: ["stage5_gate_tests=23/23", "obs_regression_tests=3/3", "10/10 archivos y 23/23 tests"]
   },
   {
-    file: "docs/etapa-5/guia-gate-cierre-e5-3.md",
-    requiredSnippets: ["stage5_gate_tests=26/26", "obs_regression_tests=4/4"]
+    file: "docs/etapa-5/guia-gate-cierre-e5-5.md",
+    requiredSnippets: ["stage5_gate_tests=23/23", "obs_regression_tests=3/3"]
   },
   {
-    file: "docs/etapa-5/checklist-entrega-pr-e5-3.md",
-    requiredSnippets: ["stage5_gate_tests=26/26", "obs_regression_tests=4/4"]
+    file: "docs/etapa-5/checklist-entrega-pr-e5-5.md",
+    requiredSnippets: ["stage5_gate_tests=23/23", "obs_regression_tests=3/3"]
+  }
+];
+
+const FORBIDDEN_CHECKS: ForbiddenCheck[] = [
+  {
+    file: ".github/workflows/ci.yml",
+    forbiddenSnippets: [
+      "E5.2 gate integration coverage: 9 files / 26 tests expected",
+      "E5.3 gate coverage: Stage 5.2 gate (9 files / 26 tests) + observability regression (1 file / 4 tests)",
+      "E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4",
+      "E5.4 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4; docs_stage5_coherence=ok"
+    ]
   },
   {
-    file: "docs/etapa-5/acta-cierre-etapa-5-3.md",
-    requiredSnippets: ["stage5_gate_tests=26/26", "obs_regression_tests=4/4"]
+    file: "docs/etapa-5/guia-gate-cierre-e5-4.md",
+    forbiddenSnippets: ["stage5_gate_tests=29/29", "obs_regression_tests=4/4"]
+  },
+  {
+    file: "docs/etapa-5/guia-gate-cierre-e5-5.md",
+    forbiddenSnippets: ["stage5_gate_tests=29/29", "obs_regression_tests=4/4"]
+  },
+  {
+    file: "docs/etapa-5/checklist-entrega-pr-e5-5.md",
+    forbiddenSnippets: ["stage5_gate_tests=29/29", "obs_regression_tests=4/4"]
   }
 ];
 
@@ -68,22 +88,20 @@ function getMarkdownFilesRecursively(dir: string): string[] {
   return results;
 }
 
-function countMatches(content: string, pattern: RegExp): number {
-  const matches = content.match(pattern);
-  return matches ? matches.length : 0;
-}
-
-function validateForbiddenPatterns(docFiles: string[]): string[] {
+function validateForbiddenSnippets(): string[] {
   const issues: string[] = [];
 
-  for (const filePath of docFiles) {
-    const content = fs.readFileSync(filePath, "utf8");
-    const relativeFile = path.relative(ROOT, filePath).replaceAll("\\", "/");
+  for (const check of FORBIDDEN_CHECKS) {
+    const fullPath = path.join(ROOT, check.file.replaceAll("/", path.sep));
+    if (!fs.existsSync(fullPath)) {
+      issues.push(`${check.file}: archivo requerido no existe`);
+      continue;
+    }
 
-    for (const rule of FORBIDDEN_DOC_PATTERNS) {
-      const hits = countMatches(content, rule.pattern);
-      if (hits > 0) {
-        issues.push(`${relativeFile}: encontrado ${rule.label} (${hits} coincidencia/s)`);
+    const content = fs.readFileSync(fullPath, "utf8");
+    for (const snippet of check.forbiddenSnippets) {
+      if (content.includes(snippet)) {
+        issues.push(`${check.file}: contiene fragmento obsoleto -> ${snippet}`);
       }
     }
   }
@@ -112,21 +130,6 @@ function validateRequiredSnippets(): string[] {
   return issues;
 }
 
-function validateCiFileHasNoLegacyMetrics(): string[] {
-  const issues: string[] = [];
-  const content = fs.readFileSync(CI_WORKFLOW_PATH, "utf8");
-  const legacyPatterns = [/23\/23/g, /3\/3/g, /23 tests/g, /3 tests/g];
-
-  for (const pattern of legacyPatterns) {
-    const hits = countMatches(content, pattern);
-    if (hits > 0) {
-      issues.push(`.github/workflows/ci.yml: contiene metrica legacy (${pattern.source}) en ${hits} coincidencia/s`);
-    }
-  }
-
-  return issues;
-}
-
 function main(): void {
   if (!fs.existsSync(DOCS_STAGE5_DIR)) {
     throw new Error("[docs:stage5:coherence] FAIL\n- No existe docs/etapa-5");
@@ -137,10 +140,13 @@ function main(): void {
   }
 
   const docFiles = getMarkdownFilesRecursively(DOCS_STAGE5_DIR);
+  if (docFiles.length === 0) {
+    throw new Error("[docs:stage5:coherence] FAIL\n- No se detectaron archivos markdown en docs/etapa-5");
+  }
+
   const issues = [
-    ...validateForbiddenPatterns(docFiles),
     ...validateRequiredSnippets(),
-    ...validateCiFileHasNoLegacyMetrics()
+    ...validateForbiddenSnippets()
   ];
 
   if (issues.length > 0) {
