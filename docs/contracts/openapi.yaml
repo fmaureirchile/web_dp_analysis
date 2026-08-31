@@ -178,6 +178,79 @@ paths:
                   error:
                     type: string
 
+  /api/v1/browser/observations/start:
+    post:
+      summary: Iniciar observacion dinamica con navegador automatizado (E6.1)
+      operationId: startDynamicObservation
+      security: []
+      tags:
+        - browser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartDynamicObservationDto'
+      responses:
+        '200':
+          description: Resultado de observacion dinamica
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DynamicObservationResultDto'
+        '400':
+          description: Request invalido o executionId no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DynamicObservationErrorDto'
+        '403':
+          description: URL fuera de alcance autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DynamicObservationErrorDto'
+        '422':
+          description: Error controlado de ejecucion en navegador
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DynamicObservationErrorDto'
+
+  /api/v1/browser/observations/{executionId}/result:
+    get:
+      summary: Consultar resultado de observacion dinamica por executionId (E6.1)
+      operationId: getDynamicObservationResult
+      security: []
+      tags:
+        - browser
+      parameters:
+        - in: path
+          name: executionId
+          required: true
+          schema:
+            type: string
+          description: Identificador de ejecucion de observacion dinamica.
+      responses:
+        '200':
+          description: Resultado disponible para la ejecucion indicada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DynamicObservationResultDto'
+        '400':
+          description: executionId no encontrado o invalido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DynamicObservationErrorDto'
+        '422':
+          description: Resultado todavia no disponible para la ejecucion
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DynamicObservationErrorDto'
+
 components:
   schemas:
     StartPassiveSinglePageCrawlDto:
@@ -370,3 +443,226 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OperationalExecutionItemDto'
+
+    StartDynamicObservationDto:
+      type: object
+      required:
+        - executionId
+        - entryUrl
+      properties:
+        executionId:
+          type: string
+          description: Identificador de ejecucion ya creada para observacion dinamica.
+          example: 08b238b4-e96f-4a5a-a48b-8f9c0d4e9721
+        entryUrl:
+          type: string
+          format: uri
+          description: URL inicial autorizada para navegacion automatizada.
+          example: https://lab.local/sitio-b
+        correlationId:
+          type: string
+          description: Correlation ID opcional para trazabilidad.
+          example: corr-e6-0001
+        timeoutMs:
+          type: integer
+          minimum: 100
+          maximum: 180000
+          description: Timeout maximo de sesion de observacion en milisegundos.
+          example: 30000
+        maxEvents:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          description: Limite maximo de eventos a registrar por ejecucion.
+          example: 200
+
+    BrowserPageSnapshotDto:
+      type: object
+      required:
+        - pageUrl
+        - capturedAt
+        - domEvidenceId
+        - screenshotEvidenceId
+      properties:
+        pageUrl:
+          type: string
+          format: uri
+        title:
+          type: string
+          nullable: true
+        capturedAt:
+          type: string
+          format: date-time
+        domEvidenceId:
+          type: string
+        screenshotEvidenceId:
+          type: string
+
+    BrowserNetworkObservationItemDto:
+      type: object
+      required:
+        - requestId
+        - pageUrl
+        - protocol
+        - method
+        - url
+        - startedAt
+      properties:
+        requestId:
+          type: string
+        pageUrl:
+          type: string
+          format: uri
+        protocol:
+          type: string
+          enum:
+            - FETCH
+            - XHR
+            - BEACON
+        method:
+          type: string
+          example: GET
+        url:
+          type: string
+          format: uri
+        statusHttp:
+          type: integer
+          minimum: 100
+          maximum: 599
+          nullable: true
+        thirdPartyDomain:
+          type: string
+          nullable: true
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    BrowserStorageObservationItemDto:
+      type: object
+      required:
+        - pageUrl
+        - kind
+        - key
+        - valueMasked
+        - observedAt
+      properties:
+        pageUrl:
+          type: string
+          format: uri
+        kind:
+          type: string
+          enum:
+            - COOKIE
+            - LOCAL_STORAGE
+            - SESSION_STORAGE
+        key:
+          type: string
+        valueMasked:
+          type: boolean
+        valueEvidenceId:
+          type: string
+          nullable: true
+        observedAt:
+          type: string
+          format: date-time
+
+    BrowserInteractionEventDto:
+      type: object
+      required:
+        - eventType
+        - pageUrl
+        - timestamp
+      properties:
+        eventType:
+          type: string
+          enum:
+            - PAGE_LOAD
+            - CLICK
+            - SPA_NAVIGATION
+            - MODAL_OPEN
+            - FORM_INTERACTION
+        pageUrl:
+          type: string
+          format: uri
+        target:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+
+    DynamicObservationSuccessDto:
+      type: object
+      required:
+        - executionId
+        - entryUrl
+        - completedAt
+        - pageSnapshots
+        - network
+        - storage
+        - events
+      properties:
+        executionId:
+          type: string
+        entryUrl:
+          type: string
+          format: uri
+        completedAt:
+          type: string
+          format: date-time
+        pageSnapshots:
+          type: array
+          items:
+            $ref: '#/components/schemas/BrowserPageSnapshotDto'
+        network:
+          type: array
+          items:
+            $ref: '#/components/schemas/BrowserNetworkObservationItemDto'
+        storage:
+          type: array
+          items:
+            $ref: '#/components/schemas/BrowserStorageObservationItemDto'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/BrowserInteractionEventDto'
+
+    DynamicObservationErrorDto:
+      type: object
+      required:
+        - executionId
+        - entryUrl
+        - errorCode
+        - message
+      properties:
+        executionId:
+          type: string
+        entryUrl:
+          type: string
+          format: uri
+        errorCode:
+          type: string
+          enum:
+            - invalid_execution_id
+            - invalid_entry_url
+            - authorization_scope_rejected
+            - browser_timeout
+            - internal_error
+        message:
+          type: string
+
+    DynamicObservationResultDto:
+      type: object
+      required:
+        - ok
+      properties:
+        ok:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/DynamicObservationSuccessDto'
+        error:
+          $ref: '#/components/schemas/DynamicObservationErrorDto'

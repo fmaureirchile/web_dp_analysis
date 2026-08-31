@@ -85,6 +85,15 @@ Etapa 6 se considera apta cuando:
 2. Tokens aproximados: 1,30M a 1,75M.
 3. Colchon de riesgo recomendado: +15% (horas y tokens) para incidentes de infraestructura/browser.
 
+## Estado de cumplimiento parcial
+
+1. E6-T01: completada (contrato minimo definido en contracts y OpenAPI).
+2. E6-T02: pendiente.
+3. E6-T03: pendiente.
+4. E6-T04: pendiente.
+5. E6-T05: pendiente.
+6. E6-T06: pendiente.
+
 ## Riesgos principales y mitigacion
 
 1. Flakiness de navegador en CI.
