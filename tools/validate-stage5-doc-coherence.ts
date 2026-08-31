@@ -23,6 +23,10 @@ const REQUIRED_CHECKS: RequiredCheck[] = [
       "tests/integration/stage5-e2e-lab-failure-matrix.integration.test.ts",
       "E5.3 gate coverage: Stage 5.2 gate (10 files / 23 tests) + observability regression (1 file / 3 tests)",
       "E5.3 gate result: stage5_gate_files=10/10; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3",
+      "E5.3 gate timing trend: status=",
+      "previous_duration_seconds=",
+      "delta_seconds=",
+      "name: stage5-gate-timing-history",
       "E5.4 gate result: stage5_gate_files=10/10; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3; docs_stage5_coherence=ok"
     ]
   },
@@ -37,6 +41,18 @@ const REQUIRED_CHECKS: RequiredCheck[] = [
   {
     file: "docs/etapa-5/checklist-entrega-pr-e5-5.md",
     requiredSnippets: ["stage5_gate_tests=23/23", "obs_regression_tests=3/3"]
+  },
+  {
+    file: "docs/etapa-5/acta-cierre-etapa-5-5.md",
+    requiredSnippets: ["E5-5-T01: completada.", "E5-5-T04: completada."]
+  },
+  {
+    file: "docs/etapa-5/revision-coherencia-etapa-5-5.md",
+    requiredSnippets: ["No se detectan desalineaciones bloqueantes para cierre E5.5."]
+  },
+  {
+    file: "docs/etapa-5/nota-release-e5-5.md",
+    requiredSnippets: ["E5.5 consolida continuidad operativa de Stage 5"]
   }
 ];
 
@@ -61,6 +77,10 @@ const FORBIDDEN_CHECKS: ForbiddenCheck[] = [
   {
     file: "docs/etapa-5/checklist-entrega-pr-e5-5.md",
     forbiddenSnippets: ["stage5_gate_tests=29/29", "obs_regression_tests=4/4"]
+  },
+  {
+    file: "docs/etapa-5/guia-gate-cierre-e5-5.md",
+    forbiddenSnippets: ["last_stage5_3_gate_duration_seconds=15."]
   }
 ];
 

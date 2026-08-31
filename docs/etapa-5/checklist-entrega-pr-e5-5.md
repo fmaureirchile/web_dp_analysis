@@ -13,8 +13,8 @@ Asegurar que un PR de continuidad E5.5 quede listo para revision y merge sin bre
 ## Checklist tecnico minimo
 
 1. El comando npm run lab:e5-4:gate pasa en local.
-2. El gate funcional Stage 5 mantiene 10 archivos y 29 tests en verde.
-3. El control de observabilidad mantiene 1 archivo y 4 tests en verde.
+2. El gate funcional Stage 5 mantiene 10 archivos y 23 tests en verde.
+3. El control de observabilidad mantiene 1 archivo y 3 tests en verde.
 4. El validador documental npm run docs:stage5:coherence reporta estado OK.
 5. Toda tarea E5.5 agrega evidencia verificable de su objetivo (tiempos, umbral o E2E).
 
@@ -29,9 +29,9 @@ Asegurar que un PR de continuidad E5.5 quede listo para revision y merge sin bre
 
 1. Salida exitosa de npm run lab:e5-4:gate.
 2. Resultado de CI post-merge con linea unica de resumen:
-E5.4 gate result: stage5_gate_files=10/10; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds=15.
+E5.4 gate result: stage5_gate_files=10/10; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds={actual}; previous_stage5_3_gate_duration_seconds={previo|na}; stage5_3_gate_delta_seconds={delta|na}.
 3. Evidencia especifica de la tarea E5.5 implementada en el PR.
-4. Evidencia de timing history E5.3: salida de trend con previous_duration_seconds y artifact stage5-gate-timing-history.
+4. Evidencia de timing history E5.3: salida de trend con previous_duration_seconds, delta_seconds y artifact stage5-gate-timing-history.
 
 ## Evidencia final post-merge (lectura rapida)
 

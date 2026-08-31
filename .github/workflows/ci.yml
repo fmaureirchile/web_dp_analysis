@@ -243,6 +243,16 @@ jobs:
           echo "- Stage 5.2 gate: npm run lab:e5-2:gate"
           echo "- Observability regression: npm run lab:e5-3:obs-regression"
 
+      - name: Restore Stage 5 gate timing history
+        id: restore-stage5-timing-history
+        uses: actions/cache/restore@v4
+        with:
+          path: .ci/timing-history
+          key: stage5-gate-timing-history-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            stage5-gate-timing-history-${{ github.ref_name }}-
+            stage5-gate-timing-history-
+
       - name: Stage 5.3 gate E5-3
         shell: bash
         run: |
@@ -312,6 +322,9 @@ jobs:
           set -euo pipefail
           duration_seconds="${E5_3_GATE_DURATION_SECONDS:-}"
           warning_threshold_seconds=480
+          history_dir=".ci/timing-history"
+          history_file="${history_dir}/e5_3_gate_history.log"
+          trend_file="e5_3_gate_timing_history.log"
 
           if [ -z "$duration_seconds" ]; then
             echo "No se pudo leer E5_3_GATE_DURATION_SECONDS para reporte de tendencia."
@@ -323,12 +336,53 @@ jobs:
             exit 1
           fi
 
+          mkdir -p "$history_dir"
+          touch "$history_file"
+
+          previous_duration_seconds="$(awk -F',' 'NF >= 3 { last = $3 } END { if (last != "") print last; else print "na" }' "$history_file")"
+
+          if [[ "$previous_duration_seconds" =~ ^[0-9]+$ ]]; then
+            delta_seconds="$((duration_seconds - previous_duration_seconds))"
+          else
+            delta_seconds="na"
+          fi
+
+          printf "%s,%s,%s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${GITHUB_RUN_ID:-na}" "$duration_seconds" >> "$history_file"
+
+          {
+            echo "history_file=${history_file}"
+            echo "duration_seconds=${duration_seconds}"
+            echo "previous_duration_seconds=${previous_duration_seconds}"
+            echo "delta_seconds=${delta_seconds}"
+            echo "threshold_seconds=${warning_threshold_seconds}"
+          } > "$trend_file"
+
+          echo "E5_3_GATE_PREVIOUS_DURATION_SECONDS=${previous_duration_seconds}" >> "$GITHUB_ENV"
+          echo "E5_3_GATE_DELTA_SECONDS=${delta_seconds}" >> "$GITHUB_ENV"
+
           if [ "$duration_seconds" -gt "$warning_threshold_seconds" ]; then
             echo "::warning::E5.3 gate timing trend: ${duration_seconds}s (umbral operativo ${warning_threshold_seconds}s). Revisar cambios recientes en suites, runner y fixtures."
-            echo "E5.3 gate timing trend: status=warning; duration_seconds=${duration_seconds}; threshold_seconds=${warning_threshold_seconds}"
+            echo "E5.3 gate timing trend: status=warning; duration_seconds=${duration_seconds}; previous_duration_seconds=${previous_duration_seconds}; delta_seconds=${delta_seconds}; threshold_seconds=${warning_threshold_seconds}"
           else
-            echo "E5.3 gate timing trend: status=ok; duration_seconds=${duration_seconds}; threshold_seconds=${warning_threshold_seconds}"
+            echo "E5.3 gate timing trend: status=ok; duration_seconds=${duration_seconds}; previous_duration_seconds=${previous_duration_seconds}; delta_seconds=${delta_seconds}; threshold_seconds=${warning_threshold_seconds}"
           fi
+
+      - name: Save Stage 5 gate timing history cache
+        if: ${{ always() }}
+        uses: actions/cache/save@v4
+        with:
+          path: .ci/timing-history
+          key: stage5-gate-timing-history-${{ github.ref_name }}-${{ github.run_id }}
+
+      - name: Upload Stage 5 gate timing history artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage5-gate-timing-history
+          path: |
+            .ci/timing-history/e5_3_gate_history.log
+            e5_3_gate_timing_history.log
+          if-no-files-found: ignore
 
       - name: Report Stage 5.4 gate coverage
         run: |
@@ -380,7 +434,9 @@ jobs:
           fi
 
           duration_seconds="${E5_3_GATE_DURATION_SECONDS:-na}"
-          echo "E5.4 gate result: stage5_gate_files=10/10; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds=${duration_seconds}"
+          previous_duration_seconds="${E5_3_GATE_PREVIOUS_DURATION_SECONDS:-na}"
+          delta_seconds="${E5_3_GATE_DELTA_SECONDS:-na}"
+          echo "E5.4 gate result: stage5_gate_files=10/10; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds=${duration_seconds}; previous_stage5_3_gate_duration_seconds=${previous_duration_seconds}; stage5_3_gate_delta_seconds=${delta_seconds}"
 
       - name: Build
         run: npm run build
