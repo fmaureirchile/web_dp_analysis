@@ -109,6 +109,10 @@ export interface EvidenceQueryItemDto {
 export interface EvidenceQueryResultDto {
   executionId: string;
   kind?: string;
+  from?: string;
+  to?: string;
+  cursor?: string;
+  nextCursor?: string;
   limit: number;
   items: EvidenceQueryItemDto[];
 }

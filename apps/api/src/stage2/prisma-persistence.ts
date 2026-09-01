@@ -201,6 +201,9 @@ export async function getLatestEvidenceByExecutionIdAndKind(
 export async function listEvidencesByExecutionIdAndKind(input: {
   executionId: string;
   kind?: string;
+  from?: string;
+  to?: string;
+  cursor?: string;
   limit: number;
 }): Promise<
   Array<{
@@ -216,16 +219,35 @@ export async function listEvidencesByExecutionIdAndKind(input: {
 > {
   if (!isEnabled()) return [];
 
+  const where: {
+    executionId: string;
+    kind?: string;
+    updatedAt?: { gte?: string; lte?: string };
+  } = {
+    executionId: input.executionId,
+    kind: input.kind
+  };
+
+  if (input.from || input.to) {
+    where.updatedAt = {};
+    if (input.from) {
+      where.updatedAt.gte = input.from;
+    }
+    if (input.to) {
+      where.updatedAt.lte = input.to;
+    }
+  }
+
   const rows = await prisma.evidence.findMany({
-    where: {
-      executionId: input.executionId,
-      kind: input.kind
-    },
+    where,
     orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
-    take: input.limit
+    take: Math.max(input.limit + 1, 201)
   });
 
-  return rows.map((row: any) => ({
+  const startIndex = input.cursor ? Math.max(rows.findIndex((row: any) => row.id === input.cursor) + 1, 0) : 0;
+  const pagedRows = rows.slice(startIndex, startIndex + input.limit);
+
+  return pagedRows.map((row: any) => ({
     id: row.id,
     executionId: row.executionId,
     level: row.level,

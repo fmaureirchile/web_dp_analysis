@@ -1124,26 +1124,45 @@ export function createReviewDecision(
 export async function listEvidenceReferencesByExecutionId(input: {
   executionId: string;
   kind?: string;
+  from?: string;
+  to?: string;
+  cursor?: string;
   limit: number;
-}): Promise<Array<{
-  evidenceId: string;
-  executionId: string;
-  level: EvidenceLevel;
-  kind: string;
-  location: string;
-  correlationId: string;
-  createdAt: string;
-  updatedAt: string;
-}>> {
-  const inMemory = Array.from(store.evidences.values())
+}): Promise<{
+  items: Array<{
+    evidenceId: string;
+    executionId: string;
+    level: EvidenceLevel;
+    kind: string;
+    location: string;
+    correlationId: string;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  nextCursor?: string;
+}> {
+  const fromTs = input.from ? Date.parse(input.from) : undefined;
+  const toTs = input.to ? Date.parse(input.to) : undefined;
+
+  const orderedInMemory = Array.from(store.evidences.values())
     .filter((evidence) => evidence.executionId === input.executionId)
     .filter((evidence) => (input.kind ? evidence.kind === input.kind : true))
+    .filter((evidence) => {
+      const updatedTs = Date.parse(evidence.updatedAt);
+      if (fromTs !== undefined && updatedTs < fromTs) return false;
+      if (toTs !== undefined && updatedTs > toTs) return false;
+      return true;
+    })
     .sort((a, b) => {
       const byUpdatedAt = Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
       if (byUpdatedAt !== 0) return byUpdatedAt;
       return a.id.localeCompare(b.id);
-    })
-    .slice(0, input.limit)
+    });
+
+  const startIndex = input.cursor ? Math.max(orderedInMemory.findIndex((evidence) => evidence.id === input.cursor) + 1, 0) : 0;
+
+  const inMemory = orderedInMemory
+    .slice(startIndex, startIndex + input.limit)
     .map((evidence) => ({
       evidenceId: evidence.id,
       executionId: evidence.executionId,
@@ -1155,17 +1174,25 @@ export async function listEvidenceReferencesByExecutionId(input: {
       updatedAt: evidence.updatedAt
     }));
 
+  const inMemoryNextCursor = inMemory.length === input.limit ? inMemory[inMemory.length - 1]?.evidenceId : undefined;
+
   if (inMemory.length > 0 || !isPrismaPersistenceEnabled()) {
-    return inMemory;
+    return {
+      items: inMemory,
+      nextCursor: inMemoryNextCursor
+    };
   }
 
   const persistedRows = await listEvidencesByExecutionIdAndKind({
     executionId: input.executionId,
     kind: input.kind,
+    from: input.from,
+    to: input.to,
+    cursor: input.cursor,
     limit: input.limit
   });
 
-  return persistedRows.map((row) => ({
+  const persistedItems = persistedRows.map((row) => ({
     evidenceId: row.id,
     executionId: row.executionId,
     level: row.level as EvidenceLevel,
@@ -1175,4 +1202,9 @@ export async function listEvidenceReferencesByExecutionId(input: {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
   }));
+
+  return {
+    items: persistedItems,
+    nextCursor: persistedItems.length === input.limit ? persistedItems[persistedItems.length - 1]?.evidenceId : undefined
+  };
 }

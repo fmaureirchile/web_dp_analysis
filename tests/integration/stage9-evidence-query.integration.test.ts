@@ -114,4 +114,120 @@ describe("Etapa 9 T01 consulta de evidencias", () => {
     expect(response.status).toBe(400);
     expect(response.body.error).toBe("execution_id_required");
   });
+
+  it("pagina resultados con cursor y respeta ventana temporal", async () => {
+    const org = await request(app).post("/api/v1/organizations").send({ name: "Org E9-T02" });
+    const project = await request(app).post("/api/v1/projects").send({ organizationId: org.body.data.id, name: "Project E9-T02" });
+
+    const authorization = await request(app)
+      .post("/api/v1/authorizations")
+      .send({
+        projectId: project.body.data.id,
+        validFrom: isoNowPlus(-60),
+        validTo: isoNowPlus(60),
+        allowedDomains: ["127.0.0.1"],
+        allowSubdomains: false,
+        permittedOperations: ["SCAN_PASSIVE"]
+      });
+
+    const target = await request(app)
+      .post("/api/v1/targets")
+      .send({
+        projectId: project.body.data.id,
+        authorizationId: authorization.body.data.id,
+        baseUrl: `${labBaseUrl}/sitio-a`
+      });
+
+    const execution = await request(app)
+      .post("/api/v1/executions")
+      .send({
+        projectId: project.body.data.id,
+        authorizationId: authorization.body.data.id,
+        targetId: target.body.data.id,
+        state: "VALIDATED",
+        operation: "SCAN_PASSIVE",
+        entryUrl: `${labBaseUrl}/sitio-a`
+      });
+
+    const executionId = execution.body.data.id as string;
+
+    await request(app).post("/api/v1/evidences").send({
+      executionId,
+      level: "E2",
+      kind: "PASSIVE_HTML",
+      location: "memory://passive-html/page-1"
+    });
+
+    await request(app).post("/api/v1/evidences").send({
+      executionId,
+      level: "E2",
+      kind: "BROWSER_DOM_SNAPSHOT",
+      location: "memory://browser-dom/page-2"
+    });
+
+    const firstPage = await request(app).get(`/api/v1/evidences?executionId=${executionId}&limit=1`);
+    expect(firstPage.status).toBe(200);
+    expect(firstPage.body.data.items).toHaveLength(1);
+    expect(typeof firstPage.body.data.nextCursor).toBe("string");
+
+    const nextCursor = firstPage.body.data.nextCursor as string;
+    const secondPage = await request(app).get(`/api/v1/evidences?executionId=${executionId}&limit=1&cursor=${nextCursor}`);
+    expect(secondPage.status).toBe(200);
+    expect(secondPage.body.data.items).toHaveLength(1);
+    expect(secondPage.body.data.items[0].evidenceId).not.toBe(firstPage.body.data.items[0].evidenceId);
+
+    const from = new Date(Date.now() - 5 * 60_000).toISOString();
+    const to = new Date(Date.now() + 5 * 60_000).toISOString();
+    const inWindow = await request(app).get(
+      `/api/v1/evidences?executionId=${executionId}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+    );
+    expect(inWindow.status).toBe(200);
+    expect(inWindow.body.data.items.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("retorna 400 cuando from es mayor que to", async () => {
+    const org = await request(app).post("/api/v1/organizations").send({ name: "Org E9-T02-window" });
+    const project = await request(app).post("/api/v1/projects").send({ organizationId: org.body.data.id, name: "Project E9-T02-window" });
+
+    const authorization = await request(app)
+      .post("/api/v1/authorizations")
+      .send({
+        projectId: project.body.data.id,
+        validFrom: isoNowPlus(-60),
+        validTo: isoNowPlus(60),
+        allowedDomains: ["127.0.0.1"],
+        allowSubdomains: false,
+        permittedOperations: ["SCAN_PASSIVE"]
+      });
+
+    const target = await request(app)
+      .post("/api/v1/targets")
+      .send({
+        projectId: project.body.data.id,
+        authorizationId: authorization.body.data.id,
+        baseUrl: `${labBaseUrl}/sitio-a`
+      });
+
+    const execution = await request(app)
+      .post("/api/v1/executions")
+      .send({
+        projectId: project.body.data.id,
+        authorizationId: authorization.body.data.id,
+        targetId: target.body.data.id,
+        state: "VALIDATED",
+        operation: "SCAN_PASSIVE",
+        entryUrl: `${labBaseUrl}/sitio-a`
+      });
+
+    const executionId = execution.body.data.id as string;
+    const from = new Date(Date.now() + 5 * 60_000).toISOString();
+    const to = new Date(Date.now() - 5 * 60_000).toISOString();
+
+    const invalidWindow = await request(app).get(
+      `/api/v1/evidences?executionId=${executionId}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+    );
+
+    expect(invalidWindow.status).toBe(400);
+    expect(invalidWindow.body.error).toBe("invalid_time_window");
+  });
 });

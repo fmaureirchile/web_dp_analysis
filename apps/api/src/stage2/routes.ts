@@ -802,6 +802,9 @@ export function createStage2Router(): Router {
     const cid = correlationId(req);
     const executionId = typeof req.query.executionId === "string" ? req.query.executionId : undefined;
     const kind = typeof req.query.kind === "string" && req.query.kind.trim().length > 0 ? req.query.kind.trim() : undefined;
+    const from = parseIso(typeof req.query.from === "string" ? req.query.from : undefined);
+    const to = parseIso(typeof req.query.to === "string" ? req.query.to : undefined);
+    const cursor = typeof req.query.cursor === "string" && req.query.cursor.trim().length > 0 ? req.query.cursor.trim() : undefined;
     const limit = parseEvidenceLimit(typeof req.query.limit === "string" ? req.query.limit : undefined);
 
     if (!executionId || executionId.trim().length === 0) {
@@ -812,22 +815,41 @@ export function createStage2Router(): Router {
       return res.status(400).setHeader("x-correlation-id", cid).json({ error: "invalid_limit" });
     }
 
+    if (typeof req.query.from === "string" && req.query.from.trim().length > 0 && !from) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "invalid_from_filter" });
+    }
+
+    if (typeof req.query.to === "string" && req.query.to.trim().length > 0 && !to) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "invalid_to_filter" });
+    }
+
+    if (from && to && Date.parse(from) > Date.parse(to)) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "invalid_time_window" });
+    }
+
     const execution = await getExecutionByIdWithFallback(executionId);
     if (!execution) {
       return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
     }
 
-    const items = await listEvidenceReferencesByExecutionId({
+    const result = await listEvidenceReferencesByExecutionId({
       executionId,
       kind,
+      from,
+      to,
+      cursor,
       limit
     });
 
     const payload: EvidenceQueryResultDto = {
       executionId,
       kind,
+      from,
+      to,
+      cursor,
+      nextCursor: result.nextCursor,
       limit,
-      items
+      items: result.items
     };
 
     return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });

@@ -8,7 +8,7 @@
 ## Comando de validacion inicial
 
 ```bash
-corepack pnpm run lab:e9-1:gate
+corepack pnpm run lab:e9-2:gate
 ```
 
 ## Cuando usarlo
