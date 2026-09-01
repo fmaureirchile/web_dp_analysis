@@ -1239,3 +1239,67 @@ export function listObservationReferencesByExecutionId(executionId: string): Arr
       updatedAt: observation.updatedAt
     }));
 }
+
+export function listFormInventoryByExecutionId(input: {
+  executionId: string;
+  pageId?: string;
+}): Array<{
+  pageId: string;
+  url: string;
+  title?: string;
+  fieldCount: number;
+  observationCount: number;
+  fields: Array<{
+    formFieldId: string;
+    pageId: string;
+    name: string;
+    type: string;
+    required: boolean;
+    observationIds: string[];
+    observationCount: number;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+}> {
+  const pages = Array.from(store.pages.values())
+    .filter((page) => page.executionId === input.executionId)
+    .filter((page) => (input.pageId ? page.id === input.pageId : true))
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  return pages.map((page) => {
+    const fields = Array.from(store.formFields.values())
+      .filter((field) => field.pageId === page.id)
+      .sort((a, b) => a.id.localeCompare(b.id));
+
+    const fieldItems = fields.map((field) => {
+      const observations = Array.from(store.observations.values())
+        .filter((observation) => observation.executionId === input.executionId && observation.formFieldId === field.id)
+        .sort((a, b) => a.id.localeCompare(b.id));
+
+      return {
+        formFieldId: field.id,
+        pageId: field.pageId,
+        name: field.name,
+        type: field.type,
+        required: field.required,
+        observationIds: observations.map((observation) => observation.id),
+        observationCount: observations.length,
+        createdAt: field.createdAt,
+        updatedAt: field.updatedAt
+      };
+    });
+
+    const pageObservationCount = Array.from(store.observations.values()).filter(
+      (observation) => observation.executionId === input.executionId && observation.pageId === page.id
+    ).length;
+
+    return {
+      pageId: page.id,
+      url: page.url,
+      title: page.title,
+      fieldCount: fieldItems.length,
+      observationCount: pageObservationCount,
+      fields: fieldItems
+    };
+  });
+}

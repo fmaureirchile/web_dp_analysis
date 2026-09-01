@@ -164,3 +164,38 @@ export interface ExecutiveSummaryReportDto {
   evidenceByKind: ExecutiveSummaryByKindDto[];
   evidenceByLevel: ExecutiveSummaryByLevelDto[];
 }
+
+export interface FormInventoryFieldDto {
+  formFieldId: string;
+  pageId: string;
+  name: string;
+  type: string;
+  required: boolean;
+  observationIds: string[];
+  observationCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FormInventoryPageDto {
+  pageId: string;
+  url: string;
+  title?: string;
+  fieldCount: number;
+  observationCount: number;
+  fields: FormInventoryFieldDto[];
+}
+
+export interface FormInventoryReportDto {
+  executionId: string;
+  executionState: ExecutionState;
+  entryUrl?: string;
+  pageId?: string;
+  generatedAt: string;
+  totals: {
+    pages: number;
+    fields: number;
+    observations: number;
+  };
+  pages: FormInventoryPageDto[];
+}

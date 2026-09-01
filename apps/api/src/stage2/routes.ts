@@ -3,6 +3,7 @@ import { Router, type Request, type Response } from "express";
 import {
   type ExecutiveSummaryReportDto,
   type EvidenceQueryResultDto,
+  type FormInventoryReportDto,
   type DynamicObservationErrorDto,
   type DynamicObservationResultDto,
   type OperationalExecutionItemDto,
@@ -54,6 +55,7 @@ import {
   getExecutionByIdWithFallback,
   getPassiveSinglePageCrawlResult,
   listEvidenceReferencesByExecutionId,
+  listFormInventoryByExecutionId,
   listObservationReferencesByExecutionId,
   listOperationalExecutions,
   recordDynamicObservationError,
@@ -932,6 +934,44 @@ export function createStage2Router(): Router {
       evidenceByLevel: Array.from(byLevel.entries())
         .map(([level, value]) => ({ level: level as typeof evidences.items[number]["level"], count: value.count, evidenceIds: value.evidenceIds }))
         .sort((a, b) => a.level.localeCompare(b.level))
+    };
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
+  });
+
+  router.get("/reports/executions/:executionId/form-inventory", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const pageId = typeof req.query.pageId === "string" && req.query.pageId.trim().length > 0 ? req.query.pageId.trim() : undefined;
+
+    const execution = await getExecutionByIdWithFallback(executionId);
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
+    }
+
+    if (pageId) {
+      const pageExists = store.pages.get(pageId);
+      if (!pageExists || pageExists.executionId !== executionId) {
+        return res.status(400).setHeader("x-correlation-id", cid).json({ error: "page_id_not_found" });
+      }
+    }
+
+    const pages = listFormInventoryByExecutionId({ executionId, pageId });
+    const totalFields = pages.reduce((acc, page) => acc + page.fieldCount, 0);
+    const totalObservations = pages.reduce((acc, page) => acc + page.observationCount, 0);
+
+    const payload: FormInventoryReportDto = {
+      executionId,
+      executionState: execution.state,
+      entryUrl: execution.entryUrl,
+      pageId,
+      generatedAt: new Date().toISOString(),
+      totals: {
+        pages: pages.length,
+        fields: totalFields,
+        observations: totalObservations
+      },
+      pages
     };
 
     return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
