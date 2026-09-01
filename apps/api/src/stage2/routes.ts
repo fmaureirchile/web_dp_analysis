@@ -1060,6 +1060,7 @@ export function createStage2Router(): Router {
       await transitionExecutionState(body.executionId, ExecutionState.RUNNING, cid, "auth_evaluation_started");
 
       const origin = new URL(body.entryUrl).origin;
+      const sessionScopeId = `${body.executionId}:${body.role}`;
       const loginUrl = new URL("/sitio-f/auth/login", origin);
       const profileUrl = new URL("/sitio-f/profile", origin);
       const logoutUrl = new URL("/sitio-f/auth/logout", origin);
@@ -1068,7 +1069,7 @@ export function createStage2Router(): Router {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-synthetic-client-id": body.executionId
+          "x-synthetic-client-id": sessionScopeId
         },
         body: JSON.stringify({
           username: body.username,
@@ -1087,7 +1088,7 @@ export function createStage2Router(): Router {
       const profileResponse = await fetch(profileUrl, {
         method: "GET",
         headers: {
-          "x-synthetic-client-id": body.executionId
+          "x-synthetic-client-id": sessionScopeId
         }
       });
 
@@ -1120,7 +1121,7 @@ export function createStage2Router(): Router {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-synthetic-client-id": body.executionId
+          "x-synthetic-client-id": sessionScopeId
         },
         body: JSON.stringify({})
       });
@@ -1133,6 +1134,7 @@ export function createStage2Router(): Router {
           executionId: body.executionId,
           entryUrl: body.entryUrl,
           role: body.role,
+          sessionScopeId,
           authenticatedAt: new Date().toISOString(),
           profile: {
             username: profilePayload.profile.username,

@@ -261,6 +261,7 @@ export interface AuthenticatedEvaluationSuccessDto {
   executionId: string;
   entryUrl: string;
   role: AuthenticatedEvaluationRole;
+  sessionScopeId: string;
   authenticatedAt: string;
   profile: AuthenticatedEvaluationProfileDto;
   evidenceId: string;
