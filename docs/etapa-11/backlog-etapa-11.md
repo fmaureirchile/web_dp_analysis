@@ -34,4 +34,4 @@ Habilitar recorridos autenticados sinteticos con sesiones aisladas, evidencia tr
 1. E11-T01: completada (login sintetico + perfil + logout con evidencia minima por executionId).
 2. E11-T02: completada (aislamiento de sesion entre ejecuciones/roles con scope explicito y prueba dedicada).
 3. E11-T03: completada (evidencia navegable por pasos login/profile/logout con referencias verificables).
-4. E11-T04: pendiente.
+4. E11-T04: completada (gate consolidado unico Etapa 11 para validacion local/CI con resumen operativo).

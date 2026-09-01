@@ -8,7 +8,7 @@
 ## Comando de validacion inicial
 
 ```bash
-corepack pnpm run lab:e11-3:gate
+corepack pnpm run lab:e11:gate
 ```
 
 ## Cuando usarlo
@@ -17,4 +17,4 @@ corepack pnpm run lab:e11-3:gate
 2. Despues de modificar aislamiento de sesion por ejecucion/rol.
 3. Despues de modificar evidencia navegable del flujo autenticado por pasos.
 4. Antes de ampliar recorridos por multiples roles.
-5. Como chequeo rapido de no regresion entre Etapa 10 y el inicio de Etapa 11.
+5. Como gate unico de no regresion de Etapa 11 antes de commit o CI.
