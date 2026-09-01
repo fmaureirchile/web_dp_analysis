@@ -32,6 +32,6 @@ Introducir evaluacion baseline de consentimiento sobre evidencia sintetica y obs
 ## Estado de cumplimiento parcial
 
 1. E8-T01: completada (contrato + evaluador baseline + tests unitarios + gate corto).
-2. E8-T02: pendiente.
+2. E8-T02: completada (adaptador de senales laboratorio sitio B/C hacia evaluador baseline).
 3. E8-T03: pendiente.
 4. E8-T04: pendiente.
