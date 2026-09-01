@@ -8,11 +8,11 @@
 ## Comando de validacion inicial
 
 ```bash
-corepack pnpm run lab:e9-3:gate
+corepack pnpm run lab:e9:gate
 ```
 
 ## Cuando usarlo
 
 1. Despues de modificar consulta o filtro de evidencias.
 2. Despues de modificar la vista de revision minima por ejecucion.
-3. Como chequeo rapido de no regresion en API de evidencias.
+3. Como gate unico de no regresion de Etapa 9 antes de commit o CI.
