@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import {
+  type AuthenticatedEvaluationResultDto,
+  type StartAuthenticatedEvaluationDto,
   type TrackingInventoryReportDto,
   type ExecutiveSummaryReportDto,
   type EvidenceQueryResultDto,
@@ -35,7 +37,7 @@ import {
   fetchPassiveSinglePageHtml
 } from "../../../worker-crawler/src";
 import { captureDynamicObservation } from "../../../worker-browser/src/dynamic-observation";
-import { ExecutionState, ReviewState } from "../../../../packages/domain/src";
+import { EvidenceLevel, ExecutionState, ReviewState } from "../../../../packages/domain/src";
 import {
   appendCrawlerOperationalEvent,
   createBrowserDomEvidence,
@@ -142,6 +144,23 @@ function isHttpEntryUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function authenticatedEvaluationError(
+  executionId: string,
+  entryUrl: string,
+  errorCode: "invalid_execution_id" | "invalid_entry_url" | "authentication_failed" | "profile_fetch_failed" | "internal_error",
+  message: string
+): AuthenticatedEvaluationResultDto {
+  return {
+    ok: false,
+    error: {
+      executionId,
+      entryUrl,
+      errorCode,
+      message
+    }
+  };
 }
 
 const OPERATIONAL_ALLOWED_STATES: ExecutionState[] = [
@@ -1005,6 +1024,135 @@ export function createStage2Router(): Router {
     };
 
     return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
+  });
+
+  router.post("/auth/evaluations/start", async (req, res) => {
+    const cid = correlationId(req);
+    const body = req.body as StartAuthenticatedEvaluationDto;
+
+    if (!body.executionId || body.executionId.trim().length === 0) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        authenticatedEvaluationError("unknown_execution", body.entryUrl ?? "unknown_entry_url", "invalid_execution_id", "execution_id_required")
+      );
+    }
+
+    if (!body.entryUrl || !isHttpEntryUrl(body.entryUrl)) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        authenticatedEvaluationError(body.executionId, body.entryUrl ?? "unknown_entry_url", "invalid_entry_url", "invalid_entry_url")
+      );
+    }
+
+    const execution = await getExecutionByIdWithFallback(body.executionId);
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        authenticatedEvaluationError(body.executionId, body.entryUrl, "invalid_execution_id", "execution_id_not_found")
+      );
+    }
+
+    if (!body.username || !body.password || (body.role !== "cliente" && body.role !== "supervisor")) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        authenticatedEvaluationError(body.executionId, body.entryUrl, "authentication_failed", "invalid_authentication_payload")
+      );
+    }
+
+    try {
+      await transitionExecutionState(body.executionId, ExecutionState.QUEUED, cid, "auth_evaluation_queued");
+      await transitionExecutionState(body.executionId, ExecutionState.RUNNING, cid, "auth_evaluation_started");
+
+      const origin = new URL(body.entryUrl).origin;
+      const loginUrl = new URL("/sitio-f/auth/login", origin);
+      const profileUrl = new URL("/sitio-f/profile", origin);
+      const logoutUrl = new URL("/sitio-f/auth/logout", origin);
+
+      const loginResponse = await fetch(loginUrl, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-synthetic-client-id": body.executionId
+        },
+        body: JSON.stringify({
+          username: body.username,
+          password: body.password,
+          role: body.role
+        })
+      });
+
+      if (loginResponse.status !== 200) {
+        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "auth_evaluation_login_failed");
+        return res.status(422).setHeader("x-correlation-id", cid).json(
+          authenticatedEvaluationError(body.executionId, body.entryUrl, "authentication_failed", "login_failed")
+        );
+      }
+
+      const profileResponse = await fetch(profileUrl, {
+        method: "GET",
+        headers: {
+          "x-synthetic-client-id": body.executionId
+        }
+      });
+
+      if (profileResponse.status !== 200) {
+        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "auth_evaluation_profile_failed");
+        return res.status(422).setHeader("x-correlation-id", cid).json(
+          authenticatedEvaluationError(body.executionId, body.entryUrl, "profile_fetch_failed", "profile_fetch_failed")
+        );
+      }
+
+      const profilePayload = (await profileResponse.json()) as {
+        profile: {
+          username: string;
+          role: "cliente" | "supervisor";
+          panel: string;
+          sections: string[];
+          syntheticDataAccess: string;
+        };
+      };
+
+      const evidence = createEvidence(
+        body.executionId,
+        EvidenceLevel.E2,
+        "AUTH_SESSION_PROFILE",
+        `memory://auth-session-profile/${body.executionId}`,
+        cid
+      );
+
+      const logoutResponse = await fetch(logoutUrl, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-synthetic-client-id": body.executionId
+        },
+        body: JSON.stringify({})
+      });
+
+      await transitionExecutionState(body.executionId, ExecutionState.COMPLETED, cid, "auth_evaluation_completed");
+
+      const payload: AuthenticatedEvaluationResultDto = {
+        ok: true,
+        data: {
+          executionId: body.executionId,
+          entryUrl: body.entryUrl,
+          role: body.role,
+          authenticatedAt: new Date().toISOString(),
+          profile: {
+            username: profilePayload.profile.username,
+            role: profilePayload.profile.role,
+            panel: profilePayload.profile.panel,
+            sections: profilePayload.profile.sections,
+            syntheticDataAccess: profilePayload.profile.syntheticDataAccess
+          },
+          evidenceId: evidence.id,
+          loggedOut: logoutResponse.status === 200
+        }
+      };
+
+      return res.status(200).setHeader("x-correlation-id", cid).json(payload);
+    } catch (error) {
+      await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "auth_evaluation_internal_error");
+      return res.status(422).setHeader("x-correlation-id", cid).json(
+        authenticatedEvaluationError(body.executionId, body.entryUrl, "internal_error", (error as Error).message)
+      );
+    }
   });
 
   router.post("/findings", (req, res) => {

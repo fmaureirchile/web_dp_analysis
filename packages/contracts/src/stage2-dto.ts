@@ -230,3 +230,52 @@ export interface TrackingInventoryReportDto {
   thirdParties: ThirdPartyInventoryItemDto[];
   cookies: CookieInventoryItemDto[];
 }
+
+export type AuthenticatedEvaluationRole = "cliente" | "supervisor";
+
+export type AuthenticatedEvaluationErrorCode =
+  | "invalid_execution_id"
+  | "invalid_entry_url"
+  | "authentication_failed"
+  | "profile_fetch_failed"
+  | "internal_error";
+
+export interface StartAuthenticatedEvaluationDto {
+  executionId: string;
+  entryUrl: string;
+  username: string;
+  password: string;
+  role: AuthenticatedEvaluationRole;
+  correlationId?: string;
+}
+
+export interface AuthenticatedEvaluationProfileDto {
+  username: string;
+  role: AuthenticatedEvaluationRole;
+  panel: string;
+  sections: string[];
+  syntheticDataAccess: string;
+}
+
+export interface AuthenticatedEvaluationSuccessDto {
+  executionId: string;
+  entryUrl: string;
+  role: AuthenticatedEvaluationRole;
+  authenticatedAt: string;
+  profile: AuthenticatedEvaluationProfileDto;
+  evidenceId: string;
+  loggedOut: boolean;
+}
+
+export interface AuthenticatedEvaluationErrorDto {
+  executionId: string;
+  entryUrl: string;
+  errorCode: AuthenticatedEvaluationErrorCode;
+  message: string;
+}
+
+export interface AuthenticatedEvaluationResultDto {
+  ok: boolean;
+  data?: AuthenticatedEvaluationSuccessDto;
+  error?: AuthenticatedEvaluationErrorDto;
+}
