@@ -234,4 +234,72 @@ describe("Etapa 6 T02 observacion dinamica minima", () => {
     expect(run.body.data.storage[1].key).toBe("synthetic_pref");
     expect(run.body.data.storage[1].valueMasked).toBe(true);
   });
+
+  it("registra timeline SPA minimo con eventos y correlacion de red/storage", async () => {
+    const org = await request(app).post("/api/v1/organizations").send({ name: "Org E6-T05" });
+    const project = await request(app).post("/api/v1/projects").send({ organizationId: org.body.data.id, name: "Project E6-T05" });
+
+    const authorization = await request(app)
+      .post("/api/v1/authorizations")
+      .send({
+        projectId: project.body.data.id,
+        validFrom: isoNowPlus(-60),
+        validTo: isoNowPlus(60),
+        allowedDomains: ["127.0.0.1"],
+        allowSubdomains: false,
+        permittedOperations: ["SCAN_PASSIVE"]
+      });
+
+    const target = await request(app)
+      .post("/api/v1/targets")
+      .send({
+        projectId: project.body.data.id,
+        authorizationId: authorization.body.data.id,
+        baseUrl: `${labBaseUrl}/sitio-d`
+      });
+
+    const execution = await request(app)
+      .post("/api/v1/executions")
+      .send({
+        projectId: project.body.data.id,
+        authorizationId: authorization.body.data.id,
+        targetId: target.body.data.id,
+        state: "VALIDATED",
+        operation: "SCAN_PASSIVE",
+        entryUrl: `${labBaseUrl}/sitio-d`
+      });
+
+    const run = await request(app)
+      .post("/api/v1/browser/observations/start")
+      .send({
+        executionId: execution.body.data.id,
+        entryUrl: `${labBaseUrl}/sitio-d`,
+        timeoutMs: 10000
+      });
+
+    expect(run.status).toBe(200);
+    expect(run.body.ok).toBe(true);
+    expect(run.body.data.network.length).toBeGreaterThanOrEqual(4);
+
+    const networkUrls = run.body.data.network.map((item: { url: string }) => item.url);
+    expect(networkUrls.some((url: string) => url.includes("/sitio-d/spa/bootstrap"))).toBe(true);
+    expect(networkUrls.some((url: string) => url.includes("/sitio-d/spa/navigate"))).toBe(true);
+    expect(networkUrls.some((url: string) => url.includes("/sitio-d/api/profile"))).toBe(true);
+
+    const eventTypes = run.body.data.events.map((event: { eventType: string }) => event.eventType);
+    expect(eventTypes).toContain("PAGE_LOAD");
+    expect(eventTypes).toContain("CLICK");
+    expect(eventTypes).toContain("SPA_NAVIGATION");
+
+    const localStorageKeys = run.body.data.storage
+      .filter((item: { kind: string }) => item.kind === "LOCAL_STORAGE")
+      .map((item: { key: string }) => item.key);
+
+    expect(localStorageKeys).toContain("synthetic_spa_boot");
+    expect(localStorageKeys).toContain("synthetic_spa_route");
+    const localStorageMasked = run.body.data.storage
+      .filter((item: { kind: string }) => item.kind === "LOCAL_STORAGE")
+      .every((item: { valueMasked: boolean }) => item.valueMasked === true);
+    expect(localStorageMasked).toBe(true);
+  });
 });

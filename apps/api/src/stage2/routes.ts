@@ -684,13 +684,7 @@ export function createStage2Router(): Router {
         ],
         network: observed.data.network,
         storage: observed.data.storage,
-        events: [
-          {
-            eventType: "PAGE_LOAD",
-            pageUrl: observed.data.entryUrl,
-            timestamp: observed.data.completedAt
-          }
-        ]
+        events: observed.data.events
       };
 
       const result = recordDynamicObservationSuccess(body.executionId, success);

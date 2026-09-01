@@ -1,10 +1,13 @@
 import {
+  type BrowserInteractionEventDto,
   type BrowserNetworkObservationItemDto,
   type BrowserStorageObservationItemDto,
   type DynamicObservationErrorDto
 } from "../../../packages/contracts/src";
 import { extractHtmlTitle, fetchPassiveSinglePageHtml } from "../../worker-crawler/src";
 import { randomUUID } from "node:crypto";
+
+const DEFAULT_TIMEOUT_MS = 5000;
 
 function escapeXml(value: string): string {
   return value
@@ -67,6 +70,170 @@ function resolveThirdPartyDomain(entryUrl: string, observedUrl: string): string 
   }
 }
 
+function toSiteDSpaUrl(pageUrl: string, suffix: string): string {
+  const origin = new URL(pageUrl).origin;
+  return new URL(`/sitio-d/${suffix}`, origin).toString();
+}
+
+async function fetchJsonWithTiming(input: {
+  method: "GET" | "POST";
+  url: string;
+  timeoutMs: number;
+  body?: Record<string, unknown>;
+}): Promise<{
+  startedAt: string;
+  finishedAt: string;
+  statusHttp: number;
+  url: string;
+  json: unknown;
+}> {
+  const startedAt = new Date().toISOString();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), input.timeoutMs);
+
+  try {
+    const response = await fetch(input.url, {
+      method: input.method,
+      headers: input.method === "POST" ? { "content-type": "application/json" } : undefined,
+      body: input.method === "POST" ? JSON.stringify(input.body ?? {}) : undefined,
+      signal: controller.signal
+    });
+
+    const json = (await response.json()) as unknown;
+
+    return {
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      statusHttp: response.status,
+      url: response.url,
+      json
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function isSiteDSpaEntry(pageUrl: string): boolean {
+  try {
+    const parsed = new URL(pageUrl);
+    return parsed.pathname === "/sitio-d" || parsed.pathname.startsWith("/sitio-d/");
+  } catch {
+    return false;
+  }
+}
+
+async function captureSiteDSpaTimeline(input: {
+  pageUrl: string;
+  timeoutMs: number;
+  entryUrl: string;
+}): Promise<{
+  network: BrowserNetworkObservationItemDto[];
+  storage: BrowserStorageObservationItemDto[];
+  events: BrowserInteractionEventDto[];
+}> {
+  const bootstrap = await fetchJsonWithTiming({
+    method: "POST",
+    url: toSiteDSpaUrl(input.pageUrl, "spa/bootstrap"),
+    timeoutMs: input.timeoutMs,
+    body: {}
+  });
+
+  const navigate = await fetchJsonWithTiming({
+    method: "POST",
+    url: toSiteDSpaUrl(input.pageUrl, "spa/navigate"),
+    timeoutMs: input.timeoutMs,
+    body: { route: "/resumen" }
+  });
+
+  const profile = await fetchJsonWithTiming({
+    method: "GET",
+    url: toSiteDSpaUrl(input.pageUrl, "api/profile"),
+    timeoutMs: input.timeoutMs
+  });
+
+  const network: BrowserNetworkObservationItemDto[] = [
+    {
+      requestId: randomUUID(),
+      pageUrl: input.pageUrl,
+      protocol: "FETCH",
+      method: "POST",
+      url: bootstrap.url,
+      statusHttp: bootstrap.statusHttp,
+      thirdPartyDomain: resolveThirdPartyDomain(input.entryUrl, bootstrap.url),
+      startedAt: bootstrap.startedAt,
+      finishedAt: bootstrap.finishedAt
+    },
+    {
+      requestId: randomUUID(),
+      pageUrl: input.pageUrl,
+      protocol: "FETCH",
+      method: "POST",
+      url: navigate.url,
+      statusHttp: navigate.statusHttp,
+      thirdPartyDomain: resolveThirdPartyDomain(input.entryUrl, navigate.url),
+      startedAt: navigate.startedAt,
+      finishedAt: navigate.finishedAt
+    },
+    {
+      requestId: randomUUID(),
+      pageUrl: input.pageUrl,
+      protocol: "FETCH",
+      method: "GET",
+      url: profile.url,
+      statusHttp: profile.statusHttp,
+      thirdPartyDomain: resolveThirdPartyDomain(input.entryUrl, profile.url),
+      startedAt: profile.startedAt,
+      finishedAt: profile.finishedAt
+    }
+  ];
+
+  const events: BrowserInteractionEventDto[] = [
+    {
+      eventType: "CLICK",
+      pageUrl: input.pageUrl,
+      target: "#spa-bootstrap",
+      timestamp: bootstrap.startedAt
+    },
+    {
+      eventType: "SPA_NAVIGATION",
+      pageUrl: input.pageUrl,
+      target: "/registro",
+      timestamp: bootstrap.finishedAt
+    },
+    {
+      eventType: "CLICK",
+      pageUrl: input.pageUrl,
+      target: "#spa-go-resumen",
+      timestamp: navigate.startedAt
+    },
+    {
+      eventType: "SPA_NAVIGATION",
+      pageUrl: input.pageUrl,
+      target: "/resumen",
+      timestamp: navigate.finishedAt
+    }
+  ];
+
+  const localStorageFromNavigate =
+    typeof navigate.json === "object" &&
+    navigate.json !== null &&
+    "spa" in navigate.json &&
+    typeof (navigate.json as { spa?: unknown }).spa === "object" &&
+    (navigate.json as { spa?: { storage?: unknown } }).spa?.storage !== null
+      ? (navigate.json as { spa?: { storage?: { localStorage?: Record<string, unknown> } } }).spa?.storage?.localStorage
+      : undefined;
+
+  const storage: BrowserStorageObservationItemDto[] = Object.keys(localStorageFromNavigate ?? {}).map((key) => ({
+    pageUrl: input.pageUrl,
+    kind: "LOCAL_STORAGE",
+    key,
+    valueMasked: true,
+    observedAt: navigate.finishedAt
+  }));
+
+  return { network, storage, events };
+}
+
 export async function captureDynamicObservation(input: {
   executionId: string;
   entryUrl: string;
@@ -84,6 +251,7 @@ export async function captureDynamicObservation(input: {
         screenshotDataUrl: string;
         network: BrowserNetworkObservationItemDto[];
         storage: BrowserStorageObservationItemDto[];
+        events: BrowserInteractionEventDto[];
       };
     }
   | {
@@ -134,6 +302,28 @@ export async function captureDynamicObservation(input: {
     valueMasked: true,
     observedAt
   }));
+  const events: BrowserInteractionEventDto[] = [
+    {
+      eventType: "PAGE_LOAD",
+      pageUrl: requestUrl,
+      timestamp: observedAt
+    }
+  ];
+
+  if (isSiteDSpaEntry(requestUrl)) {
+    const spaTimeline = await captureSiteDSpaTimeline({
+      pageUrl: requestUrl,
+      timeoutMs:
+        typeof input.timeoutMs === "number" && Number.isFinite(input.timeoutMs) && input.timeoutMs > 0
+          ? Math.trunc(input.timeoutMs)
+          : DEFAULT_TIMEOUT_MS,
+      entryUrl: input.entryUrl
+    });
+
+    network.push(...spaTimeline.network);
+    storage.push(...spaTimeline.storage);
+    events.push(...spaTimeline.events);
+  }
 
   return {
     ok: true,
@@ -145,7 +335,8 @@ export async function captureDynamicObservation(input: {
       domHtml: fetched.data.html,
       screenshotDataUrl,
       network,
-      storage
+      storage,
+      events
     }
   };
 }
