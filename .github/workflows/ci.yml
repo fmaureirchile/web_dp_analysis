@@ -614,6 +614,49 @@ jobs:
 
           echo "E9 gate result: evidence_query_integration_files=1/1; evidence_query_integration_tests=4/4; review_view_integration_files=1/1; review_view_integration_tests=2/2; typecheck=ok"
 
+      - name: Report Stage 10 gate coverage
+        run: |
+          echo "E10 gate coverage: Stage 9 consolidated gate + executive summary + form inventory + tracking inventory"
+          echo "- Stage 10 consolidated gate: npm run lab:e10:gate"
+          echo "- Integration suite 1: tests/integration/stage10-executive-report.integration.test.ts"
+          echo "- Integration suite 2: tests/integration/stage10-form-inventory.integration.test.ts"
+          echo "- Integration suite 3: tests/integration/stage10-tracking-inventory.integration.test.ts"
+
+      - name: Stage 10 gate E10
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run lab:e10:gate | tee e10_gate.log
+
+      - name: Report Stage 10 gate result
+        shell: bash
+        run: |
+          set -euo pipefail
+          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e10_gate.log)"
+          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e10_gate.log)"
+
+          if [ -z "$file_pairs" ] || [ -z "$test_pairs" ]; then
+            echo "No se pudieron extraer resultados del gate E10 desde e10_gate.log"
+            exit 1
+          fi
+
+          if ! echo "$file_pairs" | grep -q '^1/1$'; then
+            echo "Falta resultado esperado de archivos por suite en gate E10 (1/1 por corrida)."
+            exit 1
+          fi
+
+          if ! echo "$test_pairs" | grep -q '^3/3$'; then
+            echo "Falta resultado esperado de tracking inventory (3/3)."
+            exit 1
+          fi
+
+          if ! echo "$test_pairs" | grep -q '^2/2$'; then
+            echo "Falta resultado esperado de reportes/inventarios base (2/2)."
+            exit 1
+          fi
+
+          echo "E10 gate result: executive_report_integration=2/2; form_inventory_integration=2/2; tracking_inventory_integration=3/3; stage9_baseline=ok; typecheck=ok"
+
       - name: Build
         run: npm run build
 

@@ -8,7 +8,7 @@
 ## Comando de validacion inicial
 
 ```bash
-corepack pnpm run lab:e10-3:gate
+corepack pnpm run lab:e10:gate
 ```
 
 ## Cuando usarlo
@@ -16,4 +16,4 @@ corepack pnpm run lab:e10-3:gate
 1. Despues de modificar el endpoint de reporte ejecutivo por ejecucion.
 2. Despues de modificar inventario de formularios por executionId/pageId.
 3. Despues de modificar inventario de terceros/cookies observadas.
-4. Como chequeo rapido de no regresion entre Etapa 9 y los cortes iniciales de Etapa 10.
+4. Como gate unico de no regresion de Etapa 10 antes de commit o CI.
