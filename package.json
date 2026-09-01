@@ -28,7 +28,8 @@
     "lab:e5-2:gate": "corepack pnpm run lab:e5-2:baseline",
     "lab:e5-3:obs-regression": "vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage5-observability.integration.test.ts",
     "lab:e5-3:gate": "corepack pnpm run lab:e5-2:gate && corepack pnpm run lab:e5-3:obs-regression",
-    "lab:e5-4:gate": "corepack pnpm run lab:e5-3:gate && corepack pnpm run docs:stage5:coherence"
+    "lab:e5-4:gate": "corepack pnpm run lab:e5-3:gate && corepack pnpm run docs:stage5:coherence",
+    "lab:e6:gate": "corepack pnpm run openapi:validate && corepack pnpm run typecheck && vitest run --config vitest.integration.config.ts --run tests/integration/stage6-dynamic-observation.integration.test.ts"
   },
   "prisma": {
     "seed": "tsx database/seeds/stage2.seed.ts"

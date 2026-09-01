@@ -7,6 +7,7 @@ Este directorio concentra los documentos de inicio, backlog y control operativo 
 1. acta-inicio-etapa-6.md
 2. backlog-etapa-6.md
 3. control-presupuesto-etapa-6.md
+4. guia-gate-cierre-e6.md
 
 ## Orden de uso recomendado
 

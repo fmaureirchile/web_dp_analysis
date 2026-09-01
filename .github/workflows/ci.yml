@@ -438,6 +438,45 @@ jobs:
           delta_seconds="${E5_3_GATE_DELTA_SECONDS:-na}"
           echo "E5.4 gate result: stage5_gate_files=10/10; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds=${duration_seconds}; previous_stage5_3_gate_duration_seconds=${previous_duration_seconds}; stage5_3_gate_delta_seconds=${delta_seconds}"
 
+      - name: Report Stage 6 gate coverage
+        run: |
+          echo "E6 gate coverage: OpenAPI + Typecheck + Stage 6 dynamic observation integration suite"
+          echo "- OpenAPI: npm run openapi:validate"
+          echo "- Typecheck: npm run typecheck"
+          echo "- Integration suite: tests/integration/stage6-dynamic-observation.integration.test.ts"
+
+      - name: Stage 6 gate E6
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run lab:e6:gate | tee e6_gate.log
+
+      - name: Report Stage 6 gate result
+        shell: bash
+        run: |
+          set -euo pipefail
+          files_passed="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1/p' e6_gate.log | tail -n1)"
+          files_total="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\2/p' e6_gate.log | tail -n1)"
+          tests_passed="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1/p' e6_gate.log | tail -n1)"
+          tests_total="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\2/p' e6_gate.log | tail -n1)"
+
+          if [ -z "$files_passed" ] || [ -z "$files_total" ] || [ -z "$tests_passed" ] || [ -z "$tests_total" ]; then
+            echo "No se pudieron extraer resultados del gate E6 desde e6_gate.log"
+            exit 1
+          fi
+
+          if [ "$files_passed" != "1" ] || [ "$files_total" != "1" ]; then
+            echo "Cobertura inesperada de archivos para gate E6: ${files_passed}/${files_total}. Se esperaba 1/1."
+            exit 1
+          fi
+
+          if [ "$tests_passed" != "4" ] || [ "$tests_total" != "4" ]; then
+            echo "Cobertura inesperada de tests para gate E6: ${tests_passed}/${tests_total}. Se esperaba 4/4."
+            exit 1
+          fi
+
+          echo "E6 gate result: integration_files_passed=${files_passed}/${files_total}; integration_tests_passed=${tests_passed}/${tests_total}; openapi=ok; typecheck=ok"
+
       - name: Build
         run: npm run build
 

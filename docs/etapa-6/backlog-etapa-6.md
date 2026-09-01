@@ -92,7 +92,7 @@ Etapa 6 se considera apta cuando:
 3. E6-T03: completada (inventario minimo de red por ejecucion con status HTTP y deteccion third-party por hostname).
 4. E6-T04: completada (captura basica de cookies con minimizacion y enmascaramiento por defecto).
 5. E6-T05: completada (timeline SPA minimo con eventos de interaccion y correlacion en red/storage).
-6. E6-T06: pendiente.
+6. E6-T06: completada (gate unico E6 integrado en scripts/CI con resumen operativo verificable).
 
 ## Riesgos principales y mitigacion
 
