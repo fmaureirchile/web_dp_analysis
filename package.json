@@ -38,7 +38,8 @@
     "lab:e9-1:gate": "corepack pnpm run typecheck && vitest run --config vitest.integration.config.ts --run tests/integration/stage9-evidence-query.integration.test.ts",
     "lab:e9-2:gate": "corepack pnpm run lab:e9-1:gate",
     "lab:e9-3:gate": "corepack pnpm run lab:e9-2:gate && vitest run --config vitest.integration.config.ts --run tests/integration/stage9-review-view.integration.test.ts",
-    "lab:e9:gate": "corepack pnpm run lab:e9-3:gate"
+    "lab:e9:gate": "corepack pnpm run lab:e9-3:gate",
+    "lab:e10-1:gate": "corepack pnpm run lab:e9:gate && vitest run --config vitest.integration.config.ts --run tests/integration/stage10-executive-report.integration.test.ts"
   },
   "prisma": {
     "seed": "tsx database/seeds/stage2.seed.ts"

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import {
+  type ExecutiveSummaryReportDto,
   type EvidenceQueryResultDto,
   type DynamicObservationErrorDto,
   type DynamicObservationResultDto,
@@ -881,6 +882,56 @@ export function createStage2Router(): Router {
       observationCount: observations.length,
       evidences: evidences.items,
       observations
+    };
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
+  });
+
+  router.get("/reports/executions/:executionId/executive-summary", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const execution = await getExecutionByIdWithFallback(executionId);
+
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
+    }
+
+    const evidences = await listEvidenceReferencesByExecutionId({
+      executionId,
+      limit: 200
+    });
+    const observations = listObservationReferencesByExecutionId(executionId);
+
+    const byKind = new Map<string, { count: number; evidenceIds: string[] }>();
+    const byLevel = new Map<string, { count: number; evidenceIds: string[] }>();
+
+    for (const item of evidences.items) {
+      const currentKind = byKind.get(item.kind) ?? { count: 0, evidenceIds: [] };
+      currentKind.count += 1;
+      currentKind.evidenceIds.push(item.evidenceId);
+      byKind.set(item.kind, currentKind);
+
+      const currentLevel = byLevel.get(item.level) ?? { count: 0, evidenceIds: [] };
+      currentLevel.count += 1;
+      currentLevel.evidenceIds.push(item.evidenceId);
+      byLevel.set(item.level, currentLevel);
+    }
+
+    const payload: ExecutiveSummaryReportDto = {
+      executionId,
+      executionState: execution.state,
+      entryUrl: execution.entryUrl,
+      generatedAt: new Date().toISOString(),
+      totals: {
+        evidences: evidences.items.length,
+        observations: observations.length
+      },
+      evidenceByKind: Array.from(byKind.entries())
+        .map(([kind, value]) => ({ kind, count: value.count, evidenceIds: value.evidenceIds }))
+        .sort((a, b) => a.kind.localeCompare(b.kind)),
+      evidenceByLevel: Array.from(byLevel.entries())
+        .map(([level, value]) => ({ level: level as typeof evidences.items[number]["level"], count: value.count, evidenceIds: value.evidenceIds }))
+        .sort((a, b) => a.level.localeCompare(b.level))
     };
 
     return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });

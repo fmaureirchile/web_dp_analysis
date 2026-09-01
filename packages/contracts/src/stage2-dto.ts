@@ -139,3 +139,28 @@ export interface ReviewExecutionViewDto {
   evidences: EvidenceQueryItemDto[];
   observations: ReviewObservationItemDto[];
 }
+
+export interface ExecutiveSummaryByKindDto {
+  kind: string;
+  count: number;
+  evidenceIds: string[];
+}
+
+export interface ExecutiveSummaryByLevelDto {
+  level: EvidenceLevel;
+  count: number;
+  evidenceIds: string[];
+}
+
+export interface ExecutiveSummaryReportDto {
+  executionId: string;
+  executionState: ExecutionState;
+  entryUrl?: string;
+  generatedAt: string;
+  totals: {
+    evidences: number;
+    observations: number;
+  };
+  evidenceByKind: ExecutiveSummaryByKindDto[];
+  evidenceByLevel: ExecutiveSummaryByLevelDto[];
+}
