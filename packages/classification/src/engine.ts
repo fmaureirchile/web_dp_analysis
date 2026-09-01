@@ -3,11 +3,11 @@ import {
   type DataClassificationLabel,
   type DataClassificationResultDto
 } from "../../contracts/src";
+import { requiresMaskingByLabel } from "../../security/src";
 
 type ClassificationRule = {
   label: DataClassificationLabel;
   confidence: number;
-  requiresMasking: boolean;
   reason: string;
   pattern: RegExp;
 };
@@ -16,42 +16,36 @@ const RULES: ClassificationRule[] = [
   {
     label: "HEALTH_DATA",
     confidence: 0.95,
-    requiresMasking: true,
     reason: "keyword_health_or_medical",
     pattern: /(health|salud|medical|medic|diagnos|patient|enfermedad)/i
   },
   {
     label: "AUTH_SECRET",
     confidence: 0.95,
-    requiresMasking: true,
     reason: "keyword_auth_secret",
     pattern: /(password|passwd|token|secret|session|authorization|api[_-]?key|bearer)/i
   },
   {
     label: "GOV_IDENTIFIER",
     confidence: 0.9,
-    requiresMasking: true,
     reason: "keyword_government_identifier",
     pattern: /(dni|cedula|passport|ssn|tax[_-]?id|documento)/i
   },
   {
     label: "FINANCIAL_DATA",
     confidence: 0.9,
-    requiresMasking: true,
     reason: "keyword_financial",
     pattern: /(card|credit|debit|iban|swift|account|cvv)/i
   },
   {
     label: "CONTACT_DATA",
     confidence: 0.8,
-    requiresMasking: true,
     reason: "keyword_contact",
     pattern: /(email|phone|telefono|mobile|address|direccion|contact|nombre|name)/i
   },
   {
     label: "BEHAVIORAL_DATA",
     confidence: 0.7,
-    requiresMasking: false,
     reason: "keyword_behavioral",
     pattern: /(consent|tracking|analytics|event|campaign|utm)/i
   }
@@ -74,7 +68,7 @@ export function classifyDataPoint(input: ClassifyDataPointDto): DataClassificati
         label: rule.label,
         confidence: rule.confidence,
         reason: rule.reason,
-        requiresMasking: rule.requiresMasking
+        requiresMasking: requiresMaskingByLabel(rule.label)
       };
     }
   }
@@ -85,6 +79,6 @@ export function classifyDataPoint(input: ClassifyDataPointDto): DataClassificati
     label: "UNCLASSIFIED",
     confidence: 0.4,
     reason: "no_rule_match",
-    requiresMasking: false
+    requiresMasking: requiresMaskingByLabel("UNCLASSIFIED")
   };
 }
