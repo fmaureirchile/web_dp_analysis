@@ -258,6 +258,14 @@ export interface AuthenticatedEvaluationProfileDto {
 }
 
 export interface AuthenticatedEvaluationSuccessDto {
+  steps: Array<{
+    step: "LOGIN" | "PROFILE" | "LOGOUT";
+    statusHttp: number;
+    evidenceId: string;
+    evidenceKind: string;
+    evidenceLocation: string;
+    timestamp: string;
+  }>;
   executionId: string;
   entryUrl: string;
   role: AuthenticatedEvaluationRole;

@@ -1085,6 +1085,14 @@ export function createStage2Router(): Router {
         );
       }
 
+      const loginEvidence = createEvidence(
+        body.executionId,
+        EvidenceLevel.E2,
+        "AUTH_STEP_LOGIN",
+        `memory://auth-step-login/${body.executionId}`,
+        cid
+      );
+
       const profileResponse = await fetch(profileUrl, {
         method: "GET",
         headers: {
@@ -1109,7 +1117,7 @@ export function createStage2Router(): Router {
         };
       };
 
-      const evidence = createEvidence(
+      const profileEvidence = createEvidence(
         body.executionId,
         EvidenceLevel.E2,
         "AUTH_SESSION_PROFILE",
@@ -1126,11 +1134,45 @@ export function createStage2Router(): Router {
         body: JSON.stringify({})
       });
 
+      const logoutEvidence = createEvidence(
+        body.executionId,
+        EvidenceLevel.E2,
+        "AUTH_STEP_LOGOUT",
+        `memory://auth-step-logout/${body.executionId}`,
+        cid
+      );
+
       await transitionExecutionState(body.executionId, ExecutionState.COMPLETED, cid, "auth_evaluation_completed");
 
       const payload: AuthenticatedEvaluationResultDto = {
         ok: true,
         data: {
+          steps: [
+            {
+              step: "LOGIN",
+              statusHttp: loginResponse.status,
+              evidenceId: loginEvidence.id,
+              evidenceKind: loginEvidence.kind,
+              evidenceLocation: loginEvidence.location,
+              timestamp: loginEvidence.createdAt
+            },
+            {
+              step: "PROFILE",
+              statusHttp: profileResponse.status,
+              evidenceId: profileEvidence.id,
+              evidenceKind: profileEvidence.kind,
+              evidenceLocation: profileEvidence.location,
+              timestamp: profileEvidence.createdAt
+            },
+            {
+              step: "LOGOUT",
+              statusHttp: logoutResponse.status,
+              evidenceId: logoutEvidence.id,
+              evidenceKind: logoutEvidence.kind,
+              evidenceLocation: logoutEvidence.location,
+              timestamp: logoutEvidence.createdAt
+            }
+          ],
           executionId: body.executionId,
           entryUrl: body.entryUrl,
           role: body.role,
@@ -1143,7 +1185,7 @@ export function createStage2Router(): Router {
             sections: profilePayload.profile.sections,
             syntheticDataAccess: profilePayload.profile.syntheticDataAccess
           },
-          evidenceId: evidence.id,
+          evidenceId: profileEvidence.id,
           loggedOut: logoutResponse.status === 200
         }
       };
