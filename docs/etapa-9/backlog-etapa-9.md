@@ -33,5 +33,5 @@ Consolidar consulta y uso operativo de evidencias para revision trazable y prepa
 
 1. E9-T01: completada (consulta por executionId/kind con prueba de integracion y validaciones de entrada).
 2. E9-T02: completada (paginacion con cursor simple y ventana temporal from/to en consulta de evidencias).
-3. E9-T03: pendiente.
+3. E9-T03: completada (vista de revision minima con agregado de evidencias + observaciones por ejecucion).
 4. E9-T04: pendiente.

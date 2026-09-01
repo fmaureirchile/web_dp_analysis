@@ -116,3 +116,26 @@ export interface EvidenceQueryResultDto {
   limit: number;
   items: EvidenceQueryItemDto[];
 }
+
+export interface ReviewObservationItemDto {
+  observationId: string;
+  executionId: string;
+  pageId?: string;
+  formFieldId?: string;
+  description: string;
+  reviewState: ReviewState;
+  correlationId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReviewExecutionViewDto {
+  executionId: string;
+  executionState: ExecutionState;
+  entryUrl?: string;
+  generatedAt: string;
+  evidenceCount: number;
+  observationCount: number;
+  evidences: EvidenceQueryItemDto[];
+  observations: ReviewObservationItemDto[];
+}

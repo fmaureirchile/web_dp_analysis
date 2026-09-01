@@ -9,6 +9,7 @@ import {
   type OperationalExecutionStateFilter,
   type PassiveSinglePageCrawlErrorDto,
   type PassiveSinglePageCrawlResultDto,
+  type ReviewExecutionViewDto,
   CreateAuthorizationDto,
   CreateEvidenceDto,
   CreateExecutionDto,
@@ -52,6 +53,7 @@ import {
   getExecutionByIdWithFallback,
   getPassiveSinglePageCrawlResult,
   listEvidenceReferencesByExecutionId,
+  listObservationReferencesByExecutionId,
   listOperationalExecutions,
   recordDynamicObservationError,
   recordDynamicObservationSuccess,
@@ -850,6 +852,35 @@ export function createStage2Router(): Router {
       nextCursor: result.nextCursor,
       limit,
       items: result.items
+    };
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
+  });
+
+  router.get("/review/executions/:executionId/view", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const execution = await getExecutionByIdWithFallback(executionId);
+
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
+    }
+
+    const evidences = await listEvidenceReferencesByExecutionId({
+      executionId,
+      limit: 200
+    });
+    const observations = listObservationReferencesByExecutionId(executionId);
+
+    const payload: ReviewExecutionViewDto = {
+      executionId,
+      executionState: execution.state,
+      entryUrl: execution.entryUrl,
+      generatedAt: new Date().toISOString(),
+      evidenceCount: evidences.items.length,
+      observationCount: observations.length,
+      evidences: evidences.items,
+      observations
     };
 
     return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });

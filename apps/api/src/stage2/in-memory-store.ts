@@ -1208,3 +1208,34 @@ export async function listEvidenceReferencesByExecutionId(input: {
     nextCursor: persistedItems.length === input.limit ? persistedItems[persistedItems.length - 1]?.evidenceId : undefined
   };
 }
+
+export function listObservationReferencesByExecutionId(executionId: string): Array<{
+  observationId: string;
+  executionId: string;
+  pageId?: string;
+  formFieldId?: string;
+  description: string;
+  reviewState: ReviewState;
+  correlationId: string;
+  createdAt: string;
+  updatedAt: string;
+}> {
+  return Array.from(store.observations.values())
+    .filter((observation) => observation.executionId === executionId)
+    .sort((a, b) => {
+      const byUpdatedAt = Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+      if (byUpdatedAt !== 0) return byUpdatedAt;
+      return a.id.localeCompare(b.id);
+    })
+    .map((observation) => ({
+      observationId: observation.id,
+      executionId: observation.executionId,
+      pageId: observation.pageId,
+      formFieldId: observation.formFieldId,
+      description: observation.description,
+      reviewState: observation.reviewState,
+      correlationId: observation.correlationId,
+      createdAt: observation.createdAt,
+      updatedAt: observation.updatedAt
+    }));
+}
