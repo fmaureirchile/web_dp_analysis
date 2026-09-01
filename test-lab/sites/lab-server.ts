@@ -301,6 +301,19 @@ export function buildLaboratoryServer(): Express {
         res.end(payload);
       });
 
+      app.get(`${site.basePath}/redirect-host-swap`, (req, res) => {
+        const hostHeader = typeof req.headers.host === "string" ? req.headers.host : "";
+        const hostParts = hostHeader.split(":");
+        const port = hostParts.length > 1 ? hostParts[1] : "";
+
+        if (!port) {
+          res.status(400).json({ error: "port_not_detected" });
+          return;
+        }
+
+        res.redirect(302, `http://127.0.0.1:${port}${site.basePath}`);
+      });
+
       app.get(`${site.basePath}/large-html`, (_req, res) => {
         const body = `<html><head><title>Sitio A - Large HTML</title></head><body>${"x".repeat(4096)}</body></html>`;
         res.writeHead(200, {

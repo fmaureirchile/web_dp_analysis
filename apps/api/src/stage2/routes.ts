@@ -682,7 +682,7 @@ export function createStage2Router(): Router {
             screenshotEvidenceId: screenshotEvidence.id
           }
         ],
-        network: [],
+        network: observed.data.network,
         storage: [],
         events: [
           {

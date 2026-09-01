@@ -91,7 +91,12 @@ describe("Etapa 6 T02 observacion dinamica minima", () => {
     expect(run.body.ok).toBe(true);
     expect(run.body.data.executionId).toBe(execution.body.data.id);
     expect(run.body.data.pageSnapshots).toHaveLength(1);
-    expect(run.body.data.network).toEqual([]);
+    expect(run.body.data.network).toHaveLength(1);
+    expect(run.body.data.network[0].protocol).toBe("FETCH");
+    expect(run.body.data.network[0].method).toBe("GET");
+    expect(run.body.data.network[0].statusHttp).toBe(200);
+    expect(run.body.data.network[0].url).toContain("/sitio-a");
+    expect(run.body.data.network[0].thirdPartyDomain).toBeUndefined();
     expect(run.body.data.storage).toEqual([]);
     expect(run.body.data.events).toHaveLength(1);
     expect(run.body.data.events[0].eventType).toBe("PAGE_LOAD");
@@ -123,5 +128,57 @@ describe("Etapa 6 T02 observacion dinamica minima", () => {
 
     const finalExecution = store.executions.get(execution.body.data.id);
     expect(finalExecution?.state).toBe("COMPLETED");
+  });
+
+  it("registra third-party cuando hay redireccion con cambio de hostname", async () => {
+    const org = await request(app).post("/api/v1/organizations").send({ name: "Org E6-T03" });
+    const project = await request(app).post("/api/v1/projects").send({ organizationId: org.body.data.id, name: "Project E6-T03" });
+
+    const authorization = await request(app)
+      .post("/api/v1/authorizations")
+      .send({
+        projectId: project.body.data.id,
+        validFrom: isoNowPlus(-60),
+        validTo: isoNowPlus(60),
+        allowedDomains: ["localhost", "127.0.0.1"],
+        allowSubdomains: false,
+        permittedOperations: ["SCAN_PASSIVE"]
+      });
+
+    const target = await request(app)
+      .post("/api/v1/targets")
+      .send({
+        projectId: project.body.data.id,
+        authorizationId: authorization.body.data.id,
+        baseUrl: `${labBaseUrl}/sitio-a/redirect-host-swap`
+      });
+
+    const localhostEntry = labBaseUrl.replace("127.0.0.1", "localhost");
+
+    const execution = await request(app)
+      .post("/api/v1/executions")
+      .send({
+        projectId: project.body.data.id,
+        authorizationId: authorization.body.data.id,
+        targetId: target.body.data.id,
+        state: "VALIDATED",
+        operation: "SCAN_PASSIVE",
+        entryUrl: `${localhostEntry}/sitio-a/redirect-host-swap`
+      });
+
+    const run = await request(app)
+      .post("/api/v1/browser/observations/start")
+      .send({
+        executionId: execution.body.data.id,
+        entryUrl: `${localhostEntry}/sitio-a/redirect-host-swap`,
+        timeoutMs: 10000
+      });
+
+    expect(run.status).toBe(200);
+    expect(run.body.ok).toBe(true);
+    expect(run.body.data.network).toHaveLength(1);
+    expect(run.body.data.network[0].statusHttp).toBe(200);
+    expect(run.body.data.network[0].url).toContain("127.0.0.1");
+    expect(run.body.data.network[0].thirdPartyDomain).toBe("127.0.0.1");
   });
 });

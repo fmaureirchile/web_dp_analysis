@@ -1,7 +1,9 @@
 import {
+  type BrowserNetworkObservationItemDto,
   type DynamicObservationErrorDto
 } from "../../../packages/contracts/src";
 import { extractHtmlTitle, fetchPassiveSinglePageHtml } from "../../worker-crawler/src";
+import { randomUUID } from "node:crypto";
 
 function escapeXml(value: string): string {
   return value
@@ -51,6 +53,19 @@ function mapFetchErrorToDynamicError(
   };
 }
 
+function resolveThirdPartyDomain(entryUrl: string, observedUrl: string): string | undefined {
+  try {
+    const entryHost = new URL(entryUrl).hostname.toLowerCase();
+    const observedHost = new URL(observedUrl).hostname.toLowerCase();
+    if (entryHost !== observedHost) {
+      return observedHost;
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function captureDynamicObservation(input: {
   executionId: string;
   entryUrl: string;
@@ -66,6 +81,7 @@ export async function captureDynamicObservation(input: {
         title?: string;
         domHtml: string;
         screenshotDataUrl: string;
+        network: BrowserNetworkObservationItemDto[];
       };
     }
   | {
@@ -73,6 +89,7 @@ export async function captureDynamicObservation(input: {
       error: DynamicObservationErrorDto;
     }
 > {
+  const startedAt = new Date().toISOString();
   const fetched = await fetchPassiveSinglePageHtml({
     executionId: input.executionId,
     entryUrl: input.entryUrl,
@@ -93,16 +110,31 @@ export async function captureDynamicObservation(input: {
 
   const title = extractHtmlTitle(fetched.data.html);
   const screenshotDataUrl = buildPlaceholderScreenshotDataUrl(input.entryUrl, title);
+  const requestUrl = fetched.data.finalUrl;
+  const network: BrowserNetworkObservationItemDto[] = [
+    {
+      requestId: randomUUID(),
+      pageUrl: input.entryUrl,
+      protocol: "FETCH",
+      method: "GET",
+      url: requestUrl,
+      statusHttp: fetched.data.statusHttp,
+      thirdPartyDomain: resolveThirdPartyDomain(input.entryUrl, requestUrl),
+      startedAt,
+      finishedAt: fetched.data.fetchedAt
+    }
+  ];
 
   return {
     ok: true,
     data: {
       executionId: input.executionId,
-      entryUrl: fetched.data.entryUrl,
+      entryUrl: fetched.data.finalUrl,
       completedAt: new Date().toISOString(),
       title,
       domHtml: fetched.data.html,
-      screenshotDataUrl
+      screenshotDataUrl,
+      network
     }
   };
 }

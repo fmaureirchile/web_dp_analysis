@@ -18,6 +18,8 @@ const ERROR_MESSAGE_FETCH_FAILED = "http_fetch_failed:network_failure";
 export interface PassiveHttpFetchSuccess {
   executionId: string;
   entryUrl: string;
+  finalUrl: string;
+  redirected: boolean;
   statusHttp: number;
   fetchedAt: string;
   contentType?: string;
@@ -159,6 +161,8 @@ export async function fetchPassiveSinglePageHtml(request: StartPassiveSinglePage
       data: {
         executionId: request.executionId,
         entryUrl: request.entryUrl,
+        finalUrl: response.url,
+        redirected: response.redirected,
         statusHttp: response.status,
         fetchedAt: new Date().toISOString(),
         contentType: contentType ?? undefined,
