@@ -477,6 +477,53 @@ jobs:
 
           echo "E6 gate result: integration_files_passed=${files_passed}/${files_total}; integration_tests_passed=${tests_passed}/${tests_total}; openapi=ok; typecheck=ok"
 
+      - name: Report Stage 7 gate coverage
+        run: |
+          echo "E7 gate coverage: typecheck + unit classification/masking + integration dynamic observation"
+          echo "- Typecheck: npm run typecheck"
+          echo "- Unit suite: tests/unit/stage7-classification-engine.test.ts tests/unit/stage7-masking-policy.test.ts"
+          echo "- Integration suite: tests/integration/stage6-dynamic-observation.integration.test.ts"
+
+      - name: Stage 7 gate E7
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run lab:e7:gate | tee e7_gate.log
+
+      - name: Report Stage 7 gate result
+        shell: bash
+        run: |
+          set -euo pipefail
+          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e7_gate.log)"
+          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e7_gate.log)"
+
+          if [ -z "$file_pairs" ] || [ -z "$test_pairs" ]; then
+            echo "No se pudieron extraer resultados del gate E7 desde e7_gate.log"
+            exit 1
+          fi
+
+          if ! echo "$file_pairs" | grep -q '^2/2$'; then
+            echo "Falta resultado esperado de unit tests E7 en archivos (2/2)."
+            exit 1
+          fi
+
+          if ! echo "$test_pairs" | grep -q '^6/6$'; then
+            echo "Falta resultado esperado de unit tests E7 en tests (6/6)."
+            exit 1
+          fi
+
+          if ! echo "$file_pairs" | grep -q '^1/1$'; then
+            echo "Falta resultado esperado de integracion en archivos (1/1)."
+            exit 1
+          fi
+
+          if ! echo "$test_pairs" | grep -q '^4/4$'; then
+            echo "Falta resultado esperado de integracion en tests (4/4)."
+            exit 1
+          fi
+
+          echo "E7 gate result: unit_files_passed=2/2; unit_tests_passed=6/6; integration_files_passed=1/1; integration_tests_passed=4/4; typecheck=ok"
+
       - name: Build
         run: npm run build
 
