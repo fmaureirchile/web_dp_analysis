@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import {
+  type TrackingInventoryReportDto,
   type ExecutiveSummaryReportDto,
   type EvidenceQueryResultDto,
   type FormInventoryReportDto,
@@ -57,6 +58,7 @@ import {
   listEvidenceReferencesByExecutionId,
   listFormInventoryByExecutionId,
   listObservationReferencesByExecutionId,
+  listTrackingInventoryByExecutionId,
   listOperationalExecutions,
   recordDynamicObservationError,
   recordDynamicObservationSuccess,
@@ -972,6 +974,34 @@ export function createStage2Router(): Router {
         observations: totalObservations
       },
       pages
+    };
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
+  });
+
+  router.get("/reports/executions/:executionId/tracking-inventory", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const execution = await getExecutionByIdWithFallback(executionId);
+
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
+    }
+
+    const inventory = listTrackingInventoryByExecutionId(executionId);
+    const payload: TrackingInventoryReportDto = {
+      executionId,
+      executionState: execution.state,
+      entryUrl: execution.entryUrl,
+      generatedAt: new Date().toISOString(),
+      totals: {
+        thirdParties: inventory.thirdParties.length,
+        cookies: inventory.cookies.length,
+        networkRequests: inventory.networkRequests,
+        cookieObservations: inventory.cookieObservations
+      },
+      thirdParties: inventory.thirdParties,
+      cookies: inventory.cookies
     };
 
     return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });

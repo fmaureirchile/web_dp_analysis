@@ -199,3 +199,34 @@ export interface FormInventoryReportDto {
   };
   pages: FormInventoryPageDto[];
 }
+
+export interface ThirdPartyInventoryItemDto {
+  domain: string;
+  requestCount: number;
+  requestIds: string[];
+  urls: string[];
+}
+
+export interface CookieInventoryItemDto {
+  key: string;
+  occurrenceCount: number;
+  classificationLabel?: import("./stage7-dto").DataClassificationLabel;
+  valueMasked: boolean;
+  latestObservedAt: string;
+  pageUrls: string[];
+}
+
+export interface TrackingInventoryReportDto {
+  executionId: string;
+  executionState: ExecutionState;
+  entryUrl?: string;
+  generatedAt: string;
+  totals: {
+    thirdParties: number;
+    cookies: number;
+    networkRequests: number;
+    cookieObservations: number;
+  };
+  thirdParties: ThirdPartyInventoryItemDto[];
+  cookies: CookieInventoryItemDto[];
+}

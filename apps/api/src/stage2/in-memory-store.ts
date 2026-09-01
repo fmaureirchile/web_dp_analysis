@@ -1303,3 +1303,98 @@ export function listFormInventoryByExecutionId(input: {
     };
   });
 }
+
+export function listTrackingInventoryByExecutionId(executionId: string): {
+  thirdParties: Array<{
+    domain: string;
+    requestCount: number;
+    requestIds: string[];
+    urls: string[];
+  }>;
+  cookies: Array<{
+    key: string;
+    occurrenceCount: number;
+    classificationLabel?: import("../../../../packages/contracts/src/stage7-dto").DataClassificationLabel;
+    valueMasked: boolean;
+    latestObservedAt: string;
+    pageUrls: string[];
+  }>;
+  networkRequests: number;
+  cookieObservations: number;
+} {
+  const result = getDynamicObservationResult(executionId);
+  if (!result?.ok || !result.data) {
+    return {
+      thirdParties: [],
+      cookies: [],
+      networkRequests: 0,
+      cookieObservations: 0
+    };
+  }
+
+  const thirdPartyMap = new Map<string, { requestCount: number; requestIds: string[]; urls: Set<string> }>();
+  for (const item of result.data.network) {
+    if (!item.thirdPartyDomain) continue;
+    const current = thirdPartyMap.get(item.thirdPartyDomain) ?? { requestCount: 0, requestIds: [], urls: new Set<string>() };
+    current.requestCount += 1;
+    current.requestIds.push(item.requestId);
+    current.urls.add(item.url);
+    thirdPartyMap.set(item.thirdPartyDomain, current);
+  }
+
+  const cookieMap = new Map<
+    string,
+    {
+      occurrenceCount: number;
+      classificationLabel?: import("../../../../packages/contracts/src/stage7-dto").DataClassificationLabel;
+      valueMasked: boolean;
+      latestObservedAt: string;
+      pageUrls: Set<string>;
+    }
+  >();
+
+  for (const item of result.data.storage) {
+    if (item.kind !== "COOKIE") continue;
+    const current = cookieMap.get(item.key) ?? {
+      occurrenceCount: 0,
+      classificationLabel: item.classificationLabel,
+      valueMasked: item.valueMasked,
+      latestObservedAt: item.observedAt,
+      pageUrls: new Set<string>()
+    };
+
+    current.occurrenceCount += 1;
+    current.valueMasked = current.valueMasked || item.valueMasked;
+    if (!current.classificationLabel && item.classificationLabel) {
+      current.classificationLabel = item.classificationLabel;
+    }
+    if (Date.parse(item.observedAt) > Date.parse(current.latestObservedAt)) {
+      current.latestObservedAt = item.observedAt;
+    }
+    current.pageUrls.add(item.pageUrl);
+    cookieMap.set(item.key, current);
+  }
+
+  return {
+    thirdParties: Array.from(thirdPartyMap.entries())
+      .map(([domain, value]) => ({
+        domain,
+        requestCount: value.requestCount,
+        requestIds: value.requestIds.sort((a, b) => a.localeCompare(b)),
+        urls: Array.from(value.urls).sort((a, b) => a.localeCompare(b))
+      }))
+      .sort((a, b) => a.domain.localeCompare(b.domain)),
+    cookies: Array.from(cookieMap.entries())
+      .map(([key, value]) => ({
+        key,
+        occurrenceCount: value.occurrenceCount,
+        classificationLabel: value.classificationLabel,
+        valueMasked: value.valueMasked,
+        latestObservedAt: value.latestObservedAt,
+        pageUrls: Array.from(value.pageUrls).sort((a, b) => a.localeCompare(b))
+      }))
+      .sort((a, b) => a.key.localeCompare(b.key)),
+    networkRequests: result.data.network.length,
+    cookieObservations: result.data.storage.filter((item) => item.kind === "COOKIE").length
+  };
+}
