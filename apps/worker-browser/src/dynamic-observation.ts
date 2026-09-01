@@ -1,5 +1,6 @@
 import {
   type BrowserNetworkObservationItemDto,
+  type BrowserStorageObservationItemDto,
   type DynamicObservationErrorDto
 } from "../../../packages/contracts/src";
 import { extractHtmlTitle, fetchPassiveSinglePageHtml } from "../../worker-crawler/src";
@@ -82,6 +83,7 @@ export async function captureDynamicObservation(input: {
         domHtml: string;
         screenshotDataUrl: string;
         network: BrowserNetworkObservationItemDto[];
+        storage: BrowserStorageObservationItemDto[];
       };
     }
   | {
@@ -111,6 +113,7 @@ export async function captureDynamicObservation(input: {
   const title = extractHtmlTitle(fetched.data.html);
   const screenshotDataUrl = buildPlaceholderScreenshotDataUrl(input.entryUrl, title);
   const requestUrl = fetched.data.finalUrl;
+  const observedAt = fetched.data.fetchedAt;
   const network: BrowserNetworkObservationItemDto[] = [
     {
       requestId: randomUUID(),
@@ -121,9 +124,16 @@ export async function captureDynamicObservation(input: {
       statusHttp: fetched.data.statusHttp,
       thirdPartyDomain: resolveThirdPartyDomain(input.entryUrl, requestUrl),
       startedAt,
-      finishedAt: fetched.data.fetchedAt
+      finishedAt: observedAt
     }
   ];
+  const storage: BrowserStorageObservationItemDto[] = fetched.data.setCookieNames.map((cookieName) => ({
+    pageUrl: requestUrl,
+    kind: "COOKIE",
+    key: cookieName,
+    valueMasked: true,
+    observedAt
+  }));
 
   return {
     ok: true,
@@ -134,7 +144,8 @@ export async function captureDynamicObservation(input: {
       title,
       domHtml: fetched.data.html,
       screenshotDataUrl,
-      network
+      network,
+      storage
     }
   };
 }

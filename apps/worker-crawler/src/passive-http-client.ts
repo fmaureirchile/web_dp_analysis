@@ -20,6 +20,7 @@ export interface PassiveHttpFetchSuccess {
   entryUrl: string;
   finalUrl: string;
   redirected: boolean;
+  setCookieNames: string[];
   statusHttp: number;
   fetchedAt: string;
   contentType?: string;
@@ -83,6 +84,29 @@ function isHtmlContentType(contentType: string | null): boolean {
   if (!contentType) return false;
   const normalized = contentType.toLowerCase();
   return HTML_CONTENT_TYPES.some((candidate) => normalized.includes(candidate));
+}
+
+function extractSetCookieNames(headers: Headers): string[] {
+  const fromGetSetCookie = (headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
+  const rawSetCookies =
+    typeof fromGetSetCookie === "function"
+      ? fromGetSetCookie.call(headers)
+      : (() => {
+          const single = headers.get("set-cookie");
+          return single ? [single] : [];
+        })();
+
+  return Array.from(
+    new Set(
+      rawSetCookies
+        .map((raw) => raw.split(";")[0]?.trim() ?? "")
+        .map((pair) => {
+          const equalsAt = pair.indexOf("=");
+          return equalsAt > 0 ? pair.slice(0, equalsAt).trim() : "";
+        })
+        .filter((name) => name.length > 0)
+    )
+  );
 }
 
 async function readBodyWithLimit(response: Response, maxResponseBytes: number): Promise<Uint8Array> {
@@ -163,6 +187,7 @@ export async function fetchPassiveSinglePageHtml(request: StartPassiveSinglePage
         entryUrl: request.entryUrl,
         finalUrl: response.url,
         redirected: response.redirected,
+        setCookieNames: extractSetCookieNames(response.headers),
         statusHttp: response.status,
         fetchedAt: new Date().toISOString(),
         contentType: contentType ?? undefined,

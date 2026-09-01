@@ -683,7 +683,7 @@ export function createStage2Router(): Router {
           }
         ],
         network: observed.data.network,
-        storage: [],
+        storage: observed.data.storage,
         events: [
           {
             eventType: "PAGE_LOAD",

@@ -323,6 +323,16 @@ export function buildLaboratoryServer(): Express {
         res.end(body);
       });
 
+      app.get(`${site.basePath}/storage-cookie`, (_req, res) => {
+        const html = "<html><head><title>Sitio A - Storage Cookie</title></head><body><h1>cookie</h1></body></html>";
+        res.setHeader("set-cookie", ["synthetic_session=abc123; Path=/; HttpOnly", "synthetic_pref=on; Path=/"]);
+        res.writeHead(200, {
+          "content-type": "text/html; charset=utf-8",
+          "content-length": String(Buffer.byteLength(html))
+        });
+        res.end(html);
+      });
+
       app.post(`${site.basePath}/submit`, (req, res) => {
         res.status(200).json({
           status: "ok",
