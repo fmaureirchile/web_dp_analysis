@@ -74,6 +74,7 @@ export interface DynamicObservationSuccessDto {
   network: BrowserNetworkObservationItemDto[];
   storage: BrowserStorageObservationItemDto[];
   events: BrowserInteractionEventDto[];
+  consentEvaluation?: import("./stage8-dto").ConsentScenarioEvaluationDto;
 }
 
 export interface DynamicObservationErrorDto {

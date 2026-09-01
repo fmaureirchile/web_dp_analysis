@@ -2,9 +2,16 @@ import {
   type BrowserInteractionEventDto,
   type BrowserNetworkObservationItemDto,
   type BrowserStorageObservationItemDto,
+  type ConsentScenarioEvaluationDto,
   type DynamicObservationErrorDto
 } from "../../../packages/contracts/src";
 import { classifyDataPoint } from "../../../packages/classification/src";
+import {
+  evaluateConsentFromLabSiteB,
+  evaluateConsentFromLabSiteC,
+  type LabSiteBConsentStatusPayload,
+  type LabSiteCTrackingEventsPayload
+} from "../../../packages/domain/src";
 import { extractHtmlTitle, fetchPassiveSinglePageHtml } from "../../worker-crawler/src";
 import { randomUUID } from "node:crypto";
 
@@ -107,6 +114,21 @@ function toSiteDSpaUrl(pageUrl: string, suffix: string): string {
   return new URL(`/sitio-d/${suffix}`, origin).toString();
 }
 
+function toSiteBConsentStatusUrl(pageUrl: string): string {
+  const origin = new URL(pageUrl).origin;
+  return new URL("/sitio-b/consent/status", origin).toString();
+}
+
+function toSiteCTrackingBootUrl(pageUrl: string): string {
+  const origin = new URL(pageUrl).origin;
+  return new URL("/sitio-c/tracking/boot", origin).toString();
+}
+
+function toSiteCTrackingEventsUrl(pageUrl: string): string {
+  const origin = new URL(pageUrl).origin;
+  return new URL("/sitio-c/tracking/events", origin).toString();
+}
+
 async function fetchJsonWithTiming(input: {
   method: "GET" | "POST";
   url: string;
@@ -152,6 +174,58 @@ function isSiteDSpaEntry(pageUrl: string): boolean {
   } catch {
     return false;
   }
+}
+
+function isSiteBEntry(pageUrl: string): boolean {
+  try {
+    const parsed = new URL(pageUrl);
+    return parsed.pathname === "/sitio-b" || parsed.pathname.startsWith("/sitio-b/");
+  } catch {
+    return false;
+  }
+}
+
+function isSiteCEntry(pageUrl: string): boolean {
+  try {
+    const parsed = new URL(pageUrl);
+    return parsed.pathname === "/sitio-c" || parsed.pathname.startsWith("/sitio-c/");
+  } catch {
+    return false;
+  }
+}
+
+async function captureConsentEvaluationForLab(input: {
+  pageUrl: string;
+  timeoutMs: number;
+}): Promise<ConsentScenarioEvaluationDto | undefined> {
+  if (isSiteBEntry(input.pageUrl)) {
+    const siteBStatus = await fetchJsonWithTiming({
+      method: "GET",
+      url: toSiteBConsentStatusUrl(input.pageUrl),
+      timeoutMs: input.timeoutMs
+    });
+
+    return evaluateConsentFromLabSiteB(siteBStatus.json as LabSiteBConsentStatusPayload);
+  }
+
+  if (isSiteCEntry(input.pageUrl)) {
+    await fetchJsonWithTiming({
+      method: "POST",
+      url: toSiteCTrackingBootUrl(input.pageUrl),
+      timeoutMs: input.timeoutMs,
+      body: {}
+    });
+
+    const siteCEvents = await fetchJsonWithTiming({
+      method: "GET",
+      url: toSiteCTrackingEventsUrl(input.pageUrl),
+      timeoutMs: input.timeoutMs
+    });
+
+    return evaluateConsentFromLabSiteC(siteCEvents.json as LabSiteCTrackingEventsPayload);
+  }
+
+  return undefined;
 }
 
 async function captureSiteDSpaTimeline(input: {
@@ -287,6 +361,7 @@ export async function captureDynamicObservation(input: {
         network: BrowserNetworkObservationItemDto[];
         storage: BrowserStorageObservationItemDto[];
         events: BrowserInteractionEventDto[];
+        consentEvaluation?: ConsentScenarioEvaluationDto;
       };
     }
   | {
@@ -363,6 +438,14 @@ export async function captureDynamicObservation(input: {
     events.push(...spaTimeline.events);
   }
 
+  const consentEvaluation = await captureConsentEvaluationForLab({
+    pageUrl: requestUrl,
+    timeoutMs:
+      typeof input.timeoutMs === "number" && Number.isFinite(input.timeoutMs) && input.timeoutMs > 0
+        ? Math.trunc(input.timeoutMs)
+        : DEFAULT_TIMEOUT_MS
+  });
+
   return {
     ok: true,
     data: {
@@ -374,7 +457,8 @@ export async function captureDynamicObservation(input: {
       screenshotDataUrl,
       network,
       storage,
-      events
+      events,
+      consentEvaluation
     }
   };
 }

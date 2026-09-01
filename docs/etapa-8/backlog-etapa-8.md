@@ -33,5 +33,5 @@ Introducir evaluacion baseline de consentimiento sobre evidencia sintetica y obs
 
 1. E8-T01: completada (contrato + evaluador baseline + tests unitarios + gate corto).
 2. E8-T02: completada (adaptador de senales laboratorio sitio B/C hacia evaluador baseline).
-3. E8-T03: pendiente.
+3. E8-T03: completada (resultado de observacion dinamica publica bloque consentEvaluation por executionId).
 4. E8-T04: pendiente.

@@ -312,4 +312,100 @@ describe("Etapa 6 T02 observacion dinamica minima", () => {
       .every((item: { classificationLabel?: string }) => typeof item.classificationLabel === "string");
     expect(localStorageHasClassification).toBe(true);
   });
+
+  it("publica consentimiento COMPLIANT para sitio B", async () => {
+    const org = await request(app).post("/api/v1/organizations").send({ name: "Org E8-T03-B" });
+    const project = await request(app).post("/api/v1/projects").send({ organizationId: org.body.data.id, name: "Project E8-T03-B" });
+
+    const authorization = await request(app)
+      .post("/api/v1/authorizations")
+      .send({
+        projectId: project.body.data.id,
+        validFrom: isoNowPlus(-60),
+        validTo: isoNowPlus(60),
+        allowedDomains: ["127.0.0.1"],
+        allowSubdomains: false,
+        permittedOperations: ["SCAN_PASSIVE"]
+      });
+
+    const target = await request(app)
+      .post("/api/v1/targets")
+      .send({
+        projectId: project.body.data.id,
+        authorizationId: authorization.body.data.id,
+        baseUrl: `${labBaseUrl}/sitio-b`
+      });
+
+    const execution = await request(app)
+      .post("/api/v1/executions")
+      .send({
+        projectId: project.body.data.id,
+        authorizationId: authorization.body.data.id,
+        targetId: target.body.data.id,
+        state: "VALIDATED",
+        operation: "SCAN_PASSIVE",
+        entryUrl: `${labBaseUrl}/sitio-b`
+      });
+
+    const run = await request(app)
+      .post("/api/v1/browser/observations/start")
+      .send({
+        executionId: execution.body.data.id,
+        entryUrl: `${labBaseUrl}/sitio-b`,
+        timeoutMs: 10000
+      });
+
+    expect(run.status).toBe(200);
+    expect(run.body.ok).toBe(true);
+    expect(run.body.data.consentEvaluation?.status).toBe("COMPLIANT");
+    expect(run.body.data.consentEvaluation?.code).toBe("BASELINE_OK");
+  });
+
+  it("publica consentimiento DEFECTIVE para sitio C", async () => {
+    const org = await request(app).post("/api/v1/organizations").send({ name: "Org E8-T03-C" });
+    const project = await request(app).post("/api/v1/projects").send({ organizationId: org.body.data.id, name: "Project E8-T03-C" });
+
+    const authorization = await request(app)
+      .post("/api/v1/authorizations")
+      .send({
+        projectId: project.body.data.id,
+        validFrom: isoNowPlus(-60),
+        validTo: isoNowPlus(60),
+        allowedDomains: ["127.0.0.1"],
+        allowSubdomains: false,
+        permittedOperations: ["SCAN_PASSIVE"]
+      });
+
+    const target = await request(app)
+      .post("/api/v1/targets")
+      .send({
+        projectId: project.body.data.id,
+        authorizationId: authorization.body.data.id,
+        baseUrl: `${labBaseUrl}/sitio-c`
+      });
+
+    const execution = await request(app)
+      .post("/api/v1/executions")
+      .send({
+        projectId: project.body.data.id,
+        authorizationId: authorization.body.data.id,
+        targetId: target.body.data.id,
+        state: "VALIDATED",
+        operation: "SCAN_PASSIVE",
+        entryUrl: `${labBaseUrl}/sitio-c`
+      });
+
+    const run = await request(app)
+      .post("/api/v1/browser/observations/start")
+      .send({
+        executionId: execution.body.data.id,
+        entryUrl: `${labBaseUrl}/sitio-c`,
+        timeoutMs: 10000
+      });
+
+    expect(run.status).toBe(200);
+    expect(run.body.ok).toBe(true);
+    expect(run.body.data.consentEvaluation?.status).toBe("DEFECTIVE");
+    expect(run.body.data.consentEvaluation?.code).toBe("TRACKING_BEFORE_CONSENT");
+  });
 });
