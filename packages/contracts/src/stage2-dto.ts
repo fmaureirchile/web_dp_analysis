@@ -94,3 +94,21 @@ export interface CreateReviewDecisionDto {
   reviewState: ReviewState;
   comment: string;
 }
+
+export interface EvidenceQueryItemDto {
+  evidenceId: string;
+  executionId: string;
+  level: EvidenceLevel;
+  kind: string;
+  location: string;
+  correlationId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EvidenceQueryResultDto {
+  executionId: string;
+  kind?: string;
+  limit: number;
+  items: EvidenceQueryItemDto[];
+}

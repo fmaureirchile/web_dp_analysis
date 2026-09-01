@@ -27,6 +27,7 @@ import {
   countScopeRequestsLastMinute,
   getExecutionById,
   getLatestEvidenceByExecutionIdAndKind,
+  listEvidencesByExecutionIdAndKind,
   getPassiveSinglePageResultByExecutionId,
   isPrismaPersistenceEnabled,
   listExecutionsByStateAndWindow,
@@ -1118,4 +1119,60 @@ export function createReviewDecision(
   const entity: ReviewDecision = { ...baseEntity(correlationId), findingId, reviewState, comment };
   store.reviewDecisions.set(entity.id, entity);
   return entity;
+}
+
+export async function listEvidenceReferencesByExecutionId(input: {
+  executionId: string;
+  kind?: string;
+  limit: number;
+}): Promise<Array<{
+  evidenceId: string;
+  executionId: string;
+  level: EvidenceLevel;
+  kind: string;
+  location: string;
+  correlationId: string;
+  createdAt: string;
+  updatedAt: string;
+}>> {
+  const inMemory = Array.from(store.evidences.values())
+    .filter((evidence) => evidence.executionId === input.executionId)
+    .filter((evidence) => (input.kind ? evidence.kind === input.kind : true))
+    .sort((a, b) => {
+      const byUpdatedAt = Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+      if (byUpdatedAt !== 0) return byUpdatedAt;
+      return a.id.localeCompare(b.id);
+    })
+    .slice(0, input.limit)
+    .map((evidence) => ({
+      evidenceId: evidence.id,
+      executionId: evidence.executionId,
+      level: evidence.level,
+      kind: evidence.kind,
+      location: evidence.location,
+      correlationId: evidence.correlationId,
+      createdAt: evidence.createdAt,
+      updatedAt: evidence.updatedAt
+    }));
+
+  if (inMemory.length > 0 || !isPrismaPersistenceEnabled()) {
+    return inMemory;
+  }
+
+  const persistedRows = await listEvidencesByExecutionIdAndKind({
+    executionId: input.executionId,
+    kind: input.kind,
+    limit: input.limit
+  });
+
+  return persistedRows.map((row) => ({
+    evidenceId: row.id,
+    executionId: row.executionId,
+    level: row.level as EvidenceLevel,
+    kind: row.kind,
+    location: row.location,
+    correlationId: row.correlationId,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString()
+  }));
 }

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import {
+  type EvidenceQueryResultDto,
   type DynamicObservationErrorDto,
   type DynamicObservationResultDto,
   type OperationalExecutionItemDto,
@@ -50,6 +51,7 @@ import {
   getDynamicObservationResult,
   getExecutionByIdWithFallback,
   getPassiveSinglePageCrawlResult,
+  listEvidenceReferencesByExecutionId,
   listOperationalExecutions,
   recordDynamicObservationError,
   recordDynamicObservationSuccess,
@@ -184,6 +186,19 @@ function parseIso(raw: string | undefined): string | undefined {
 }
 
 function parseLimit(raw: string | undefined): number | undefined {
+  if (!raw || raw.trim().length === 0) {
+    return 50;
+  }
+
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > 200) {
+    return undefined;
+  }
+
+  return parsed;
+}
+
+function parseEvidenceLimit(raw: string | undefined): number | undefined {
   if (!raw || raw.trim().length === 0) {
     return 50;
   }
@@ -781,6 +796,41 @@ export function createStage2Router(): Router {
     } catch (error) {
       notFound(res, (error as Error).message, cid);
     }
+  });
+
+  router.get("/evidences", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = typeof req.query.executionId === "string" ? req.query.executionId : undefined;
+    const kind = typeof req.query.kind === "string" && req.query.kind.trim().length > 0 ? req.query.kind.trim() : undefined;
+    const limit = parseEvidenceLimit(typeof req.query.limit === "string" ? req.query.limit : undefined);
+
+    if (!executionId || executionId.trim().length === 0) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_required" });
+    }
+
+    if (!limit) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "invalid_limit" });
+    }
+
+    const execution = await getExecutionByIdWithFallback(executionId);
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
+    }
+
+    const items = await listEvidenceReferencesByExecutionId({
+      executionId,
+      kind,
+      limit
+    });
+
+    const payload: EvidenceQueryResultDto = {
+      executionId,
+      kind,
+      limit,
+      items
+    };
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
   });
 
   router.post("/findings", (req, res) => {

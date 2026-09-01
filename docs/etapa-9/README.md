@@ -1,0 +1,18 @@
+# Etapa 9 - Repositorio de evidencias y revision
+
+## Documentos de trabajo
+
+1. acta-inicio-etapa-9.md
+2. backlog-etapa-9.md
+
+## Comando de validacion inicial
+
+```bash
+corepack pnpm run lab:e9-1:gate
+```
+
+## Cuando usarlo
+
+1. Despues de modificar consulta o filtro de evidencias.
+2. Antes de integrar vistas de revision o reportes.
+3. Como chequeo rapido de no regresion en API de evidencias.

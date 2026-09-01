@@ -198,6 +198,45 @@ export async function getLatestEvidenceByExecutionIdAndKind(
   };
 }
 
+export async function listEvidencesByExecutionIdAndKind(input: {
+  executionId: string;
+  kind?: string;
+  limit: number;
+}): Promise<
+  Array<{
+    id: string;
+    executionId: string;
+    level: string;
+    kind: string;
+    location: string;
+    correlationId: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }>
+> {
+  if (!isEnabled()) return [];
+
+  const rows = await prisma.evidence.findMany({
+    where: {
+      executionId: input.executionId,
+      kind: input.kind
+    },
+    orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+    take: input.limit
+  });
+
+  return rows.map((row: any) => ({
+    id: row.id,
+    executionId: row.executionId,
+    level: row.level,
+    kind: row.kind,
+    location: row.location,
+    correlationId: row.correlationId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt
+  }));
+}
+
 export async function getExecutionById(executionId: string): Promise<
   | {
       id: string;
