@@ -34,6 +34,6 @@ Introducir una clasificacion inicial, trazable y segura para datos observados en
 ## Estado de cumplimiento parcial
 
 1. E7-T01: completada (contrato + engine baseline + test unitario + gate corto).
-2. E7-T02: pendiente.
+2. E7-T02: completada (observacion dinamica expone etiquetas de clasificacion en network/storage).
 3. E7-T03: pendiente.
 4. E7-T04: pendiente.

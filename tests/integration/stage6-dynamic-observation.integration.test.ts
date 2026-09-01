@@ -97,6 +97,8 @@ describe("Etapa 6 T02 observacion dinamica minima", () => {
     expect(run.body.data.network[0].statusHttp).toBe(200);
     expect(run.body.data.network[0].url).toContain("/sitio-a");
     expect(run.body.data.network[0].thirdPartyDomain).toBeUndefined();
+    expect(typeof run.body.data.network[0].classificationLabel).toBe("string");
+    expect(typeof run.body.data.network[0].classificationConfidence).toBe("number");
     expect(run.body.data.storage).toEqual([]);
     expect(run.body.data.events).toHaveLength(1);
     expect(run.body.data.events[0].eventType).toBe("PAGE_LOAD");
@@ -180,6 +182,7 @@ describe("Etapa 6 T02 observacion dinamica minima", () => {
     expect(run.body.data.network[0].statusHttp).toBe(200);
     expect(run.body.data.network[0].url).toContain("127.0.0.1");
     expect(run.body.data.network[0].thirdPartyDomain).toBe("127.0.0.1");
+    expect(typeof run.body.data.network[0].classificationLabel).toBe("string");
   });
 
   it("registra cookies con metadatos enmascarados", async () => {
@@ -231,8 +234,10 @@ describe("Etapa 6 T02 observacion dinamica minima", () => {
     expect(run.body.data.storage[0].valueMasked).toBe(true);
     expect(run.body.data.storage[0].key).toBe("synthetic_session");
     expect(run.body.data.storage[0].valueEvidenceId).toBeUndefined();
+    expect(run.body.data.storage[0].classificationLabel).toBe("AUTH_SECRET");
     expect(run.body.data.storage[1].key).toBe("synthetic_pref");
     expect(run.body.data.storage[1].valueMasked).toBe(true);
+    expect(typeof run.body.data.storage[1].classificationLabel).toBe("string");
   });
 
   it("registra timeline SPA minimo con eventos y correlacion de red/storage", async () => {
@@ -301,5 +306,10 @@ describe("Etapa 6 T02 observacion dinamica minima", () => {
       .filter((item: { kind: string }) => item.kind === "LOCAL_STORAGE")
       .every((item: { valueMasked: boolean }) => item.valueMasked === true);
     expect(localStorageMasked).toBe(true);
+
+    const localStorageHasClassification = run.body.data.storage
+      .filter((item: { kind: string }) => item.kind === "LOCAL_STORAGE")
+      .every((item: { classificationLabel?: string }) => typeof item.classificationLabel === "string");
+    expect(localStorageHasClassification).toBe(true);
   });
 });

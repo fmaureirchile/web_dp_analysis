@@ -40,6 +40,9 @@ export interface BrowserNetworkObservationItemDto {
   url: string;
   statusHttp?: number;
   thirdPartyDomain?: string;
+  classificationLabel?: import("./stage7-dto").DataClassificationLabel;
+  classificationConfidence?: number;
+  classificationReason?: string;
   startedAt: string;
   finishedAt?: string;
 }
@@ -50,6 +53,9 @@ export interface BrowserStorageObservationItemDto {
   key: string;
   valueMasked: boolean;
   valueEvidenceId?: string;
+  classificationLabel?: import("./stage7-dto").DataClassificationLabel;
+  classificationConfidence?: number;
+  classificationReason?: string;
   observedAt: string;
 }
 

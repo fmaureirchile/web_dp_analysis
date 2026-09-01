@@ -4,6 +4,7 @@ import {
   type BrowserStorageObservationItemDto,
   type DynamicObservationErrorDto
 } from "../../../packages/contracts/src";
+import { classifyDataPoint } from "../../../packages/classification/src";
 import { extractHtmlTitle, fetchPassiveSinglePageHtml } from "../../worker-crawler/src";
 import { randomUUID } from "node:crypto";
 
@@ -68,6 +69,37 @@ function resolveThirdPartyDomain(entryUrl: string, observedUrl: string): string 
   } catch {
     return undefined;
   }
+}
+
+function classifyNetworkItem(item: BrowserNetworkObservationItemDto): BrowserNetworkObservationItemDto {
+  const classification = classifyDataPoint({
+    source: "NETWORK_PARAM",
+    key: item.url,
+    valueSample: item.thirdPartyDomain
+  });
+
+  return {
+    ...item,
+    classificationLabel: classification.label,
+    classificationConfidence: classification.confidence,
+    classificationReason: classification.reason
+  };
+}
+
+function classifyStorageItem(item: BrowserStorageObservationItemDto): BrowserStorageObservationItemDto {
+  const source = item.kind === "COOKIE" ? "COOKIE" : "LOCAL_STORAGE";
+  const classification = classifyDataPoint({
+    source,
+    key: item.key
+  });
+
+  return {
+    ...item,
+    classificationLabel: classification.label,
+    classificationConfidence: classification.confidence,
+    classificationReason: classification.reason,
+    valueMasked: item.valueMasked || classification.requiresMasking
+  };
 }
 
 function toSiteDSpaUrl(pageUrl: string, suffix: string): string {
@@ -151,7 +183,7 @@ async function captureSiteDSpaTimeline(input: {
     timeoutMs: input.timeoutMs
   });
 
-  const network: BrowserNetworkObservationItemDto[] = [
+  const networkBase: BrowserNetworkObservationItemDto[] = [
     {
       requestId: randomUUID(),
       pageUrl: input.pageUrl,
@@ -186,6 +218,7 @@ async function captureSiteDSpaTimeline(input: {
       finishedAt: profile.finishedAt
     }
   ];
+  const network: BrowserNetworkObservationItemDto[] = networkBase.map(classifyNetworkItem);
 
   const events: BrowserInteractionEventDto[] = [
     {
@@ -223,13 +256,15 @@ async function captureSiteDSpaTimeline(input: {
       ? (navigate.json as { spa?: { storage?: { localStorage?: Record<string, unknown> } } }).spa?.storage?.localStorage
       : undefined;
 
-  const storage: BrowserStorageObservationItemDto[] = Object.keys(localStorageFromNavigate ?? {}).map((key) => ({
-    pageUrl: input.pageUrl,
-    kind: "LOCAL_STORAGE",
-    key,
-    valueMasked: true,
-    observedAt: navigate.finishedAt
-  }));
+  const storageBase: BrowserStorageObservationItemDto[] = Object.keys(localStorageFromNavigate ?? {})
+    .map((key) => ({
+      pageUrl: input.pageUrl,
+      kind: "LOCAL_STORAGE",
+      key,
+      valueMasked: true,
+      observedAt: navigate.finishedAt
+    }));
+  const storage: BrowserStorageObservationItemDto[] = storageBase.map(classifyStorageItem);
 
   return { network, storage, events };
 }
@@ -282,7 +317,7 @@ export async function captureDynamicObservation(input: {
   const screenshotDataUrl = buildPlaceholderScreenshotDataUrl(input.entryUrl, title);
   const requestUrl = fetched.data.finalUrl;
   const observedAt = fetched.data.fetchedAt;
-  const network: BrowserNetworkObservationItemDto[] = [
+  const networkBase: BrowserNetworkObservationItemDto[] = [
     {
       requestId: randomUUID(),
       pageUrl: input.entryUrl,
@@ -295,13 +330,16 @@ export async function captureDynamicObservation(input: {
       finishedAt: observedAt
     }
   ];
-  const storage: BrowserStorageObservationItemDto[] = fetched.data.setCookieNames.map((cookieName) => ({
-    pageUrl: requestUrl,
-    kind: "COOKIE",
-    key: cookieName,
-    valueMasked: true,
-    observedAt
-  }));
+  const network: BrowserNetworkObservationItemDto[] = networkBase.map(classifyNetworkItem);
+  const storageBase: BrowserStorageObservationItemDto[] = fetched.data.setCookieNames
+    .map((cookieName) => ({
+      pageUrl: requestUrl,
+      kind: "COOKIE",
+      key: cookieName,
+      valueMasked: true,
+      observedAt
+    }));
+  const storage: BrowserStorageObservationItemDto[] = storageBase.map(classifyStorageItem);
   const events: BrowserInteractionEventDto[] = [
     {
       eventType: "PAGE_LOAD",
