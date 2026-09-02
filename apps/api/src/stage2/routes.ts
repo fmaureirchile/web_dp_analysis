@@ -4,6 +4,7 @@ import path from "node:path";
 import { Router, type Request, type Response } from "express";
 import {
   type FrontendFilePatternDetectionsDto,
+  type FrontendStaticFindingsViewDto,
   type FrontendPatternDetectionResultDto,
   type FrontendPatternMatchDto,
   type StartFrontendPatternDetectionDto,
@@ -1612,6 +1613,64 @@ export function createStage2Router(): Router {
     }
 
     return res.status(200).setHeader("x-correlation-id", cid).json(result);
+  });
+
+  router.get("/code-analysis/frontend/findings/:executionId/view", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const execution = await getExecutionByIdWithFallback(executionId);
+
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
+    }
+
+    const patternResult = getFrontendPatternDetectionResult(executionId);
+    if (!patternResult || !patternResult.ok || !patternResult.data) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "frontend_pattern_detection_result_not_available" });
+    }
+
+    const ruleStats = new Map<FrontendPatternMatchDto["rule"], { matches: number; files: Set<string> }>();
+    const fileSummaries = patternResult.data.files
+      .map((file) => {
+        const rules = Array.from(new Set(file.matches.map((match) => match.rule))).sort();
+        for (const match of file.matches) {
+          const current = ruleStats.get(match.rule) ?? { matches: 0, files: new Set<string>() };
+          current.matches += 1;
+          current.files.add(file.relativePath);
+          ruleStats.set(match.rule, current);
+        }
+
+        return {
+          relativePath: file.relativePath,
+          matchCount: file.matches.length,
+          rules
+        };
+      })
+      .sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+
+    const byRule = Array.from(ruleStats.entries())
+      .map(([rule, stats]) => ({
+        rule,
+        matchCount: stats.matches,
+        filesCount: stats.files.size
+      }))
+      .sort((a, b) => a.rule.localeCompare(b.rule));
+
+    const payload: FrontendStaticFindingsViewDto = {
+      executionId,
+      generatedAt: new Date().toISOString(),
+      totals: {
+        scannedFiles: patternResult.data.totalFilesScanned,
+        filesWithMatches: patternResult.data.totalFilesWithMatches,
+        matches: patternResult.data.totalMatches,
+        distinctRules: byRule.length
+      },
+      byRule,
+      files: fileSummaries,
+      evidenceId: patternResult.data.evidenceId
+    };
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
   });
 
   router.post("/findings", (req, res) => {

@@ -33,5 +33,5 @@ Habilitar ingesta e indexacion de frontend para descubrir capturas potenciales y
 
 1. E12-T01: completada (indexacion minima frontend con deteccion de framework y resultado consultable).
 2. E12-T02: completada (deteccion inicial de patrones de captura por archivo con fragmento minimo).
-3. E12-T03: pendiente.
+3. E12-T03: completada (vista consolidada por regla/archivo para correlacion preliminar).
 4. E12-T04: pendiente.

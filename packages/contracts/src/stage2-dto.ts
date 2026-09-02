@@ -338,6 +338,32 @@ export interface FrontendPatternDetectionResultDto {
   error?: FrontendPatternDetectionErrorDto;
 }
 
+export interface FrontendStaticFindingsRuleSummaryDto {
+  rule: FrontendCapturePatternRule;
+  matchCount: number;
+  filesCount: number;
+}
+
+export interface FrontendStaticFindingsFileSummaryDto {
+  relativePath: string;
+  matchCount: number;
+  rules: FrontendCapturePatternRule[];
+}
+
+export interface FrontendStaticFindingsViewDto {
+  executionId: string;
+  generatedAt: string;
+  totals: {
+    scannedFiles: number;
+    filesWithMatches: number;
+    matches: number;
+    distinctRules: number;
+  };
+  byRule: FrontendStaticFindingsRuleSummaryDto[];
+  files: FrontendStaticFindingsFileSummaryDto[];
+  evidenceId: string;
+}
+
 export type AuthenticatedEvaluationRole = "cliente" | "supervisor";
 
 export type AuthenticatedEvaluationErrorCode =
