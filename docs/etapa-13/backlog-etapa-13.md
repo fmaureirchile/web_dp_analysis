@@ -32,6 +32,6 @@ Extender el descubrimiento a sistemas internos con trazabilidad desde endpoint h
 ## Estado de cumplimiento parcial
 
 1. E13-T01: completada (indexacion minima de APIs backend con evidencia y consulta).
-2. E13-T02: pendiente.
+2. E13-T02: completada (deteccion inicial de puntos de procesamiento backend por archivo).
 3. E13-T03: pendiente.
 4. E13-T04: pendiente.

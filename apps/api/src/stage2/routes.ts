@@ -6,7 +6,11 @@ import {
   type BackendApiArtifactType,
   type BackendApiIndexedArtifactDto,
   type BackendApiIndexResultDto,
+  type BackendProcessingFileDetectionsDto,
+  type BackendProcessingMatchDto,
+  type BackendProcessingDetectionResultDto,
   type StartBackendApiIndexDto,
+  type StartBackendProcessingDetectionDto,
   type FrontendFilePatternDetectionsDto,
   type FrontendStaticFindingsViewDto,
   type FrontendPatternDetectionResultDto,
@@ -70,6 +74,7 @@ import {
   createReviewDecision,
   createTarget,
   getBackendApiIndexResult,
+  getBackendProcessingDetectionResult,
   getFrontendPatternDetectionResult,
   getFrontendRepositoryIndexResult,
   getDynamicObservationResult,
@@ -81,6 +86,7 @@ import {
   listTrackingInventoryByExecutionId,
   listOperationalExecutions,
   recordBackendApiIndexResult,
+  recordBackendProcessingDetectionResult,
   recordFrontendPatternDetectionResult,
   recordFrontendRepositoryIndexResult,
   recordDynamicObservationError,
@@ -297,6 +303,30 @@ function backendApiIndexError(
   };
 }
 
+function backendProcessingDetectionError(
+  executionId: string,
+  repositoryPath: string,
+  errorCode: "invalid_execution_id" | "invalid_repository_path" | "repository_path_not_found" | "detection_failed" | "result_not_available",
+  message: string
+): BackendProcessingDetectionResultDto {
+  return {
+    ok: false,
+    error: {
+      executionId,
+      repositoryPath,
+      errorCode,
+      message
+    }
+  };
+}
+
+const BACKEND_PROCESSING_PATTERNS: Array<{ rule: BackendProcessingMatchDto["rule"]; regex: RegExp }> = [
+  { rule: "ROUTE_HANDLER", regex: /\b(router|app)\.(get|post|put|patch|delete|use)\s*\(/i },
+  { rule: "CONTROLLER_USAGE", regex: /\bcontroller\b|controllers?\//i },
+  { rule: "SERVICE_USAGE", regex: /\bservice\b|services?\//i },
+  { rule: "INTEGRATION_USAGE", regex: /\b(prisma|redis|queue|webhook|axios|fetch|smtp|nodemailer|kafka|sqs)\b/i }
+];
+
 function detectBackendApiArtifactType(relativePath: string): BackendApiArtifactType | undefined {
   const normalized = relativePath.toLowerCase();
   const fileName = path.basename(normalized);
@@ -445,6 +475,54 @@ async function detectFrontendCapturePatterns(
 
   output.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
   return output;
+}
+
+async function detectBackendProcessingPoints(
+  repositoryPath: string,
+  artifacts: BackendApiIndexedArtifactDto[],
+  maxMatchesPerFile: number
+): Promise<BackendProcessingFileDetectionsDto[]> {
+  const files: BackendProcessingFileDetectionsDto[] = [];
+
+  for (const artifact of artifacts) {
+    const absolutePath = path.join(repositoryPath, artifact.relativePath);
+    let content = "";
+
+    try {
+      content = await fs.readFile(absolutePath, "utf8");
+    } catch {
+      continue;
+    }
+
+    const matches: BackendProcessingMatchDto[] = [];
+    for (const pattern of BACKEND_PROCESSING_PATTERNS) {
+      pattern.regex.lastIndex = 0;
+      const found = pattern.regex.exec(content);
+      if (!found || found.index === undefined) {
+        continue;
+      }
+
+      matches.push({
+        rule: pattern.rule,
+        line: lineFromOffset(content, found.index),
+        snippet: extractLineSnippet(content, found.index)
+      });
+
+      if (matches.length >= maxMatchesPerFile) {
+        break;
+      }
+    }
+
+    if (matches.length > 0) {
+      files.push({
+        relativePath: artifact.relativePath,
+        matches
+      });
+    }
+  }
+
+  files.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+  return files;
 }
 
 async function detectFrontendFramework(repositoryPath: string): Promise<FrontendFramework> {
@@ -1869,6 +1947,122 @@ export function createStage2Router(): Router {
     if (!result) {
       return res.status(422).setHeader("x-correlation-id", cid).json(
         backendApiIndexError(executionId, "unknown_repository", "result_not_available", "backend_api_index_result_not_available")
+      );
+    }
+
+    return res.status(200).setHeader("x-correlation-id", cid).json(result);
+  });
+
+  router.post("/code-analysis/backend/processing/start", async (req, res) => {
+    const cid = correlationId(req);
+    const body = req.body as StartBackendProcessingDetectionDto;
+
+    if (!body.executionId || body.executionId.trim().length === 0) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        backendProcessingDetectionError("unknown_execution", body.repositoryPath ?? "unknown_repository", "invalid_execution_id", "execution_id_required")
+      );
+    }
+
+    if (!body.repositoryPath || body.repositoryPath.trim().length === 0) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        backendProcessingDetectionError(body.executionId, "unknown_repository", "invalid_repository_path", "repository_path_required")
+      );
+    }
+
+    const maxFiles = body.maxFiles ?? 500;
+    if (!Number.isInteger(maxFiles) || maxFiles <= 0 || maxFiles > 3000) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        backendProcessingDetectionError(body.executionId, body.repositoryPath, "invalid_repository_path", "invalid_max_files")
+      );
+    }
+
+    const maxMatchesPerFile = body.maxMatchesPerFile ?? 5;
+    if (!Number.isInteger(maxMatchesPerFile) || maxMatchesPerFile <= 0 || maxMatchesPerFile > 25) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        backendProcessingDetectionError(body.executionId, body.repositoryPath, "invalid_repository_path", "invalid_max_matches_per_file")
+      );
+    }
+
+    const execution = await getExecutionByIdWithFallback(body.executionId);
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        backendProcessingDetectionError(body.executionId, body.repositoryPath, "invalid_execution_id", "execution_id_not_found")
+      );
+    }
+
+    const repositoryPath = path.resolve(body.repositoryPath);
+    const repositoryStat = await fs.stat(repositoryPath).catch(() => undefined);
+    if (!repositoryStat || !repositoryStat.isDirectory()) {
+      const failure = recordBackendProcessingDetectionResult(
+        body.executionId,
+        backendProcessingDetectionError(body.executionId, repositoryPath, "repository_path_not_found", "repository_path_not_found")
+      );
+      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
+    }
+
+    try {
+      await transitionExecutionState(body.executionId, ExecutionState.QUEUED, cid, "backend_processing_detection_queued");
+      await transitionExecutionState(body.executionId, ExecutionState.RUNNING, cid, "backend_processing_detection_started");
+
+      const artifacts = await collectBackendApiArtifacts(repositoryPath, maxFiles);
+      const files = await detectBackendProcessingPoints(repositoryPath, artifacts, maxMatchesPerFile);
+      const totalMatches = files.reduce((sum, file) => sum + file.matches.length, 0);
+
+      const evidence = createEvidence(
+        body.executionId,
+        EvidenceLevel.E2,
+        "BACKEND_PROCESSING_SUMMARY",
+        `memory://backend-processing/${body.executionId}`,
+        cid
+      );
+
+      const success: BackendProcessingDetectionResultDto = {
+        ok: true,
+        data: {
+          executionId: body.executionId,
+          repositoryPath,
+          detectedAt: new Date().toISOString(),
+          totalFilesScanned: artifacts.length,
+          totalFilesWithMatches: files.length,
+          totalMatches,
+          files,
+          evidenceId: evidence.id
+        }
+      };
+
+      recordBackendProcessingDetectionResult(body.executionId, success);
+      await transitionExecutionState(body.executionId, ExecutionState.COMPLETED, cid, "backend_processing_detection_completed");
+
+      return res.status(200).setHeader("x-correlation-id", cid).json(success);
+    } catch (error) {
+      const currentExecution = store.executions.get(body.executionId);
+      if (currentExecution?.state === ExecutionState.RUNNING || currentExecution?.state === ExecutionState.QUEUED) {
+        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "backend_processing_detection_failed");
+      }
+
+      const failure = recordBackendProcessingDetectionResult(
+        body.executionId,
+        backendProcessingDetectionError(body.executionId, repositoryPath, "detection_failed", (error as Error).message)
+      );
+      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
+    }
+  });
+
+  router.get("/code-analysis/backend/processing/:executionId/result", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const execution = await getExecutionByIdWithFallback(executionId);
+
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        backendProcessingDetectionError(executionId, "unknown_repository", "invalid_execution_id", "execution_id_not_found")
+      );
+    }
+
+    const result = getBackendProcessingDetectionResult(executionId);
+    if (!result) {
+      return res.status(422).setHeader("x-correlation-id", cid).json(
+        backendProcessingDetectionError(executionId, "unknown_repository", "result_not_available", "backend_processing_detection_result_not_available")
       );
     }
 

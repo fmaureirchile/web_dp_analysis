@@ -413,6 +413,61 @@ export interface BackendApiIndexResultDto {
   error?: BackendApiIndexErrorDto;
 }
 
+export type BackendProcessingRule =
+  | "ROUTE_HANDLER"
+  | "CONTROLLER_USAGE"
+  | "SERVICE_USAGE"
+  | "INTEGRATION_USAGE";
+
+export interface BackendProcessingMatchDto {
+  rule: BackendProcessingRule;
+  line: number;
+  snippet: string;
+}
+
+export interface BackendProcessingFileDetectionsDto {
+  relativePath: string;
+  matches: BackendProcessingMatchDto[];
+}
+
+export interface StartBackendProcessingDetectionDto {
+  executionId: string;
+  repositoryPath: string;
+  maxFiles?: number;
+  maxMatchesPerFile?: number;
+}
+
+export type BackendProcessingDetectionErrorCode =
+  | "invalid_execution_id"
+  | "invalid_repository_path"
+  | "repository_path_not_found"
+  | "detection_failed"
+  | "result_not_available";
+
+export interface BackendProcessingDetectionSuccessDto {
+  executionId: string;
+  repositoryPath: string;
+  detectedAt: string;
+  totalFilesScanned: number;
+  totalFilesWithMatches: number;
+  totalMatches: number;
+  files: BackendProcessingFileDetectionsDto[];
+  evidenceId: string;
+}
+
+export interface BackendProcessingDetectionErrorDto {
+  executionId: string;
+  repositoryPath: string;
+  errorCode: BackendProcessingDetectionErrorCode;
+  message: string;
+}
+
+export interface BackendProcessingDetectionResultDto {
+  ok: boolean;
+  data?: BackendProcessingDetectionSuccessDto;
+  error?: BackendProcessingDetectionErrorDto;
+}
+
 export type AuthenticatedEvaluationRole = "cliente" | "supervisor";
 
 export type AuthenticatedEvaluationErrorCode =

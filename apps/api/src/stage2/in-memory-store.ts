@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  type BackendProcessingDetectionResultDto,
   type BackendApiIndexResultDto,
   type FrontendPatternDetectionResultDto,
   type FrontendRepositoryIndexResultDto,
@@ -98,6 +99,12 @@ type FrontendPatternDetectionResultRecord = {
 type BackendApiIndexResultRecord = {
   executionId: string;
   result: BackendApiIndexResultDto;
+  updatedAt: string;
+};
+
+type BackendProcessingDetectionResultRecord = {
+  executionId: string;
+  result: BackendProcessingDetectionResultDto;
   updatedAt: string;
 };
 
@@ -312,6 +319,7 @@ export const store = {
   frontendRepositoryIndexResults: new Map<string, FrontendRepositoryIndexResultRecord>(),
   frontendPatternDetectionResults: new Map<string, FrontendPatternDetectionResultRecord>(),
   backendApiIndexResults: new Map<string, BackendApiIndexResultRecord>(),
+  backendProcessingDetectionResults: new Map<string, BackendProcessingDetectionResultRecord>(),
   browserDomSnapshots: new Map<string, BrowserDomSnapshotRecord>(),
   browserScreenshots: new Map<string, BrowserScreenshotRecord>()
 };
@@ -337,6 +345,7 @@ export function resetStore(): void {
   store.frontendRepositoryIndexResults.clear();
   store.frontendPatternDetectionResults.clear();
   store.backendApiIndexResults.clear();
+  store.backendProcessingDetectionResults.clear();
   store.browserDomSnapshots.clear();
   store.browserScreenshots.clear();
 }
@@ -650,6 +659,25 @@ export function recordBackendApiIndexResult(
 
 export function getBackendApiIndexResult(executionId: string): BackendApiIndexResultDto | undefined {
   return store.backendApiIndexResults.get(executionId)?.result;
+}
+
+export function recordBackendProcessingDetectionResult(
+  executionId: string,
+  result: BackendProcessingDetectionResultDto
+): BackendProcessingDetectionResultDto {
+  store.backendProcessingDetectionResults.set(executionId, {
+    executionId,
+    result,
+    updatedAt: nowIso()
+  });
+
+  return result;
+}
+
+export function getBackendProcessingDetectionResult(
+  executionId: string
+): BackendProcessingDetectionResultDto | undefined {
+  return store.backendProcessingDetectionResults.get(executionId)?.result;
 }
 
 export async function getExecutionByIdWithFallback(executionId: string): Promise<Execution | undefined> {
