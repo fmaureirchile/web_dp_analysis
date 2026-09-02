@@ -8,11 +8,11 @@
 ## Comando de validacion inicial
 
 ```bash
-corepack pnpm run lab:e12-1:gate
+corepack pnpm run lab:e12-2:gate
 ```
 
 ## Cuando usarlo
 
-1. Despues de modificar endpoints de indexacion frontend.
-2. Antes de agregar reglas de deteccion estaticas por archivo.
-3. Como chequeo rapido de no regresion entre Etapa 11 y el inicio de Etapa 12.
+1. Despues de modificar endpoints de indexacion o deteccion de patrones frontend.
+2. Antes de agregar la vista consolidada de hallazgos estaticos (E12-T03).
+3. Como chequeo rapido de no regresion entre Etapa 11 y el avance actual de Etapa 12.

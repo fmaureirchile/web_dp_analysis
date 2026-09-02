@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  type FrontendPatternDetectionResultDto,
   type FrontendRepositoryIndexResultDto,
   type DynamicObservationErrorDto,
   type DynamicObservationResultDto,
@@ -84,6 +85,12 @@ type DynamicObservationResultRecord = {
 type FrontendRepositoryIndexResultRecord = {
   executionId: string;
   result: FrontendRepositoryIndexResultDto;
+  updatedAt: string;
+};
+
+type FrontendPatternDetectionResultRecord = {
+  executionId: string;
+  result: FrontendPatternDetectionResultDto;
   updatedAt: string;
 };
 
@@ -296,6 +303,7 @@ export const store = {
   passiveSinglePageResults: new Map<string, PassiveSinglePageCrawlResultRecord>(),
   dynamicObservationResults: new Map<string, DynamicObservationResultRecord>(),
   frontendRepositoryIndexResults: new Map<string, FrontendRepositoryIndexResultRecord>(),
+  frontendPatternDetectionResults: new Map<string, FrontendPatternDetectionResultRecord>(),
   browserDomSnapshots: new Map<string, BrowserDomSnapshotRecord>(),
   browserScreenshots: new Map<string, BrowserScreenshotRecord>()
 };
@@ -319,6 +327,7 @@ export function resetStore(): void {
   store.passiveSinglePageResults.clear();
   store.dynamicObservationResults.clear();
   store.frontendRepositoryIndexResults.clear();
+  store.frontendPatternDetectionResults.clear();
   store.browserDomSnapshots.clear();
   store.browserScreenshots.clear();
 }
@@ -598,6 +607,23 @@ export function recordFrontendRepositoryIndexResult(
 
 export function getFrontendRepositoryIndexResult(executionId: string): FrontendRepositoryIndexResultDto | undefined {
   return store.frontendRepositoryIndexResults.get(executionId)?.result;
+}
+
+export function recordFrontendPatternDetectionResult(
+  executionId: string,
+  result: FrontendPatternDetectionResultDto
+): FrontendPatternDetectionResultDto {
+  store.frontendPatternDetectionResults.set(executionId, {
+    executionId,
+    result,
+    updatedAt: nowIso()
+  });
+
+  return result;
+}
+
+export function getFrontendPatternDetectionResult(executionId: string): FrontendPatternDetectionResultDto | undefined {
+  return store.frontendPatternDetectionResults.get(executionId)?.result;
 }
 
 export async function getExecutionByIdWithFallback(executionId: string): Promise<Execution | undefined> {

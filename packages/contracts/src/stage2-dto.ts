@@ -282,6 +282,62 @@ export interface FrontendRepositoryIndexResultDto {
   error?: FrontendRepositoryIndexErrorDto;
 }
 
+export type FrontendCapturePatternRule =
+  | "FORM_INPUT"
+  | "NETWORK_FETCH"
+  | "COOKIE_ACCESS"
+  | "STORAGE_ACCESS"
+  | "ANALYTICS_BEACON";
+
+export interface FrontendPatternMatchDto {
+  rule: FrontendCapturePatternRule;
+  line: number;
+  snippet: string;
+}
+
+export interface FrontendFilePatternDetectionsDto {
+  relativePath: string;
+  matches: FrontendPatternMatchDto[];
+}
+
+export interface StartFrontendPatternDetectionDto {
+  executionId: string;
+  repositoryPath: string;
+  maxFiles?: number;
+  maxMatchesPerFile?: number;
+}
+
+export type FrontendPatternDetectionErrorCode =
+  | "invalid_execution_id"
+  | "invalid_repository_path"
+  | "repository_path_not_found"
+  | "detection_failed"
+  | "result_not_available";
+
+export interface FrontendPatternDetectionSuccessDto {
+  executionId: string;
+  repositoryPath: string;
+  detectedAt: string;
+  totalFilesScanned: number;
+  totalFilesWithMatches: number;
+  totalMatches: number;
+  files: FrontendFilePatternDetectionsDto[];
+  evidenceId: string;
+}
+
+export interface FrontendPatternDetectionErrorDto {
+  executionId: string;
+  repositoryPath: string;
+  errorCode: FrontendPatternDetectionErrorCode;
+  message: string;
+}
+
+export interface FrontendPatternDetectionResultDto {
+  ok: boolean;
+  data?: FrontendPatternDetectionSuccessDto;
+  error?: FrontendPatternDetectionErrorDto;
+}
+
 export type AuthenticatedEvaluationRole = "cliente" | "supervisor";
 
 export type AuthenticatedEvaluationErrorCode =

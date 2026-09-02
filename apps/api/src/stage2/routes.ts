@@ -3,6 +3,10 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { Router, type Request, type Response } from "express";
 import {
+  type FrontendFilePatternDetectionsDto,
+  type FrontendPatternDetectionResultDto,
+  type FrontendPatternMatchDto,
+  type StartFrontendPatternDetectionDto,
   type FrontendFramework,
   type FrontendIndexedFileDto,
   type FrontendRepositoryIndexResultDto,
@@ -60,6 +64,7 @@ import {
   createProject,
   createReviewDecision,
   createTarget,
+  getFrontendPatternDetectionResult,
   getFrontendRepositoryIndexResult,
   getDynamicObservationResult,
   getExecutionByIdWithFallback,
@@ -69,6 +74,7 @@ import {
   listObservationReferencesByExecutionId,
   listTrackingInventoryByExecutionId,
   listOperationalExecutions,
+  recordFrontendPatternDetectionResult,
   recordFrontendRepositoryIndexResult,
   recordDynamicObservationError,
   recordDynamicObservationSuccess,
@@ -263,6 +269,91 @@ function frontendIndexError(
       message
     }
   };
+}
+
+function frontendPatternDetectionError(
+  executionId: string,
+  repositoryPath: string,
+  errorCode: "invalid_execution_id" | "invalid_repository_path" | "repository_path_not_found" | "detection_failed" | "result_not_available",
+  message: string
+): FrontendPatternDetectionResultDto {
+  return {
+    ok: false,
+    error: {
+      executionId,
+      repositoryPath,
+      errorCode,
+      message
+    }
+  };
+}
+
+const FRONTEND_CAPTURE_PATTERNS: Array<{ rule: FrontendPatternMatchDto["rule"]; regex: RegExp }> = [
+  { rule: "FORM_INPUT", regex: /<(input|textarea|select)\b|addEventListener\(\s*["'](?:input|change|submit)["']/i },
+  { rule: "NETWORK_FETCH", regex: /\b(fetch\s*\(|axios\.|XMLHttpRequest\b)/i },
+  { rule: "COOKIE_ACCESS", regex: /document\.cookie\b/i },
+  { rule: "STORAGE_ACCESS", regex: /\b(localStorage|sessionStorage)\b/i },
+  { rule: "ANALYTICS_BEACON", regex: /\b(gtag\s*\(|dataLayer\b|fbq\s*\(|analytics\.|sendBeacon\s*\()/i }
+];
+
+function lineFromOffset(content: string, offset: number): number {
+  return content.slice(0, offset).split(/\r?\n/).length;
+}
+
+function extractLineSnippet(content: string, offset: number): string {
+  const lineStart = Math.max(content.lastIndexOf("\n", offset - 1) + 1, 0);
+  const rawLineEnd = content.indexOf("\n", offset);
+  const lineEnd = rawLineEnd === -1 ? content.length : rawLineEnd;
+  return content.slice(lineStart, lineEnd).trim().slice(0, 220);
+}
+
+async function detectFrontendCapturePatterns(
+  repositoryPath: string,
+  files: FrontendIndexedFileDto[],
+  maxMatchesPerFile: number
+): Promise<FrontendFilePatternDetectionsDto[]> {
+  const output: FrontendFilePatternDetectionsDto[] = [];
+
+  for (const file of files) {
+    const absolutePath = path.join(repositoryPath, file.relativePath);
+    let content = "";
+
+    try {
+      content = await fs.readFile(absolutePath, "utf8");
+    } catch {
+      continue;
+    }
+
+    const matches: FrontendPatternMatchDto[] = [];
+
+    for (const pattern of FRONTEND_CAPTURE_PATTERNS) {
+      pattern.regex.lastIndex = 0;
+      const found = pattern.regex.exec(content);
+      if (!found || found.index === undefined) {
+        continue;
+      }
+
+      matches.push({
+        rule: pattern.rule,
+        line: lineFromOffset(content, found.index),
+        snippet: extractLineSnippet(content, found.index)
+      });
+
+      if (matches.length >= maxMatchesPerFile) {
+        break;
+      }
+    }
+
+    if (matches.length > 0) {
+      output.push({
+        relativePath: file.relativePath,
+        matches
+      });
+    }
+  }
+
+  output.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+  return output;
 }
 
 async function detectFrontendFramework(repositoryPath: string): Promise<FrontendFramework> {
@@ -1401,6 +1492,122 @@ export function createStage2Router(): Router {
     if (!result) {
       return res.status(422).setHeader("x-correlation-id", cid).json(
         frontendIndexError(executionId, "unknown_repository", "result_not_available", "frontend_index_result_not_available")
+      );
+    }
+
+    return res.status(200).setHeader("x-correlation-id", cid).json(result);
+  });
+
+  router.post("/code-analysis/frontend/patterns/start", async (req, res) => {
+    const cid = correlationId(req);
+    const body = req.body as StartFrontendPatternDetectionDto;
+
+    if (!body.executionId || body.executionId.trim().length === 0) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        frontendPatternDetectionError("unknown_execution", body.repositoryPath ?? "unknown_repository", "invalid_execution_id", "execution_id_required")
+      );
+    }
+
+    if (!body.repositoryPath || body.repositoryPath.trim().length === 0) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        frontendPatternDetectionError(body.executionId, "unknown_repository", "invalid_repository_path", "repository_path_required")
+      );
+    }
+
+    const maxFiles = body.maxFiles ?? 500;
+    if (!Number.isInteger(maxFiles) || maxFiles <= 0 || maxFiles > 2000) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        frontendPatternDetectionError(body.executionId, body.repositoryPath, "invalid_repository_path", "invalid_max_files")
+      );
+    }
+
+    const maxMatchesPerFile = body.maxMatchesPerFile ?? 5;
+    if (!Number.isInteger(maxMatchesPerFile) || maxMatchesPerFile <= 0 || maxMatchesPerFile > 25) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        frontendPatternDetectionError(body.executionId, body.repositoryPath, "invalid_repository_path", "invalid_max_matches_per_file")
+      );
+    }
+
+    const execution = await getExecutionByIdWithFallback(body.executionId);
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        frontendPatternDetectionError(body.executionId, body.repositoryPath, "invalid_execution_id", "execution_id_not_found")
+      );
+    }
+
+    const repositoryPath = path.resolve(body.repositoryPath);
+    const repositoryStat = await fs.stat(repositoryPath).catch(() => undefined);
+    if (!repositoryStat || !repositoryStat.isDirectory()) {
+      const failure = recordFrontendPatternDetectionResult(
+        body.executionId,
+        frontendPatternDetectionError(body.executionId, repositoryPath, "repository_path_not_found", "repository_path_not_found")
+      );
+      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
+    }
+
+    try {
+      await transitionExecutionState(body.executionId, ExecutionState.QUEUED, cid, "frontend_pattern_detection_queued");
+      await transitionExecutionState(body.executionId, ExecutionState.RUNNING, cid, "frontend_pattern_detection_started");
+
+      const indexedFiles = await collectFrontendFiles(repositoryPath, maxFiles);
+      const files = await detectFrontendCapturePatterns(repositoryPath, indexedFiles, maxMatchesPerFile);
+      const totalMatches = files.reduce((sum, file) => sum + file.matches.length, 0);
+
+      const evidence = createEvidence(
+        body.executionId,
+        EvidenceLevel.E2,
+        "FRONTEND_PATTERN_SUMMARY",
+        `memory://frontend-patterns/${body.executionId}`,
+        cid
+      );
+
+      const success: FrontendPatternDetectionResultDto = {
+        ok: true,
+        data: {
+          executionId: body.executionId,
+          repositoryPath,
+          detectedAt: new Date().toISOString(),
+          totalFilesScanned: indexedFiles.length,
+          totalFilesWithMatches: files.length,
+          totalMatches,
+          files,
+          evidenceId: evidence.id
+        }
+      };
+
+      recordFrontendPatternDetectionResult(body.executionId, success);
+      await transitionExecutionState(body.executionId, ExecutionState.COMPLETED, cid, "frontend_pattern_detection_completed");
+
+      return res.status(200).setHeader("x-correlation-id", cid).json(success);
+    } catch (error) {
+      const currentExecution = store.executions.get(body.executionId);
+      if (currentExecution?.state === ExecutionState.RUNNING || currentExecution?.state === ExecutionState.QUEUED) {
+        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "frontend_pattern_detection_failed");
+      }
+
+      const failure = recordFrontendPatternDetectionResult(
+        body.executionId,
+        frontendPatternDetectionError(body.executionId, repositoryPath, "detection_failed", (error as Error).message)
+      );
+      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
+    }
+  });
+
+  router.get("/code-analysis/frontend/patterns/:executionId/result", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const execution = await getExecutionByIdWithFallback(executionId);
+
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        frontendPatternDetectionError(executionId, "unknown_repository", "invalid_execution_id", "execution_id_not_found")
+      );
+    }
+
+    const result = getFrontendPatternDetectionResult(executionId);
+    if (!result) {
+      return res.status(422).setHeader("x-correlation-id", cid).json(
+        frontendPatternDetectionError(executionId, "unknown_repository", "result_not_available", "frontend_pattern_detection_result_not_available")
       );
     }
 

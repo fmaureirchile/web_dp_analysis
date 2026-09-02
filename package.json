@@ -47,7 +47,8 @@
     "lab:e11-2:gate": "corepack pnpm run lab:e11-1:gate && vitest run --config vitest.integration.config.ts --run tests/integration/stage11-session-isolation.integration.test.ts",
     "lab:e11-3:gate": "corepack pnpm run lab:e11-2:gate && vitest run --config vitest.integration.config.ts --run tests/integration/stage11-auth-evidence-flow.integration.test.ts",
     "lab:e11:gate": "corepack pnpm run lab:e11-3:gate",
-    "lab:e12-1:gate": "corepack pnpm run lab:e11:gate && vitest run --config vitest.integration.config.ts --run tests/integration/stage12-frontend-indexing.integration.test.ts"
+    "lab:e12-1:gate": "corepack pnpm run lab:e11:gate && vitest run --config vitest.integration.config.ts --run tests/integration/stage12-frontend-indexing.integration.test.ts",
+    "lab:e12-2:gate": "corepack pnpm run lab:e12-1:gate && vitest run --config vitest.integration.config.ts --run tests/integration/stage12-frontend-pattern-detection.integration.test.ts"
   },
   "prisma": {
     "seed": "tsx database/seeds/stage2.seed.ts"
