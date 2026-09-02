@@ -231,6 +231,57 @@ export interface TrackingInventoryReportDto {
   cookies: CookieInventoryItemDto[];
 }
 
+export type FrontendFramework = "REACT" | "NEXT" | "VUE" | "ANGULAR" | "SVELTE" | "UNKNOWN";
+
+export interface FrontendIndexedFileDto {
+  relativePath: string;
+  extension: string;
+  bytes: number;
+}
+
+export interface FrontendFileTypeCountDto {
+  extension: string;
+  count: number;
+}
+
+export interface StartFrontendRepositoryIndexDto {
+  executionId: string;
+  repositoryPath: string;
+  maxFiles?: number;
+}
+
+export type FrontendRepositoryIndexErrorCode =
+  | "invalid_execution_id"
+  | "invalid_repository_path"
+  | "repository_path_not_found"
+  | "indexing_failed"
+  | "result_not_available";
+
+export interface FrontendRepositoryIndexSuccessDto {
+  executionId: string;
+  repositoryPath: string;
+  indexedAt: string;
+  framework: FrontendFramework;
+  totalFiles: number;
+  totalBytes: number;
+  fileTypeCounts: FrontendFileTypeCountDto[];
+  sampleFiles: FrontendIndexedFileDto[];
+  evidenceId: string;
+}
+
+export interface FrontendRepositoryIndexErrorDto {
+  executionId: string;
+  repositoryPath: string;
+  errorCode: FrontendRepositoryIndexErrorCode;
+  message: string;
+}
+
+export interface FrontendRepositoryIndexResultDto {
+  ok: boolean;
+  data?: FrontendRepositoryIndexSuccessDto;
+  error?: FrontendRepositoryIndexErrorDto;
+}
+
 export type AuthenticatedEvaluationRole = "cliente" | "supervisor";
 
 export type AuthenticatedEvaluationErrorCode =

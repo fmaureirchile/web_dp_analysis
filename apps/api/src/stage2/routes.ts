@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import { Router, type Request, type Response } from "express";
 import {
+  type FrontendFramework,
+  type FrontendIndexedFileDto,
+  type FrontendRepositoryIndexResultDto,
+  type StartFrontendRepositoryIndexDto,
   type AuthenticatedEvaluationResultDto,
   type StartAuthenticatedEvaluationDto,
   type TrackingInventoryReportDto,
@@ -54,6 +60,7 @@ import {
   createProject,
   createReviewDecision,
   createTarget,
+  getFrontendRepositoryIndexResult,
   getDynamicObservationResult,
   getExecutionByIdWithFallback,
   getPassiveSinglePageCrawlResult,
@@ -62,6 +69,7 @@ import {
   listObservationReferencesByExecutionId,
   listTrackingInventoryByExecutionId,
   listOperationalExecutions,
+  recordFrontendRepositoryIndexResult,
   recordDynamicObservationError,
   recordDynamicObservationSuccess,
   recordPassiveSinglePageCrawlError,
@@ -235,6 +243,89 @@ function parseEvidenceLimit(raw: string | undefined): number | undefined {
   }
 
   return parsed;
+}
+
+const FRONTEND_ALLOWED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".vue", ".svelte", ".html", ".css", ".scss"]);
+const FRONTEND_IGNORED_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", "coverage", ".next"]);
+
+function frontendIndexError(
+  executionId: string,
+  repositoryPath: string,
+  errorCode: "invalid_execution_id" | "invalid_repository_path" | "repository_path_not_found" | "indexing_failed" | "result_not_available",
+  message: string
+): FrontendRepositoryIndexResultDto {
+  return {
+    ok: false,
+    error: {
+      executionId,
+      repositoryPath,
+      errorCode,
+      message
+    }
+  };
+}
+
+async function detectFrontendFramework(repositoryPath: string): Promise<FrontendFramework> {
+  const packageJsonPath = path.join(repositoryPath, "package.json");
+  try {
+    const raw = await fs.readFile(packageJsonPath, "utf8");
+    const parsed = JSON.parse(raw) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+
+    const deps = {
+      ...(parsed.dependencies ?? {}),
+      ...(parsed.devDependencies ?? {})
+    };
+
+    if (deps.react) return "REACT";
+    if (deps.next) return "NEXT";
+    if (deps.vue) return "VUE";
+    if (deps["@angular/core"]) return "ANGULAR";
+    if (deps.svelte) return "SVELTE";
+    return "UNKNOWN";
+  } catch {
+    return "UNKNOWN";
+  }
+}
+
+async function collectFrontendFiles(repositoryPath: string, maxFiles: number): Promise<FrontendIndexedFileDto[]> {
+  const files: FrontendIndexedFileDto[] = [];
+  const stack: string[] = [repositoryPath];
+
+  while (stack.length > 0 && files.length < maxFiles) {
+    const currentDir = stack.pop() as string;
+    const entries = await fs.readdir(currentDir, { withFileTypes: true });
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+
+    for (const entry of entries) {
+      if (files.length >= maxFiles) break;
+      const absolutePath = path.join(currentDir, entry.name);
+
+      if (entry.isDirectory()) {
+        if (!FRONTEND_IGNORED_DIRECTORIES.has(entry.name)) {
+          stack.push(absolutePath);
+        }
+        continue;
+      }
+
+      if (!entry.isFile()) continue;
+
+      const extension = path.extname(entry.name).toLowerCase();
+      if (!FRONTEND_ALLOWED_EXTENSIONS.has(extension)) continue;
+
+      const stat = await fs.stat(absolutePath);
+      files.push({
+        relativePath: path.relative(repositoryPath, absolutePath).replaceAll("\\", "/"),
+        extension,
+        bytes: stat.size
+      });
+    }
+  }
+
+  files.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+  return files;
 }
 
 export function createStage2Router(): Router {
@@ -1197,6 +1288,123 @@ export function createStage2Router(): Router {
         authenticatedEvaluationError(body.executionId, body.entryUrl, "internal_error", (error as Error).message)
       );
     }
+  });
+
+  router.post("/code-analysis/frontend/index/start", async (req, res) => {
+    const cid = correlationId(req);
+    const body = req.body as StartFrontendRepositoryIndexDto;
+
+    if (!body.executionId || body.executionId.trim().length === 0) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        frontendIndexError("unknown_execution", body.repositoryPath ?? "unknown_repository", "invalid_execution_id", "execution_id_required")
+      );
+    }
+
+    if (!body.repositoryPath || body.repositoryPath.trim().length === 0) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        frontendIndexError(body.executionId, "unknown_repository", "invalid_repository_path", "repository_path_required")
+      );
+    }
+
+    const maxFiles = body.maxFiles ?? 500;
+    if (!Number.isInteger(maxFiles) || maxFiles <= 0 || maxFiles > 2000) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        frontendIndexError(body.executionId, body.repositoryPath, "invalid_repository_path", "invalid_max_files")
+      );
+    }
+
+    const execution = await getExecutionByIdWithFallback(body.executionId);
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        frontendIndexError(body.executionId, body.repositoryPath, "invalid_execution_id", "execution_id_not_found")
+      );
+    }
+
+    const repositoryPath = path.resolve(body.repositoryPath);
+    const repositoryStat = await fs.stat(repositoryPath).catch(() => undefined);
+    if (!repositoryStat || !repositoryStat.isDirectory()) {
+      const failure = recordFrontendRepositoryIndexResult(
+        body.executionId,
+        frontendIndexError(body.executionId, repositoryPath, "repository_path_not_found", "repository_path_not_found")
+      );
+      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
+    }
+
+    try {
+      await transitionExecutionState(body.executionId, ExecutionState.QUEUED, cid, "frontend_index_queued");
+      await transitionExecutionState(body.executionId, ExecutionState.RUNNING, cid, "frontend_index_started");
+
+      const framework = await detectFrontendFramework(repositoryPath);
+      const indexedFiles = await collectFrontendFiles(repositoryPath, maxFiles);
+      const totalBytes = indexedFiles.reduce((sum, file) => sum + file.bytes, 0);
+
+      const fileTypeCountMap = new Map<string, number>();
+      for (const file of indexedFiles) {
+        fileTypeCountMap.set(file.extension, (fileTypeCountMap.get(file.extension) ?? 0) + 1);
+      }
+
+      const evidence = createEvidence(
+        body.executionId,
+        EvidenceLevel.E2,
+        "FRONTEND_INDEX_SUMMARY",
+        `memory://frontend-index/${body.executionId}`,
+        cid
+      );
+
+      const success: FrontendRepositoryIndexResultDto = {
+        ok: true,
+        data: {
+          executionId: body.executionId,
+          repositoryPath,
+          indexedAt: new Date().toISOString(),
+          framework,
+          totalFiles: indexedFiles.length,
+          totalBytes,
+          fileTypeCounts: Array.from(fileTypeCountMap.entries())
+            .map(([extension, count]) => ({ extension, count }))
+            .sort((a, b) => a.extension.localeCompare(b.extension)),
+          sampleFiles: indexedFiles.slice(0, 25),
+          evidenceId: evidence.id
+        }
+      };
+
+      recordFrontendRepositoryIndexResult(body.executionId, success);
+      await transitionExecutionState(body.executionId, ExecutionState.COMPLETED, cid, "frontend_index_completed");
+
+      return res.status(200).setHeader("x-correlation-id", cid).json(success);
+    } catch (error) {
+      const currentExecution = store.executions.get(body.executionId);
+      if (currentExecution?.state === ExecutionState.RUNNING || currentExecution?.state === ExecutionState.QUEUED) {
+        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "frontend_index_failed");
+      }
+
+      const failure = recordFrontendRepositoryIndexResult(
+        body.executionId,
+        frontendIndexError(body.executionId, repositoryPath, "indexing_failed", (error as Error).message)
+      );
+      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
+    }
+  });
+
+  router.get("/code-analysis/frontend/index/:executionId/result", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const execution = await getExecutionByIdWithFallback(executionId);
+
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        frontendIndexError(executionId, "unknown_repository", "invalid_execution_id", "execution_id_not_found")
+      );
+    }
+
+    const result = getFrontendRepositoryIndexResult(executionId);
+    if (!result) {
+      return res.status(422).setHeader("x-correlation-id", cid).json(
+        frontendIndexError(executionId, "unknown_repository", "result_not_available", "frontend_index_result_not_available")
+      );
+    }
+
+    return res.status(200).setHeader("x-correlation-id", cid).json(result);
   });
 
   router.post("/findings", (req, res) => {
