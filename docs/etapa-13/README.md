@@ -8,11 +8,11 @@
 ## Comando de validacion inicial
 
 ```bash
-corepack pnpm run lab:e13-2:gate
+corepack pnpm run lab:e13-3:gate
 ```
 
 ## Cuando usarlo
 
 1. Despues de modificar endpoints o contratos de indexacion/deteccion backend en Etapa 13.
-2. Antes de avanzar a la vista consolidada de recorrido API -> procesamiento (E13-T03).
+2. Antes de consolidar gate final de etapa (E13-T04).
 3. Como chequeo rapido de no regresion entre Etapa 12 y el avance actual de Etapa 13.

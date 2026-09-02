@@ -468,6 +468,36 @@ export interface BackendProcessingDetectionResultDto {
   error?: BackendProcessingDetectionErrorDto;
 }
 
+export interface BackendProcessingFlowRuleSummaryDto {
+  rule: BackendProcessingRule;
+  matchCount: number;
+  filesCount: number;
+}
+
+export interface BackendProcessingFlowFileSummaryDto {
+  relativePath: string;
+  artifactType?: BackendApiArtifactType;
+  matchCount: number;
+  rules: BackendProcessingRule[];
+}
+
+export interface BackendProcessingFlowViewDto {
+  executionId: string;
+  generatedAt: string;
+  totals: {
+    apiArtifacts: number;
+    filesWithProcessingMatches: number;
+    processingMatches: number;
+    distinctProcessingRules: number;
+  };
+  byRule: BackendProcessingFlowRuleSummaryDto[];
+  files: BackendProcessingFlowFileSummaryDto[];
+  evidenceIds: {
+    apiIndexEvidenceId: string;
+    processingEvidenceId: string;
+  };
+}
+
 export type AuthenticatedEvaluationRole = "cliente" | "supervisor";
 
 export type AuthenticatedEvaluationErrorCode =

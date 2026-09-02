@@ -7,6 +7,7 @@ import {
   type BackendApiIndexedArtifactDto,
   type BackendApiIndexResultDto,
   type BackendProcessingFileDetectionsDto,
+  type BackendProcessingFlowViewDto,
   type BackendProcessingMatchDto,
   type BackendProcessingDetectionResultDto,
   type StartBackendApiIndexDto,
@@ -327,6 +328,11 @@ const BACKEND_PROCESSING_PATTERNS: Array<{ rule: BackendProcessingMatchDto["rule
   { rule: "INTEGRATION_USAGE", regex: /\b(prisma|redis|queue|webhook|axios|fetch|smtp|nodemailer|kafka|sqs)\b/i }
 ];
 
+type BackendProcessingCandidateFile = {
+  relativePath: string;
+  bytes: number;
+};
+
 function detectBackendApiArtifactType(relativePath: string): BackendApiArtifactType | undefined {
   const normalized = relativePath.toLowerCase();
   const fileName = path.basename(normalized);
@@ -479,13 +485,13 @@ async function detectFrontendCapturePatterns(
 
 async function detectBackendProcessingPoints(
   repositoryPath: string,
-  artifacts: BackendApiIndexedArtifactDto[],
+  candidates: BackendProcessingCandidateFile[],
   maxMatchesPerFile: number
 ): Promise<BackendProcessingFileDetectionsDto[]> {
   const files: BackendProcessingFileDetectionsDto[] = [];
 
-  for (const artifact of artifacts) {
-    const absolutePath = path.join(repositoryPath, artifact.relativePath);
+  for (const candidate of candidates) {
+    const absolutePath = path.join(repositoryPath, candidate.relativePath);
     let content = "";
 
     try {
@@ -515,8 +521,71 @@ async function detectBackendProcessingPoints(
 
     if (matches.length > 0) {
       files.push({
-        relativePath: artifact.relativePath,
+        relativePath: candidate.relativePath,
         matches
+      });
+    }
+  }
+
+  files.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+  return files;
+}
+
+function isBackendProcessingCandidate(relativePath: string): boolean {
+  const normalized = relativePath.toLowerCase();
+  const fileName = path.basename(normalized);
+
+  if (normalized.includes("/apps/api/")) {
+    return true;
+  }
+
+  return (
+    fileName.includes("route") ||
+    fileName.includes("controller") ||
+    fileName.includes("service") ||
+    normalized.includes("/routes/") ||
+    normalized.includes("/controllers/") ||
+    normalized.includes("/services/") ||
+    normalized.includes("/integrations/") ||
+    normalized.includes("/webhooks/")
+  );
+}
+
+async function collectBackendProcessingCandidates(
+  repositoryPath: string,
+  maxFiles: number
+): Promise<BackendProcessingCandidateFile[]> {
+  const files: BackendProcessingCandidateFile[] = [];
+  const stack: string[] = [repositoryPath];
+
+  while (stack.length > 0 && files.length < maxFiles) {
+    const currentDir = stack.pop() as string;
+    const entries = await fs.readdir(currentDir, { withFileTypes: true });
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+
+    for (const entry of entries) {
+      if (files.length >= maxFiles) break;
+      const absolutePath = path.join(currentDir, entry.name);
+
+      if (entry.isDirectory()) {
+        if (!BACKEND_API_IGNORED_DIRECTORIES.has(entry.name)) {
+          stack.push(absolutePath);
+        }
+        continue;
+      }
+
+      if (!entry.isFile()) continue;
+
+      const extension = path.extname(entry.name).toLowerCase();
+      if (!BACKEND_API_ALLOWED_EXTENSIONS.has(extension)) continue;
+
+      const relativePath = path.relative(repositoryPath, absolutePath).replaceAll("\\", "/");
+      if (!isBackendProcessingCandidate(relativePath)) continue;
+
+      const stat = await fs.stat(absolutePath);
+      files.push({
+        relativePath,
+        bytes: stat.size
       });
     }
   }
@@ -1882,8 +1951,21 @@ export function createStage2Router(): Router {
     }
 
     try {
-      await transitionExecutionState(body.executionId, ExecutionState.QUEUED, cid, "backend_api_index_queued");
-      await transitionExecutionState(body.executionId, ExecutionState.RUNNING, cid, "backend_api_index_started");
+      const currentState = store.executions.get(body.executionId)?.state;
+      const shouldTransitionLifecycle = currentState === ExecutionState.VALIDATED;
+
+      if (
+        currentState !== ExecutionState.VALIDATED &&
+        currentState !== ExecutionState.COMPLETED &&
+        currentState !== ExecutionState.COMPLETED_WITH_WARNINGS
+      ) {
+        throw new Error(`execution_invalid_state_for_backend_api_index:${currentState ?? "unknown"}`);
+      }
+
+      if (shouldTransitionLifecycle) {
+        await transitionExecutionState(body.executionId, ExecutionState.QUEUED, cid, "backend_api_index_queued");
+        await transitionExecutionState(body.executionId, ExecutionState.RUNNING, cid, "backend_api_index_started");
+      }
 
       const artifacts = await collectBackendApiArtifacts(repositoryPath, maxFiles);
       const typeMap = new Map<BackendApiArtifactType, number>();
@@ -1915,7 +1997,9 @@ export function createStage2Router(): Router {
       };
 
       recordBackendApiIndexResult(body.executionId, success);
-      await transitionExecutionState(body.executionId, ExecutionState.COMPLETED, cid, "backend_api_index_completed");
+      if (shouldTransitionLifecycle) {
+        await transitionExecutionState(body.executionId, ExecutionState.COMPLETED, cid, "backend_api_index_completed");
+      }
 
       return res.status(200).setHeader("x-correlation-id", cid).json(success);
     } catch (error) {
@@ -2001,11 +2085,24 @@ export function createStage2Router(): Router {
     }
 
     try {
-      await transitionExecutionState(body.executionId, ExecutionState.QUEUED, cid, "backend_processing_detection_queued");
-      await transitionExecutionState(body.executionId, ExecutionState.RUNNING, cid, "backend_processing_detection_started");
+      const currentState = store.executions.get(body.executionId)?.state;
+      const shouldTransitionLifecycle = currentState === ExecutionState.VALIDATED;
 
-      const artifacts = await collectBackendApiArtifacts(repositoryPath, maxFiles);
-      const files = await detectBackendProcessingPoints(repositoryPath, artifacts, maxMatchesPerFile);
+      if (
+        currentState !== ExecutionState.VALIDATED &&
+        currentState !== ExecutionState.COMPLETED &&
+        currentState !== ExecutionState.COMPLETED_WITH_WARNINGS
+      ) {
+        throw new Error(`execution_invalid_state_for_backend_processing_detection:${currentState ?? "unknown"}`);
+      }
+
+      if (shouldTransitionLifecycle) {
+        await transitionExecutionState(body.executionId, ExecutionState.QUEUED, cid, "backend_processing_detection_queued");
+        await transitionExecutionState(body.executionId, ExecutionState.RUNNING, cid, "backend_processing_detection_started");
+      }
+
+      const candidates = await collectBackendProcessingCandidates(repositoryPath, maxFiles);
+      const files = await detectBackendProcessingPoints(repositoryPath, candidates, maxMatchesPerFile);
       const totalMatches = files.reduce((sum, file) => sum + file.matches.length, 0);
 
       const evidence = createEvidence(
@@ -2022,7 +2119,7 @@ export function createStage2Router(): Router {
           executionId: body.executionId,
           repositoryPath,
           detectedAt: new Date().toISOString(),
-          totalFilesScanned: artifacts.length,
+          totalFilesScanned: candidates.length,
           totalFilesWithMatches: files.length,
           totalMatches,
           files,
@@ -2031,7 +2128,9 @@ export function createStage2Router(): Router {
       };
 
       recordBackendProcessingDetectionResult(body.executionId, success);
-      await transitionExecutionState(body.executionId, ExecutionState.COMPLETED, cid, "backend_processing_detection_completed");
+      if (shouldTransitionLifecycle) {
+        await transitionExecutionState(body.executionId, ExecutionState.COMPLETED, cid, "backend_processing_detection_completed");
+      }
 
       return res.status(200).setHeader("x-correlation-id", cid).json(success);
     } catch (error) {
@@ -2067,6 +2166,79 @@ export function createStage2Router(): Router {
     }
 
     return res.status(200).setHeader("x-correlation-id", cid).json(result);
+  });
+
+  router.get("/code-analysis/backend/processing-flow/:executionId/view", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const execution = await getExecutionByIdWithFallback(executionId);
+
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
+    }
+
+    const apiIndexResult = getBackendApiIndexResult(executionId);
+    if (!apiIndexResult || !apiIndexResult.ok || !apiIndexResult.data) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "backend_api_index_result_not_available" });
+    }
+
+    const processingResult = getBackendProcessingDetectionResult(executionId);
+    if (!processingResult || !processingResult.ok || !processingResult.data) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "backend_processing_detection_result_not_available" });
+    }
+
+    const artifactTypeByPath = new Map<string, BackendApiArtifactType>();
+    for (const artifact of apiIndexResult.data.artifacts) {
+      artifactTypeByPath.set(artifact.relativePath, artifact.artifactType);
+    }
+
+    const ruleStats = new Map<BackendProcessingMatchDto["rule"], { matches: number; files: Set<string> }>();
+    const fileSummaries = processingResult.data.files
+      .map((file) => {
+        const rules = Array.from(new Set(file.matches.map((match) => match.rule))).sort();
+
+        for (const match of file.matches) {
+          const current = ruleStats.get(match.rule) ?? { matches: 0, files: new Set<string>() };
+          current.matches += 1;
+          current.files.add(file.relativePath);
+          ruleStats.set(match.rule, current);
+        }
+
+        return {
+          relativePath: file.relativePath,
+          artifactType: artifactTypeByPath.get(file.relativePath),
+          matchCount: file.matches.length,
+          rules
+        };
+      })
+      .sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+
+    const byRule = Array.from(ruleStats.entries())
+      .map(([rule, stats]) => ({
+        rule,
+        matchCount: stats.matches,
+        filesCount: stats.files.size
+      }))
+      .sort((a, b) => a.rule.localeCompare(b.rule));
+
+    const payload: BackendProcessingFlowViewDto = {
+      executionId,
+      generatedAt: new Date().toISOString(),
+      totals: {
+        apiArtifacts: apiIndexResult.data.totalArtifacts,
+        filesWithProcessingMatches: processingResult.data.totalFilesWithMatches,
+        processingMatches: processingResult.data.totalMatches,
+        distinctProcessingRules: byRule.length
+      },
+      byRule,
+      files: fileSummaries,
+      evidenceIds: {
+        apiIndexEvidenceId: apiIndexResult.data.evidenceId,
+        processingEvidenceId: processingResult.data.evidenceId
+      }
+    };
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
   });
 
   router.post("/findings", (req, res) => {
