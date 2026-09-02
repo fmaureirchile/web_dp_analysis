@@ -364,6 +364,55 @@ export interface FrontendStaticFindingsViewDto {
   evidenceId: string;
 }
 
+export type BackendApiArtifactType = "OPENAPI" | "GRAPHQL" | "ROUTE" | "DTO";
+
+export interface BackendApiIndexedArtifactDto {
+  relativePath: string;
+  artifactType: BackendApiArtifactType;
+  bytes: number;
+}
+
+export interface BackendApiArtifactTypeCountDto {
+  artifactType: BackendApiArtifactType;
+  count: number;
+}
+
+export interface StartBackendApiIndexDto {
+  executionId: string;
+  repositoryPath: string;
+  maxFiles?: number;
+}
+
+export type BackendApiIndexErrorCode =
+  | "invalid_execution_id"
+  | "invalid_repository_path"
+  | "repository_path_not_found"
+  | "indexing_failed"
+  | "result_not_available";
+
+export interface BackendApiIndexSuccessDto {
+  executionId: string;
+  repositoryPath: string;
+  indexedAt: string;
+  totalArtifacts: number;
+  artifactTypeCounts: BackendApiArtifactTypeCountDto[];
+  artifacts: BackendApiIndexedArtifactDto[];
+  evidenceId: string;
+}
+
+export interface BackendApiIndexErrorDto {
+  executionId: string;
+  repositoryPath: string;
+  errorCode: BackendApiIndexErrorCode;
+  message: string;
+}
+
+export interface BackendApiIndexResultDto {
+  ok: boolean;
+  data?: BackendApiIndexSuccessDto;
+  error?: BackendApiIndexErrorDto;
+}
+
 export type AuthenticatedEvaluationRole = "cliente" | "supervisor";
 
 export type AuthenticatedEvaluationErrorCode =

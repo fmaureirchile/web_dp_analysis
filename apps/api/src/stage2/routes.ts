@@ -3,6 +3,10 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { Router, type Request, type Response } from "express";
 import {
+  type BackendApiArtifactType,
+  type BackendApiIndexedArtifactDto,
+  type BackendApiIndexResultDto,
+  type StartBackendApiIndexDto,
   type FrontendFilePatternDetectionsDto,
   type FrontendStaticFindingsViewDto,
   type FrontendPatternDetectionResultDto,
@@ -65,6 +69,7 @@ import {
   createProject,
   createReviewDecision,
   createTarget,
+  getBackendApiIndexResult,
   getFrontendPatternDetectionResult,
   getFrontendRepositoryIndexResult,
   getDynamicObservationResult,
@@ -75,6 +80,7 @@ import {
   listObservationReferencesByExecutionId,
   listTrackingInventoryByExecutionId,
   listOperationalExecutions,
+  recordBackendApiIndexResult,
   recordFrontendPatternDetectionResult,
   recordFrontendRepositoryIndexResult,
   recordDynamicObservationError,
@@ -254,6 +260,8 @@ function parseEvidenceLimit(raw: string | undefined): number | undefined {
 
 const FRONTEND_ALLOWED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".vue", ".svelte", ".html", ".css", ".scss"]);
 const FRONTEND_IGNORED_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", "coverage", ".next"]);
+const BACKEND_API_ALLOWED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".json", ".yaml", ".yml", ".graphql", ".gql"]);
+const BACKEND_API_IGNORED_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", "coverage", ".next", "validate_job_logs", "validate-job-logs"]);
 
 function frontendIndexError(
   executionId: string,
@@ -270,6 +278,88 @@ function frontendIndexError(
       message
     }
   };
+}
+
+function backendApiIndexError(
+  executionId: string,
+  repositoryPath: string,
+  errorCode: "invalid_execution_id" | "invalid_repository_path" | "repository_path_not_found" | "indexing_failed" | "result_not_available",
+  message: string
+): BackendApiIndexResultDto {
+  return {
+    ok: false,
+    error: {
+      executionId,
+      repositoryPath,
+      errorCode,
+      message
+    }
+  };
+}
+
+function detectBackendApiArtifactType(relativePath: string): BackendApiArtifactType | undefined {
+  const normalized = relativePath.toLowerCase();
+  const fileName = path.basename(normalized);
+
+  if (fileName.includes("openapi") || fileName.includes("swagger")) {
+    return "OPENAPI";
+  }
+
+  if (normalized.endsWith(".graphql") || normalized.endsWith(".gql") || normalized.includes("graphql")) {
+    return "GRAPHQL";
+  }
+
+  if (fileName.includes("route") || normalized.includes("/routes/")) {
+    return "ROUTE";
+  }
+
+  if (fileName.includes("dto") || normalized.includes("/contracts/")) {
+    return "DTO";
+  }
+
+  return undefined;
+}
+
+async function collectBackendApiArtifacts(repositoryPath: string, maxFiles: number): Promise<BackendApiIndexedArtifactDto[]> {
+  const artifacts: BackendApiIndexedArtifactDto[] = [];
+  const stack: string[] = [repositoryPath];
+
+  while (stack.length > 0 && artifacts.length < maxFiles) {
+    const currentDir = stack.pop() as string;
+    const entries = await fs.readdir(currentDir, { withFileTypes: true });
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+
+    for (const entry of entries) {
+      if (artifacts.length >= maxFiles) break;
+      const absolutePath = path.join(currentDir, entry.name);
+
+      if (entry.isDirectory()) {
+        if (!BACKEND_API_IGNORED_DIRECTORIES.has(entry.name)) {
+          stack.push(absolutePath);
+        }
+        continue;
+      }
+
+      if (!entry.isFile()) continue;
+
+      const extension = path.extname(entry.name).toLowerCase();
+      if (!BACKEND_API_ALLOWED_EXTENSIONS.has(extension)) continue;
+
+      const relativePath = path.relative(repositoryPath, absolutePath).replaceAll("\\", "/");
+      const artifactType = detectBackendApiArtifactType(relativePath);
+      if (!artifactType) continue;
+
+      const stat = await fs.stat(absolutePath);
+      artifacts.push({
+        relativePath,
+        artifactType,
+        bytes: stat.size
+      });
+    }
+  }
+
+  artifacts.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+  return artifacts;
 }
 
 function frontendPatternDetectionError(
@@ -1671,6 +1761,118 @@ export function createStage2Router(): Router {
     };
 
     return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
+  });
+
+  router.post("/code-analysis/backend/api-index/start", async (req, res) => {
+    const cid = correlationId(req);
+    const body = req.body as StartBackendApiIndexDto;
+
+    if (!body.executionId || body.executionId.trim().length === 0) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        backendApiIndexError("unknown_execution", body.repositoryPath ?? "unknown_repository", "invalid_execution_id", "execution_id_required")
+      );
+    }
+
+    if (!body.repositoryPath || body.repositoryPath.trim().length === 0) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        backendApiIndexError(body.executionId, "unknown_repository", "invalid_repository_path", "repository_path_required")
+      );
+    }
+
+    const maxFiles = body.maxFiles ?? 500;
+    if (!Number.isInteger(maxFiles) || maxFiles <= 0 || maxFiles > 3000) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        backendApiIndexError(body.executionId, body.repositoryPath, "invalid_repository_path", "invalid_max_files")
+      );
+    }
+
+    const execution = await getExecutionByIdWithFallback(body.executionId);
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        backendApiIndexError(body.executionId, body.repositoryPath, "invalid_execution_id", "execution_id_not_found")
+      );
+    }
+
+    const repositoryPath = path.resolve(body.repositoryPath);
+    const repositoryStat = await fs.stat(repositoryPath).catch(() => undefined);
+    if (!repositoryStat || !repositoryStat.isDirectory()) {
+      const failure = recordBackendApiIndexResult(
+        body.executionId,
+        backendApiIndexError(body.executionId, repositoryPath, "repository_path_not_found", "repository_path_not_found")
+      );
+      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
+    }
+
+    try {
+      await transitionExecutionState(body.executionId, ExecutionState.QUEUED, cid, "backend_api_index_queued");
+      await transitionExecutionState(body.executionId, ExecutionState.RUNNING, cid, "backend_api_index_started");
+
+      const artifacts = await collectBackendApiArtifacts(repositoryPath, maxFiles);
+      const typeMap = new Map<BackendApiArtifactType, number>();
+      for (const artifact of artifacts) {
+        typeMap.set(artifact.artifactType, (typeMap.get(artifact.artifactType) ?? 0) + 1);
+      }
+
+      const evidence = createEvidence(
+        body.executionId,
+        EvidenceLevel.E2,
+        "BACKEND_API_INDEX_SUMMARY",
+        `memory://backend-api-index/${body.executionId}`,
+        cid
+      );
+
+      const success: BackendApiIndexResultDto = {
+        ok: true,
+        data: {
+          executionId: body.executionId,
+          repositoryPath,
+          indexedAt: new Date().toISOString(),
+          totalArtifacts: artifacts.length,
+          artifactTypeCounts: Array.from(typeMap.entries())
+            .map(([artifactType, count]) => ({ artifactType, count }))
+            .sort((a, b) => a.artifactType.localeCompare(b.artifactType)),
+          artifacts: artifacts.slice(0, 200),
+          evidenceId: evidence.id
+        }
+      };
+
+      recordBackendApiIndexResult(body.executionId, success);
+      await transitionExecutionState(body.executionId, ExecutionState.COMPLETED, cid, "backend_api_index_completed");
+
+      return res.status(200).setHeader("x-correlation-id", cid).json(success);
+    } catch (error) {
+      const currentExecution = store.executions.get(body.executionId);
+      if (currentExecution?.state === ExecutionState.RUNNING || currentExecution?.state === ExecutionState.QUEUED) {
+        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "backend_api_index_failed");
+      }
+
+      const failure = recordBackendApiIndexResult(
+        body.executionId,
+        backendApiIndexError(body.executionId, repositoryPath, "indexing_failed", (error as Error).message)
+      );
+      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
+    }
+  });
+
+  router.get("/code-analysis/backend/api-index/:executionId/result", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const execution = await getExecutionByIdWithFallback(executionId);
+
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(
+        backendApiIndexError(executionId, "unknown_repository", "invalid_execution_id", "execution_id_not_found")
+      );
+    }
+
+    const result = getBackendApiIndexResult(executionId);
+    if (!result) {
+      return res.status(422).setHeader("x-correlation-id", cid).json(
+        backendApiIndexError(executionId, "unknown_repository", "result_not_available", "backend_api_index_result_not_available")
+      );
+    }
+
+    return res.status(200).setHeader("x-correlation-id", cid).json(result);
   });
 
   router.post("/findings", (req, res) => {
