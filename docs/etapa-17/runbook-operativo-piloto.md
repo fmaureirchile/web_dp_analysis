@@ -63,6 +63,17 @@ Cuando usar:
 1. Antes de iniciar la corrida para validar alcance y credenciales.
 2. Al finalizar la corrida para confirmar purga/retencion y cierre seguro.
 
+### 5) Plan de primera corrida piloto E2E
+
+Documento:
+
+- docs/etapa-17/plan-primera-corrida-piloto-e2e.md
+
+Cuando usar:
+
+1. Para preparar la primera corrida real post-simulacro.
+2. Para documentar parametros, evidencia y cierre de credenciales en un formato unico.
+
 ### 2) Purga puntual por executionId
 
 Comando:

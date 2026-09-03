@@ -34,10 +34,22 @@ const REQUIRED_CHECKS: RequiredCheck[] = [
     ]
   },
   {
+    file: "docs/etapa-17/plan-primera-corrida-piloto-e2e.md",
+    requiredSnippets: [
+      "## Objetivo",
+      "## Insumos previos obligatorios",
+      "## Secuencia de ejecucion",
+      "## Criterios de aceptacion de la primera corrida",
+      "alcance autorizado",
+      "cierre de credenciales"
+    ]
+  },
+  {
     file: "docs/etapa-17/README.md",
     requiredSnippets: [
       "runbook-operativo-piloto.md",
       "checklist-piloto-e2e-autorizado.md",
+      "plan-primera-corrida-piloto-e2e.md",
       "npm run docs:stage17:runbook"
     ]
   },
