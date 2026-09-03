@@ -99,7 +99,8 @@ Cierre de credenciales:
 2. Evidencia minima registrada con trazabilidad completa.
 3. Limpieza post-corrida aplicada y comprobada.
 4. Cierre de credenciales documentado.
-5. Bitacora final emitida con decision operativa.
+5. Validacion explicita de cierre de credenciales en bitacora final.
+6. Bitacora final emitida con decision operativa.
 
 ## Salidas documentales obligatorias
 
