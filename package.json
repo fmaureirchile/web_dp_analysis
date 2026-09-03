@@ -12,6 +12,7 @@
     "env:validate": "tsx tools/validate-env.ts",
     "secret:check": "tsx tools/check-hardcoded-secrets.ts",
     "docs:stage5:coherence": "tsx tools/validate-stage5-doc-coherence.ts",
+    "docs:stage17:runbook": "tsx tools/validate-stage17-runbook.ts",
     "api:start": "tsx apps/api/src/server.ts",
     "db:generate": "prisma generate",
     "db:migrate:dev": "prisma migrate dev",
@@ -69,7 +70,8 @@
     "lab:e16:gate": "vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage16-version-comparison.integration.test.ts tests/integration/stage16-endpoint-delta.integration.test.ts tests/integration/stage16-alert-classification.integration.test.ts",
     "lab:e17-1:gate": "npm run lab:e16:gate && vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage17-execution-data-purge.integration.test.ts",
     "lab:e17-2:gate": "npm run lab:e17-1:gate && vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage17-retention-window.integration.test.ts",
-    "lab:e17:gate": "npm run lab:e17-2:gate"
+    "lab:e17-3:gate": "npm run lab:e17-2:gate && npm run docs:stage17:runbook",
+    "lab:e17:gate": "npm run lab:e17-3:gate"
   },
   "prisma": {
     "seed": "tsx database/seeds/stage2.seed.ts"
