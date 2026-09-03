@@ -537,6 +537,35 @@ export interface LineageEndpointCorrelationViewDto {
   };
 }
 
+export interface LineageDtoArtifactReferenceDto {
+  relativePath: string;
+  dtoName: string;
+}
+
+export interface LineageDtoProcessingCorrelationDto {
+  dto: LineageDtoArtifactReferenceDto;
+  status: LineageCorrelationStatus;
+  confidence: number;
+  matchedTokens: string[];
+  processingReferences: LineageBackendReferenceDto[];
+}
+
+export interface LineageDtoProcessingCorrelationViewDto {
+  executionId: string;
+  generatedAt: string;
+  totals: {
+    dtoArtifacts: number;
+    dtoWithProcessingMatches: number;
+    processingFiles: number;
+    correlations: number;
+  };
+  correlations: LineageDtoProcessingCorrelationDto[];
+  evidenceIds: {
+    backendApiIndexEvidenceId: string;
+    backendProcessingEvidenceId: string;
+  };
+}
+
 export type AuthenticatedEvaluationRole = "cliente" | "supervisor";
 
 export type AuthenticatedEvaluationErrorCode =

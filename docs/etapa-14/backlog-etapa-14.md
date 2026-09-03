@@ -18,6 +18,7 @@ Unificar resultados frontend y backend en enlaces de linaje explicables con esta
 
 - Objetivo unico: enlazar DTO y procesamiento backend por nombre/esquema basico.
 - Criterio de aceptacion: salida por enlace con confianza explicita y evidencia asociada.
+- Estado: completada.
 
 ## E14-T03 - Vista minima de linaje consolidado
 
@@ -32,6 +33,6 @@ Unificar resultados frontend y backend en enlaces de linaje explicables con esta
 ## Estado de cumplimiento parcial
 
 1. E14-T01: completada (correlacion inicial frontend-backend por endpoint).
-2. E14-T02: pendiente.
+2. E14-T02: completada (correlacion DTO/procesamiento por nombre/esquema basico).
 3. E14-T03: pendiente.
 4. E14-T04: pendiente.

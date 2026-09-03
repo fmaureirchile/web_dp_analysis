@@ -12,6 +12,7 @@ import {
   type BackendProcessingDetectionResultDto,
   type LineageBackendReferenceDto,
   type LineageCorrelationStatus,
+  type LineageDtoProcessingCorrelationViewDto,
   type LineageEndpointCorrelationViewDto,
   type LineageFrontendReferenceDto,
   type StartBackendApiIndexDto,
@@ -695,6 +696,29 @@ function extractSnippetEndpoints(snippet: string): string[] {
   }
 
   return Array.from(endpoints).sort((a, b) => a.localeCompare(b));
+}
+
+function normalizeTokenSource(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function extractDtoNameFromPath(relativePath: string): string {
+  const baseName = path.basename(relativePath).replace(/\.[a-z0-9]+$/i, "");
+  return baseName.replace(/([.-_]?dto)$/i, "");
+}
+
+function buildDtoCorrelationTokens(dtoName: string): string[] {
+  const camelSeparated = dtoName.replace(/([a-z])([A-Z])/g, "$1 $2");
+  const words = normalizeTokenSource(camelSeparated)
+    .split(/\s+/)
+    .filter((value) => value.length >= 3);
+
+  const tokens = new Set<string>(words);
+  if (words.length > 1) {
+    tokens.add(words.join(""));
+  }
+
+  return Array.from(tokens).sort((a, b) => a.localeCompare(b));
 }
 
 export function createStage2Router(): Router {
@@ -2367,6 +2391,97 @@ export function createStage2Router(): Router {
       evidenceIds: {
         frontendPatternEvidenceId: frontendResult.data.evidenceId,
         backendProcessingEvidenceId: backendResult.data.evidenceId
+      }
+    };
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
+  });
+
+  router.get("/lineage/correlations/:executionId/by-dto-processing", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const execution = await getExecutionByIdWithFallback(executionId);
+
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
+    }
+
+    const apiIndexResult = getBackendApiIndexResult(executionId);
+    if (!apiIndexResult || !apiIndexResult.ok || !apiIndexResult.data) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "backend_api_index_result_not_available" });
+    }
+
+    const processingResult = getBackendProcessingDetectionResult(executionId);
+    if (!processingResult || !processingResult.ok || !processingResult.data) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "backend_processing_detection_result_not_available" });
+    }
+
+    const apiIndexData = apiIndexResult.data;
+    const processingData = processingResult.data;
+
+    const dtoArtifacts = apiIndexData.artifacts.filter((artifact) => artifact.artifactType === "DTO");
+    const correlations = dtoArtifacts
+      .map((artifact) => {
+        const dtoName = extractDtoNameFromPath(artifact.relativePath);
+        const tokens = buildDtoCorrelationTokens(dtoName);
+        const matchedTokens = new Set<string>();
+        const processingReferences: LineageBackendReferenceDto[] = [];
+
+        for (const file of processingData.files) {
+          const normalizedPath = normalizeTokenSource(file.relativePath);
+
+          for (const match of file.matches) {
+            const normalizedSnippet = normalizeTokenSource(match.snippet);
+            const hasTokenMatch = tokens.some((token) => {
+              const found = normalizedSnippet.includes(token) || normalizedPath.includes(token);
+              if (found) {
+                matchedTokens.add(token);
+              }
+              return found;
+            });
+
+            if (!hasTokenMatch) {
+              continue;
+            }
+
+            processingReferences.push({
+              relativePath: file.relativePath,
+              rule: match.rule,
+              line: match.line,
+              snippet: match.snippet
+            });
+          }
+        }
+
+        const status: LineageCorrelationStatus = processingReferences.length > 0 ? "INFERRED_HIGH" : "PENDING";
+        const confidence = processingReferences.length > 0 ? 0.78 : 0.25;
+
+        return {
+          dto: {
+            relativePath: artifact.relativePath,
+            dtoName
+          },
+          status,
+          confidence,
+          matchedTokens: Array.from(matchedTokens).sort((a, b) => a.localeCompare(b)),
+          processingReferences
+        };
+      })
+      .sort((a, b) => a.dto.relativePath.localeCompare(b.dto.relativePath));
+
+    const payload: LineageDtoProcessingCorrelationViewDto = {
+      executionId,
+      generatedAt: new Date().toISOString(),
+      totals: {
+        dtoArtifacts: dtoArtifacts.length,
+        dtoWithProcessingMatches: correlations.filter((item) => item.processingReferences.length > 0).length,
+        processingFiles: processingData.totalFilesWithMatches,
+        correlations: correlations.length
+      },
+      correlations,
+      evidenceIds: {
+        backendApiIndexEvidenceId: apiIndexData.evidenceId,
+        backendProcessingEvidenceId: processingData.evidenceId
       }
     };
 
