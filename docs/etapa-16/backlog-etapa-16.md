@@ -25,6 +25,7 @@ Detectar cambios entre ejecuciones y distinguir variaciones tecnicas que requier
 
 - Objetivo unico: agregar clasificacion preliminar de causa probable por tipo de cambio.
 - Criterio de aceptacion: alerta explicita sin afirmaciones concluyentes.
+- Estado: completada.
 
 ## E16-T04 - Gate consolidado Etapa 16
 
@@ -35,5 +36,5 @@ Detectar cambios entre ejecuciones y distinguir variaciones tecnicas que requier
 
 1. E16-T01: completada.
 2. E16-T02: completada.
-3. E16-T03: pendiente.
+3. E16-T03: completada.
 4. E16-T04: pendiente.

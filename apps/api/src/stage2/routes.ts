@@ -848,6 +848,60 @@ function collectObservedEndpointSignatures(network: Array<{ method: string; url:
   return signatures;
 }
 
+function buildVersionComparisonAlert(changes: VersionComparisonChangeDto[]): {
+  status: "NO_CHANGES" | "CHANGES_DETECTED";
+  probableCause:
+    | "NO_RELEVANT_CHANGE"
+    | "SITE_CHANGE"
+    | "DOCUMENTATION_GAP"
+    | "RULE_CHANGE_OR_INSTRUMENTATION"
+    | "MIXED_CHANGE_REQUIRES_REVIEW";
+  message: string;
+} {
+  if (changes.length === 0) {
+    return {
+      status: "NO_CHANGES",
+      probableCause: "NO_RELEVANT_CHANGE",
+      message: "No se observaron cambios relevantes entre baseline y version actual."
+    };
+  }
+
+  const causes = new Set(changes.map((item) => item.probableCause));
+  if (causes.size === 1) {
+    const [singleCause] = Array.from(causes);
+
+    if (singleCause === "DOCUMENTATION_GAP") {
+      return {
+        status: "CHANGES_DETECTED",
+        probableCause: "DOCUMENTATION_GAP",
+        message: "Se observaron cambios que podrian indicar brecha documental. Requiere validacion."
+      };
+    }
+
+    if (singleCause === "RULE_CHANGE_OR_INSTRUMENTATION") {
+      return {
+        status: "CHANGES_DETECTED",
+        probableCause: "RULE_CHANGE_OR_INSTRUMENTATION",
+        message: "Se observaron cambios compatibles con ajuste de reglas o instrumentacion. Requiere validacion."
+      };
+    }
+
+    if (singleCause === "SITE_CHANGE") {
+      return {
+        status: "CHANGES_DETECTED",
+        probableCause: "SITE_CHANGE",
+        message: "Se observaron cambios tecnicos probables en el sitio. Requiere validacion."
+      };
+    }
+  }
+
+  return {
+    status: "CHANGES_DETECTED",
+    probableCause: "MIXED_CHANGE_REQUIRES_REVIEW",
+    message: "Se observaron cambios mixtos entre baseline y version actual. Requiere validacion para determinar causa probable."
+  };
+}
+
 export function createStage2Router(): Router {
   const router = Router();
 
@@ -3018,6 +3072,9 @@ export function createStage2Router(): Router {
       const currentCookies = new Set(currentInventory.cookies.map((item) => item.key.toLowerCase()));
       const baselineEndpoints = collectObservedEndpointSignatures(baselineDynamic.data.network);
       const currentEndpoints = collectObservedEndpointSignatures(currentDynamic.data.network);
+      const newEndpoints = Array.from(currentEndpoints)
+        .filter((item) => !baselineEndpoints.has(item))
+        .sort((a, b) => a.localeCompare(b));
 
       const changes: VersionComparisonChangeDto[] = [];
 
@@ -3027,7 +3084,7 @@ export function createStage2Router(): Router {
             kind: "NEW_THIRD_PARTY",
             value: item,
             severity: "WARNING",
-            probableCause: "SITE_CHANGE",
+            probableCause: newEndpoints.length > 0 ? "SITE_CHANGE" : "DOCUMENTATION_GAP",
             message: `No se observo ${item} en baseline y ahora si se observo. Existe un cambio tecnico probable. Requiere validacion.`,
             requiresValidation: true
           });
@@ -3040,7 +3097,7 @@ export function createStage2Router(): Router {
             kind: "REMOVED_THIRD_PARTY",
             value: item,
             severity: "INFO",
-            probableCause: "SITE_CHANGE",
+            probableCause: "RULE_CHANGE_OR_INSTRUMENTATION",
             message: `Se observo ${item} en baseline y ahora no se observo. Existe un cambio tecnico probable. Requiere validacion.`,
             requiresValidation: true
           });
@@ -3053,7 +3110,7 @@ export function createStage2Router(): Router {
             kind: "NEW_COOKIE",
             value: item,
             severity: "WARNING",
-            probableCause: "SITE_CHANGE",
+            probableCause: newEndpoints.length > 0 ? "SITE_CHANGE" : "DOCUMENTATION_GAP",
             message: `No se observo cookie ${item} en baseline y ahora si se observo. Existe un cambio tecnico probable. Requiere validacion.`,
             requiresValidation: true
           });
@@ -3066,25 +3123,25 @@ export function createStage2Router(): Router {
             kind: "REMOVED_COOKIE",
             value: item,
             severity: "INFO",
-            probableCause: "SITE_CHANGE",
+            probableCause: "RULE_CHANGE_OR_INSTRUMENTATION",
             message: `Se observo cookie ${item} en baseline y ahora no se observo. Existe un cambio tecnico probable. Requiere validacion.`,
             requiresValidation: true
           });
         }
       }
 
-      for (const item of Array.from(currentEndpoints).sort((a, b) => a.localeCompare(b))) {
-        if (!baselineEndpoints.has(item)) {
-          changes.push({
-            kind: "NEW_ENDPOINT",
-            value: item,
-            severity: "WARNING",
-            probableCause: "SITE_CHANGE",
-            message: `No se observo endpoint ${item} en baseline y ahora si se observo. Existe un cambio tecnico probable. Requiere validacion.`,
-            requiresValidation: true
-          });
-        }
+      for (const item of newEndpoints) {
+        changes.push({
+          kind: "NEW_ENDPOINT",
+          value: item,
+          severity: "WARNING",
+          probableCause: "SITE_CHANGE",
+          message: `No se observo endpoint ${item} en baseline y ahora si se observo. Existe un cambio tecnico probable. Requiere validacion.`,
+          requiresValidation: true
+        });
       }
+
+      const alert = buildVersionComparisonAlert(changes);
 
       const result: VersionComparisonResultDto = {
         ok: true,
@@ -3099,22 +3156,11 @@ export function createStage2Router(): Router {
             currentCookies: currentInventory.cookies.length,
             baselineEndpoints: baselineEndpoints.size,
             currentEndpoints: currentEndpoints.size,
-            newEndpoints: changes.filter((item) => item.kind === "NEW_ENDPOINT").length,
+            newEndpoints: newEndpoints.length,
             changes: changes.length
           },
           changes,
-          alert:
-            changes.length === 0
-              ? {
-                  status: "NO_CHANGES",
-                  probableCause: "NO_RELEVANT_CHANGE",
-                  message: "No se observaron cambios relevantes entre baseline y version actual."
-                }
-              : {
-                  status: "CHANGES_DETECTED",
-                  probableCause: "MIXED_CHANGE_REQUIRES_REVIEW",
-                  message: "Se observaron cambios entre baseline y version actual. Requiere validacion para determinar causa probable."
-                }
+          alert
         }
       };
 

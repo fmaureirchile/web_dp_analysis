@@ -690,7 +690,12 @@ export type VersionComparisonAlertStatus = "NO_CHANGES" | "CHANGES_DETECTED";
 
 export interface VersionComparisonAlertDto {
   status: VersionComparisonAlertStatus;
-  probableCause: "NO_RELEVANT_CHANGE" | "SITE_CHANGE" | "MIXED_CHANGE_REQUIRES_REVIEW";
+  probableCause:
+    | "NO_RELEVANT_CHANGE"
+    | "SITE_CHANGE"
+    | "DOCUMENTATION_GAP"
+    | "RULE_CHANGE_OR_INSTRUMENTATION"
+    | "MIXED_CHANGE_REQUIRES_REVIEW";
   message: string;
 }
 

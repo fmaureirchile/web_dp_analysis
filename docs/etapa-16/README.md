@@ -10,10 +10,12 @@
 ```bash
 corepack pnpm run lab:e16-1:gate
 corepack pnpm run lab:e16-2:gate
+corepack pnpm run lab:e16-3:gate
 ```
 
 ## Cuando usarlo
 
 1. Despues de modificar logica de comparacion baseline/actual.
 2. Despues de modificar deteccion de nuevos endpoints observados entre versiones.
-3. Para validar que la alerta reporta cambios como observaciones que requieren validacion.
+3. Despues de ajustar la clasificacion de causa probable documental/tecnica.
+4. Para validar que la alerta reporta cambios como observaciones que requieren validacion.
