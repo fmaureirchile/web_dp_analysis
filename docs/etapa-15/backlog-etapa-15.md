@@ -31,10 +31,11 @@ Relacionar comportamiento observado con informacion declarada para identificar p
 
 - Objetivo unico: comando unico de validacion E15 local/CI.
 - Criterio de aceptacion: pipeline reproducible con resumen operativo.
+- Estado: completada.
 
 ## Estado de cumplimiento parcial
 
 1. E15-T01: completada.
 2. E15-T02: completada (finalidad no encontrada para categoria observada).
 3. E15-T03: completada (tracking post-rechazo y captura previa a informacion).
-4. E15-T04: pendiente.
+4. E15-T04: completada (gate consolidado local/CI).

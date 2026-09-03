@@ -833,6 +833,50 @@ jobs:
 
           echo "E14 gate result: endpoint_correlation_integration=2/2; dto_processing_correlation_integration=2/2; lineage_consolidated_view_integration=2/2; stage13_baseline=ok; typecheck=ok"
 
+      - name: Report Stage 15 gate coverage
+        run: |
+          echo "E15 gate coverage: Stage 14 consolidated gate + legal discrepancies + legal purpose baseline + legal consent discrepancies"
+          echo "- Stage 15 consolidated gate: npm run lab:e15:gate"
+          echo "- Integration suite 1: tests/integration/stage15-legal-discrepancies.integration.test.ts"
+          echo "- Integration suite 2: tests/integration/stage15-legal-purpose-baseline.integration.test.ts"
+          echo "- Integration suite 3: tests/integration/stage15-legal-consent-discrepancies.integration.test.ts"
+
+      - name: Stage 15 gate E15
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run lab:e15:gate | tee e15_gate.log
+
+      - name: Report Stage 15 gate result
+        shell: bash
+        run: |
+          set -euo pipefail
+          stage15_suite_count="$(grep -Ec 'tests/integration/stage15-.*\.integration\.test\.ts \(2\)' e15_gate.log || true)"
+          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e15_gate.log)"
+          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e15_gate.log)"
+
+          if [ "${stage15_suite_count}" != "3" ]; then
+            echo "No se detectaron las 3 suites Stage 15 esperadas en e15_gate.log. Detectadas: ${stage15_suite_count}."
+            exit 1
+          fi
+
+          if [ -z "$file_pairs" ] || [ -z "$test_pairs" ]; then
+            echo "No se pudieron extraer resultados del gate E15 desde e15_gate.log"
+            exit 1
+          fi
+
+          if ! echo "$test_pairs" | grep -q '^2/2$'; then
+            echo "No se detectaron resultados 2/2 en suites de Stage 15."
+            exit 1
+          fi
+
+          if ! echo "$file_pairs" | grep -q '^1/1$'; then
+            echo "No se detectaron resultados 1/1 de archivos en suites de integracion encadenadas."
+            exit 1
+          fi
+
+          echo "E15 gate result: legal_discrepancies_integration=2/2; legal_purpose_baseline_integration=2/2; legal_consent_discrepancies_integration=2/2; stage14_baseline=ok; typecheck=ok"
+
       - name: Build
         run: npm run build
 
