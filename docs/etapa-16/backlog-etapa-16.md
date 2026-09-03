@@ -19,6 +19,7 @@ Detectar cambios entre ejecuciones y distinguir variaciones tecnicas que requier
 
 - Objetivo unico: detectar nuevos endpoints entre versiones comparadas.
 - Criterio de aceptacion: salida reproducible con delta de endpoints.
+- Estado: completada.
 
 ## E16-T03 - Alerta por cambio documental/tecnico
 
@@ -33,6 +34,6 @@ Detectar cambios entre ejecuciones y distinguir variaciones tecnicas que requier
 ## Estado de cumplimiento parcial
 
 1. E16-T01: completada.
-2. E16-T02: pendiente.
+2. E16-T02: completada.
 3. E16-T03: pendiente.
 4. E16-T04: pendiente.

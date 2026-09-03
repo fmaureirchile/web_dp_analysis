@@ -668,7 +668,12 @@ export interface StartVersionComparisonDto {
   currentExecutionId: string;
 }
 
-export type VersionChangeKind = "NEW_THIRD_PARTY" | "REMOVED_THIRD_PARTY" | "NEW_COOKIE" | "REMOVED_COOKIE";
+export type VersionChangeKind =
+  | "NEW_THIRD_PARTY"
+  | "REMOVED_THIRD_PARTY"
+  | "NEW_COOKIE"
+  | "REMOVED_COOKIE"
+  | "NEW_ENDPOINT";
 
 export type VersionComparisonSeverity = "INFO" | "WARNING";
 
@@ -698,6 +703,9 @@ export interface VersionComparisonSuccessDto {
     currentThirdParties: number;
     baselineCookies: number;
     currentCookies: number;
+    baselineEndpoints: number;
+    currentEndpoints: number;
+    newEndpoints: number;
     changes: number;
   };
   changes: VersionComparisonChangeDto[];

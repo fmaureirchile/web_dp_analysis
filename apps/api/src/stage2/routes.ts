@@ -826,6 +826,28 @@ function versionComparisonError(
   };
 }
 
+function toObservedEndpointSignature(method: string, rawUrl: string): string | undefined {
+  try {
+    const parsed = new URL(rawUrl);
+    return `${method.toUpperCase()} ${parsed.pathname}`;
+  } catch {
+    return undefined;
+  }
+}
+
+function collectObservedEndpointSignatures(network: Array<{ method: string; url: string }>): Set<string> {
+  const signatures = new Set<string>();
+
+  for (const item of network) {
+    const signature = toObservedEndpointSignature(item.method, item.url);
+    if (signature) {
+      signatures.add(signature);
+    }
+  }
+
+  return signatures;
+}
+
 export function createStage2Router(): Router {
   const router = Router();
 
@@ -2994,6 +3016,8 @@ export function createStage2Router(): Router {
       const currentThirdParties = new Set(currentInventory.thirdParties.map((item) => item.domain.toLowerCase()));
       const baselineCookies = new Set(baselineInventory.cookies.map((item) => item.key.toLowerCase()));
       const currentCookies = new Set(currentInventory.cookies.map((item) => item.key.toLowerCase()));
+      const baselineEndpoints = collectObservedEndpointSignatures(baselineDynamic.data.network);
+      const currentEndpoints = collectObservedEndpointSignatures(currentDynamic.data.network);
 
       const changes: VersionComparisonChangeDto[] = [];
 
@@ -3049,6 +3073,19 @@ export function createStage2Router(): Router {
         }
       }
 
+      for (const item of Array.from(currentEndpoints).sort((a, b) => a.localeCompare(b))) {
+        if (!baselineEndpoints.has(item)) {
+          changes.push({
+            kind: "NEW_ENDPOINT",
+            value: item,
+            severity: "WARNING",
+            probableCause: "SITE_CHANGE",
+            message: `No se observo endpoint ${item} en baseline y ahora si se observo. Existe un cambio tecnico probable. Requiere validacion.`,
+            requiresValidation: true
+          });
+        }
+      }
+
       const result: VersionComparisonResultDto = {
         ok: true,
         data: {
@@ -3060,6 +3097,9 @@ export function createStage2Router(): Router {
             currentThirdParties: currentInventory.thirdParties.length,
             baselineCookies: baselineInventory.cookies.length,
             currentCookies: currentInventory.cookies.length,
+            baselineEndpoints: baselineEndpoints.size,
+            currentEndpoints: currentEndpoints.size,
+            newEndpoints: changes.filter((item) => item.kind === "NEW_ENDPOINT").length,
             changes: changes.length
           },
           changes,

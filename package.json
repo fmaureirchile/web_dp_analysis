@@ -63,7 +63,8 @@
     "lab:e15-2:gate": "corepack pnpm run lab:e15-1:gate && vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage15-legal-purpose-baseline.integration.test.ts",
     "lab:e15-3:gate": "corepack pnpm run lab:e15-2:gate && vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage15-legal-consent-discrepancies.integration.test.ts",
     "lab:e15:gate": "corepack pnpm run lab:e15-3:gate",
-    "lab:e16-1:gate": "corepack pnpm run lab:e15:gate && vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage16-version-comparison.integration.test.ts"
+    "lab:e16-1:gate": "corepack pnpm run lab:e15:gate && vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage16-version-comparison.integration.test.ts",
+    "lab:e16-2:gate": "corepack pnpm run lab:e16-1:gate && vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage16-endpoint-delta.integration.test.ts"
   },
   "prisma": {
     "seed": "tsx database/seeds/stage2.seed.ts"
