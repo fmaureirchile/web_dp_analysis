@@ -5,6 +5,7 @@
 1. acta-inicio-etapa-17.md
 2. backlog-etapa-17.md
 3. runbook-operativo-piloto.md
+4. acta-cierre-etapa-17.md
 
 ## Comando de validacion consolidado E17-T04
 
