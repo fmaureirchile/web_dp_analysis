@@ -11,6 +11,7 @@
 7. plan-primera-corrida-piloto-e2e.md
 8. bitacora-corrida-piloto-e2e-2026-09-03.md
 9. evidencias/piloto-e2e-controlado-2026-09-03.json
+10. plantilla-bitacora-corrida-piloto-e2e.md
 
 ## Comando de validacion consolidado E17-T04
 
