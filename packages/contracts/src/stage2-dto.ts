@@ -498,6 +498,45 @@ export interface BackendProcessingFlowViewDto {
   };
 }
 
+export type LineageCorrelationStatus = "CONFIRMED" | "INFERRED_HIGH" | "INFERRED_LOW" | "PENDING";
+
+export interface LineageFrontendReferenceDto {
+  relativePath: string;
+  rule: FrontendCapturePatternRule;
+  line: number;
+  snippet: string;
+}
+
+export interface LineageBackendReferenceDto {
+  relativePath: string;
+  rule: BackendProcessingRule;
+  line: number;
+  snippet: string;
+}
+
+export interface LineageEndpointCorrelationDto {
+  endpoint: string;
+  status: LineageCorrelationStatus;
+  confidence: number;
+  frontendReferences: LineageFrontendReferenceDto[];
+  backendReferences: LineageBackendReferenceDto[];
+}
+
+export interface LineageEndpointCorrelationViewDto {
+  executionId: string;
+  generatedAt: string;
+  totals: {
+    frontendEndpoints: number;
+    backendEndpoints: number;
+    correlatedEndpoints: number;
+  };
+  correlations: LineageEndpointCorrelationDto[];
+  evidenceIds: {
+    frontendPatternEvidenceId: string;
+    backendProcessingEvidenceId: string;
+  };
+}
+
 export type AuthenticatedEvaluationRole = "cliente" | "supervisor";
 
 export type AuthenticatedEvaluationErrorCode =

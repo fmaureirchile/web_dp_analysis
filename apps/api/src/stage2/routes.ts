@@ -10,6 +10,10 @@ import {
   type BackendProcessingFlowViewDto,
   type BackendProcessingMatchDto,
   type BackendProcessingDetectionResultDto,
+  type LineageBackendReferenceDto,
+  type LineageCorrelationStatus,
+  type LineageEndpointCorrelationViewDto,
+  type LineageFrontendReferenceDto,
   type StartBackendApiIndexDto,
   type StartBackendProcessingDetectionDto,
   type FrontendFilePatternDetectionsDto,
@@ -655,6 +659,42 @@ async function collectFrontendFiles(repositoryPath: string, maxFiles: number): P
 
   files.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
   return files;
+}
+
+function normalizeEndpointCandidate(input: string): string | undefined {
+  const trimmed = input.trim();
+  if (trimmed.length === 0) {
+    return undefined;
+  }
+
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    try {
+      const parsed = new URL(trimmed);
+      return parsed.pathname;
+    } catch {
+      return undefined;
+    }
+  }
+
+  if (!trimmed.startsWith("/")) {
+    return undefined;
+  }
+
+  return trimmed;
+}
+
+function extractSnippetEndpoints(snippet: string): string[] {
+  const endpoints = new Set<string>();
+  const regex = /["'`](https?:\/\/[^"'`\s]+|\/[A-Za-z0-9_\-./?=&]+)["'`]/g;
+
+  for (const match of snippet.matchAll(regex)) {
+    const candidate = normalizeEndpointCandidate(match[1]);
+    if (candidate) {
+      endpoints.add(candidate);
+    }
+  }
+
+  return Array.from(endpoints).sort((a, b) => a.localeCompare(b));
 }
 
 export function createStage2Router(): Router {
@@ -2235,6 +2275,98 @@ export function createStage2Router(): Router {
       evidenceIds: {
         apiIndexEvidenceId: apiIndexResult.data.evidenceId,
         processingEvidenceId: processingResult.data.evidenceId
+      }
+    };
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
+  });
+
+  router.get("/lineage/correlations/:executionId/by-endpoint", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const execution = await getExecutionByIdWithFallback(executionId);
+
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
+    }
+
+    const frontendResult = getFrontendPatternDetectionResult(executionId);
+    if (!frontendResult || !frontendResult.ok || !frontendResult.data) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "frontend_pattern_detection_result_not_available" });
+    }
+
+    const backendResult = getBackendProcessingDetectionResult(executionId);
+    if (!backendResult || !backendResult.ok || !backendResult.data) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "backend_processing_detection_result_not_available" });
+    }
+
+    const frontendEndpointMap = new Map<string, LineageFrontendReferenceDto[]>();
+    for (const file of frontendResult.data.files) {
+      for (const match of file.matches) {
+        const endpoints = extractSnippetEndpoints(match.snippet);
+        for (const endpoint of endpoints) {
+          const references = frontendEndpointMap.get(endpoint) ?? [];
+          references.push({
+            relativePath: file.relativePath,
+            rule: match.rule,
+            line: match.line,
+            snippet: match.snippet
+          });
+          frontendEndpointMap.set(endpoint, references);
+        }
+      }
+    }
+
+    const backendEndpointMap = new Map<string, LineageBackendReferenceDto[]>();
+    for (const file of backendResult.data.files) {
+      for (const match of file.matches) {
+        const endpoints = extractSnippetEndpoints(match.snippet);
+        for (const endpoint of endpoints) {
+          const references = backendEndpointMap.get(endpoint) ?? [];
+          references.push({
+            relativePath: file.relativePath,
+            rule: match.rule,
+            line: match.line,
+            snippet: match.snippet
+          });
+          backendEndpointMap.set(endpoint, references);
+        }
+      }
+    }
+
+    const allEndpoints = new Set<string>([...frontendEndpointMap.keys(), ...backendEndpointMap.keys()]);
+    const correlations = Array.from(allEndpoints)
+      .sort((a, b) => a.localeCompare(b))
+      .map((endpoint) => {
+        const frontendReferences = frontendEndpointMap.get(endpoint) ?? [];
+        const backendReferences = backendEndpointMap.get(endpoint) ?? [];
+        const hasFrontend = frontendReferences.length > 0;
+        const hasBackend = backendReferences.length > 0;
+
+        const status: LineageCorrelationStatus = hasFrontend && hasBackend ? "INFERRED_HIGH" : "PENDING";
+        const confidence = hasFrontend && hasBackend ? 0.8 : 0.3;
+
+        return {
+          endpoint,
+          status,
+          confidence,
+          frontendReferences,
+          backendReferences
+        };
+      });
+
+    const payload: LineageEndpointCorrelationViewDto = {
+      executionId,
+      generatedAt: new Date().toISOString(),
+      totals: {
+        frontendEndpoints: frontendEndpointMap.size,
+        backendEndpoints: backendEndpointMap.size,
+        correlatedEndpoints: correlations.filter((item) => item.frontendReferences.length > 0 && item.backendReferences.length > 0).length
+      },
+      correlations,
+      evidenceIds: {
+        frontendPatternEvidenceId: frontendResult.data.evidenceId,
+        backendProcessingEvidenceId: backendResult.data.evidenceId
       }
     };
 
