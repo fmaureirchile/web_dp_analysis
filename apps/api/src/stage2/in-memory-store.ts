@@ -4,6 +4,7 @@ import {
   type BackendApiIndexResultDto,
   type FrontendPatternDetectionResultDto,
   type FrontendRepositoryIndexResultDto,
+  type LegalDiscrepancyDetectionResultDto,
   type DynamicObservationErrorDto,
   type DynamicObservationResultDto,
   type DynamicObservationSuccessDto,
@@ -105,6 +106,12 @@ type BackendApiIndexResultRecord = {
 type BackendProcessingDetectionResultRecord = {
   executionId: string;
   result: BackendProcessingDetectionResultDto;
+  updatedAt: string;
+};
+
+type LegalDiscrepancyDetectionResultRecord = {
+  executionId: string;
+  result: LegalDiscrepancyDetectionResultDto;
   updatedAt: string;
 };
 
@@ -320,6 +327,7 @@ export const store = {
   frontendPatternDetectionResults: new Map<string, FrontendPatternDetectionResultRecord>(),
   backendApiIndexResults: new Map<string, BackendApiIndexResultRecord>(),
   backendProcessingDetectionResults: new Map<string, BackendProcessingDetectionResultRecord>(),
+  legalDiscrepancyDetectionResults: new Map<string, LegalDiscrepancyDetectionResultRecord>(),
   browserDomSnapshots: new Map<string, BrowserDomSnapshotRecord>(),
   browserScreenshots: new Map<string, BrowserScreenshotRecord>()
 };
@@ -346,6 +354,7 @@ export function resetStore(): void {
   store.frontendPatternDetectionResults.clear();
   store.backendApiIndexResults.clear();
   store.backendProcessingDetectionResults.clear();
+  store.legalDiscrepancyDetectionResults.clear();
   store.browserDomSnapshots.clear();
   store.browserScreenshots.clear();
 }
@@ -678,6 +687,25 @@ export function getBackendProcessingDetectionResult(
   executionId: string
 ): BackendProcessingDetectionResultDto | undefined {
   return store.backendProcessingDetectionResults.get(executionId)?.result;
+}
+
+export function recordLegalDiscrepancyDetectionResult(
+  executionId: string,
+  result: LegalDiscrepancyDetectionResultDto
+): LegalDiscrepancyDetectionResultDto {
+  store.legalDiscrepancyDetectionResults.set(executionId, {
+    executionId,
+    result,
+    updatedAt: nowIso()
+  });
+
+  return result;
+}
+
+export function getLegalDiscrepancyDetectionResult(
+  executionId: string
+): LegalDiscrepancyDetectionResultDto | undefined {
+  return store.legalDiscrepancyDetectionResults.get(executionId)?.result;
 }
 
 export async function getExecutionByIdWithFallback(executionId: string): Promise<Execution | undefined> {

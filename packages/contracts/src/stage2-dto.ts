@@ -604,6 +604,57 @@ export interface LineageConsolidatedViewDto {
   };
 }
 
+export type LegalDiscrepancyKind = "THIRD_PARTY_OBSERVED_NOT_DECLARED" | "COOKIE_OBSERVED_NOT_DECLARED";
+
+export interface LegalDiscrepancyItemDto {
+  kind: LegalDiscrepancyKind;
+  observedValue: string;
+  declaredInPolicy: boolean;
+  message: string;
+  requiresValidation: true;
+}
+
+export interface StartLegalDiscrepancyDetectionDto {
+  executionId: string;
+  declaredThirdParties?: string[];
+  declaredCookieKeys?: string[];
+}
+
+export type LegalDiscrepancyDetectionErrorCode =
+  | "invalid_execution_id"
+  | "invalid_declared_values"
+  | "tracking_inventory_not_available"
+  | "detection_failed"
+  | "result_not_available";
+
+export interface LegalDiscrepancyDetectionSuccessDto {
+  executionId: string;
+  analyzedAt: string;
+  totals: {
+    observedThirdParties: number;
+    observedCookies: number;
+    discrepancies: number;
+  };
+  declared: {
+    thirdParties: string[];
+    cookieKeys: string[];
+  };
+  discrepancies: LegalDiscrepancyItemDto[];
+  summary: string;
+}
+
+export interface LegalDiscrepancyDetectionErrorDto {
+  executionId: string;
+  errorCode: LegalDiscrepancyDetectionErrorCode;
+  message: string;
+}
+
+export interface LegalDiscrepancyDetectionResultDto {
+  ok: boolean;
+  data?: LegalDiscrepancyDetectionSuccessDto;
+  error?: LegalDiscrepancyDetectionErrorDto;
+}
+
 export type AuthenticatedEvaluationRole = "cliente" | "supervisor";
 
 export type AuthenticatedEvaluationErrorCode =

@@ -10,12 +10,15 @@ import {
   type BackendProcessingFlowViewDto,
   type BackendProcessingMatchDto,
   type BackendProcessingDetectionResultDto,
+  type LegalDiscrepancyDetectionResultDto,
+  type LegalDiscrepancyItemDto,
   type LineageBackendReferenceDto,
   type LineageConsolidatedViewDto,
   type LineageCorrelationStatus,
   type LineageDtoProcessingCorrelationViewDto,
   type LineageEndpointCorrelationViewDto,
   type LineageFrontendReferenceDto,
+  type StartLegalDiscrepancyDetectionDto,
   type StartBackendApiIndexDto,
   type StartBackendProcessingDetectionDto,
   type FrontendFilePatternDetectionsDto,
@@ -84,6 +87,7 @@ import {
   getBackendProcessingDetectionResult,
   getFrontendPatternDetectionResult,
   getFrontendRepositoryIndexResult,
+  getLegalDiscrepancyDetectionResult,
   getDynamicObservationResult,
   getExecutionByIdWithFallback,
   getPassiveSinglePageCrawlResult,
@@ -96,6 +100,7 @@ import {
   recordBackendProcessingDetectionResult,
   recordFrontendPatternDetectionResult,
   recordFrontendRepositoryIndexResult,
+  recordLegalDiscrepancyDetectionResult,
   recordDynamicObservationError,
   recordDynamicObservationSuccess,
   recordPassiveSinglePageCrawlError,
@@ -732,6 +737,34 @@ function dtoNodeId(relativePath: string): string {
 
 function processingNodeId(relativePath: string): string {
   return `processing:${relativePath}`;
+}
+
+function legalDiscrepancyDetectionError(
+  executionId: string,
+  errorCode: "invalid_execution_id" | "invalid_declared_values" | "tracking_inventory_not_available" | "detection_failed" | "result_not_available",
+  message: string
+): LegalDiscrepancyDetectionResultDto {
+  return {
+    ok: false,
+    error: {
+      executionId,
+      errorCode,
+      message
+    }
+  };
+}
+
+function normalizeDeclaredValues(values: string[] | undefined): string[] | undefined {
+  if (values === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(values)) {
+    return undefined;
+  }
+
+  const normalized = values.map((item) => item.trim().toLowerCase()).filter((item) => item.length > 0);
+  return Array.from(new Set(normalized)).sort((a, b) => a.localeCompare(b));
 }
 
 export function createStage2Router(): Router {
@@ -2679,6 +2712,129 @@ export function createStage2Router(): Router {
     };
 
     return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
+  });
+
+  router.post("/legal-analysis/discrepancies/start", async (req, res) => {
+    const cid = correlationId(req);
+    const body = req.body as StartLegalDiscrepancyDetectionDto;
+
+    if (!body.executionId || body.executionId.trim().length === 0) {
+      return res
+        .status(400)
+        .setHeader("x-correlation-id", cid)
+        .json(legalDiscrepancyDetectionError("unknown_execution", "invalid_execution_id", "execution_id_required"));
+    }
+
+    const execution = await getExecutionByIdWithFallback(body.executionId);
+    if (!execution) {
+      return res
+        .status(400)
+        .setHeader("x-correlation-id", cid)
+        .json(legalDiscrepancyDetectionError(body.executionId, "invalid_execution_id", "execution_id_not_found"));
+    }
+
+    const declaredThirdParties = normalizeDeclaredValues(body.declaredThirdParties);
+    const declaredCookieKeys = normalizeDeclaredValues(body.declaredCookieKeys);
+    if (!declaredThirdParties || !declaredCookieKeys) {
+      return res
+        .status(400)
+        .setHeader("x-correlation-id", cid)
+        .json(legalDiscrepancyDetectionError(body.executionId, "invalid_declared_values", "invalid_declared_values"));
+    }
+
+    const dynamicResult = getDynamicObservationResult(body.executionId);
+    if (!dynamicResult || !dynamicResult.ok || !dynamicResult.data) {
+      const failure = recordLegalDiscrepancyDetectionResult(
+        body.executionId,
+        legalDiscrepancyDetectionError(body.executionId, "tracking_inventory_not_available", "dynamic_observation_result_not_available")
+      );
+      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
+    }
+
+    try {
+      const inventory = listTrackingInventoryByExecutionId(body.executionId);
+      const discrepancies: LegalDiscrepancyItemDto[] = [];
+
+      for (const thirdParty of inventory.thirdParties) {
+        const normalized = thirdParty.domain.trim().toLowerCase();
+        if (!declaredThirdParties.includes(normalized)) {
+          discrepancies.push({
+            kind: "THIRD_PARTY_OBSERVED_NOT_DECLARED",
+            observedValue: thirdParty.domain,
+            declaredInPolicy: false,
+            message: `Existe una posible discrepancia: se observo tercero ${thirdParty.domain} no encontrado en lo declarado. Requiere validacion.`,
+            requiresValidation: true
+          });
+        }
+      }
+
+      for (const cookie of inventory.cookies) {
+        const normalized = cookie.key.trim().toLowerCase();
+        if (!declaredCookieKeys.includes(normalized)) {
+          discrepancies.push({
+            kind: "COOKIE_OBSERVED_NOT_DECLARED",
+            observedValue: cookie.key,
+            declaredInPolicy: false,
+            message: `Existe una posible discrepancia: se observo cookie ${cookie.key} no encontrada en lo declarado. Requiere validacion.`,
+            requiresValidation: true
+          });
+        }
+      }
+
+      const success: LegalDiscrepancyDetectionResultDto = {
+        ok: true,
+        data: {
+          executionId: body.executionId,
+          analyzedAt: new Date().toISOString(),
+          totals: {
+            observedThirdParties: inventory.thirdParties.length,
+            observedCookies: inventory.cookies.length,
+            discrepancies: discrepancies.length
+          },
+          declared: {
+            thirdParties: declaredThirdParties,
+            cookieKeys: declaredCookieKeys
+          },
+          discrepancies,
+          summary:
+            discrepancies.length > 0
+              ? "Existe una posible discrepancia entre comportamiento observado y declarado. Requiere validacion."
+              : "No se observo discrepancia en terceros o cookies respecto de lo declarado. Requiere validacion humana del contexto."
+        }
+      };
+
+      recordLegalDiscrepancyDetectionResult(body.executionId, success);
+      return res.status(200).setHeader("x-correlation-id", cid).json(success);
+    } catch (error) {
+      const failure = recordLegalDiscrepancyDetectionResult(
+        body.executionId,
+        legalDiscrepancyDetectionError(body.executionId, "detection_failed", (error as Error).message)
+      );
+      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
+    }
+  });
+
+  router.get("/legal-analysis/discrepancies/:executionId/result", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const execution = await getExecutionByIdWithFallback(executionId);
+
+    if (!execution) {
+      return res
+        .status(400)
+        .setHeader("x-correlation-id", cid)
+        .json(legalDiscrepancyDetectionError(executionId, "invalid_execution_id", "execution_id_not_found"));
+    }
+
+    const result = getLegalDiscrepancyDetectionResult(executionId);
+    if (!result) {
+      return res
+        .status(422)
+        .setHeader("x-correlation-id", cid)
+        .json(legalDiscrepancyDetectionError(executionId, "result_not_available", "legal_discrepancy_result_not_available"));
+    }
+
+    return res.status(200).setHeader("x-correlation-id", cid).json(result);
   });
 
   router.post("/findings", (req, res) => {
