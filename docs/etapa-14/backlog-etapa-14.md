@@ -30,10 +30,11 @@ Unificar resultados frontend y backend en enlaces de linaje explicables con esta
 
 - Objetivo unico: comando unico de validacion E14 local/CI.
 - Criterio de aceptacion: pipeline reproducible con resumen operativo.
+- Estado: completada.
 
 ## Estado de cumplimiento parcial
 
 1. E14-T01: completada (correlacion inicial frontend-backend por endpoint).
 2. E14-T02: completada (correlacion DTO/procesamiento por nombre/esquema basico).
 3. E14-T03: completada (vista preliminar de nodos/aristas consolidada por executionId).
-4. E14-T04: pendiente.
+4. E14-T04: completada (gate consolidado local/CI).

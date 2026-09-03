@@ -23,8 +23,14 @@ corepack pnpm run lab:e14-2:gate
 corepack pnpm run lab:e14-3:gate
 ```
 
+## Comando consolidado de etapa
+
+```bash
+corepack pnpm run lab:e14:gate
+```
+
 ## Cuando usarlo
 
 1. Despues de modificar contratos o endpoint de correlacion de linaje.
-2. Antes de avanzar al gate consolidado de la etapa (E14-T04).
-3. Como chequeo rapido de no regresion entre Etapa 13 y las vistas de linaje de Etapa 14.
+2. Antes de cerrar cambios de Etapa 14 para merge o release.
+3. Como chequeo de no regresion de T01, T02 y T03 en una sola corrida.
