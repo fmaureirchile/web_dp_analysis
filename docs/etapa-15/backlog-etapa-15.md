@@ -25,6 +25,7 @@ Relacionar comportamiento observado con informacion declarada para identificar p
 
 - Objetivo unico: detectar tracking posterior al rechazo o captura previa a informacion.
 - Criterio de aceptacion: salida sin sentencia juridica automatica.
+- Estado: completada.
 
 ## E15-T04 - Gate consolidado Etapa 15
 
@@ -35,5 +36,5 @@ Relacionar comportamiento observado con informacion declarada para identificar p
 
 1. E15-T01: completada.
 2. E15-T02: completada (finalidad no encontrada para categoria observada).
-3. E15-T03: pendiente.
+3. E15-T03: completada (tracking post-rechazo y captura previa a informacion).
 4. E15-T04: pendiente.

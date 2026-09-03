@@ -2848,6 +2848,26 @@ export function createStage2Router(): Router {
         }
       }
 
+      if (dynamicResult.data.consentEvaluation?.code === "TRACKING_AFTER_REJECT") {
+        discrepancies.push({
+          kind: "TRACKING_AFTER_REJECT",
+          observedValue: "tracking_after_reject",
+          declaredInPolicy: false,
+          message: "Se observo tracking posterior al rechazo de consentimiento. Existe una posible discrepancia. Requiere validacion.",
+          requiresValidation: true
+        });
+      }
+
+      if (dynamicResult.data.consentEvaluation?.code === "TRACKING_BEFORE_CONSENT") {
+        discrepancies.push({
+          kind: "CAPTURE_BEFORE_INFORMATION",
+          observedValue: "tracking_before_consent",
+          declaredInPolicy: false,
+          message: "Se observo captura previa a informacion y decision de consentimiento. Existe una posible discrepancia. Requiere validacion.",
+          requiresValidation: true
+        });
+      }
+
       const success: LegalDiscrepancyDetectionResultDto = {
         ok: true,
         data: {

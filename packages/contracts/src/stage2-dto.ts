@@ -607,7 +607,9 @@ export interface LineageConsolidatedViewDto {
 export type LegalDiscrepancyKind =
   | "THIRD_PARTY_OBSERVED_NOT_DECLARED"
   | "COOKIE_OBSERVED_NOT_DECLARED"
-  | "PURPOSE_NOT_FOUND_FOR_OBSERVED_CATEGORY";
+  | "PURPOSE_NOT_FOUND_FOR_OBSERVED_CATEGORY"
+  | "TRACKING_AFTER_REJECT"
+  | "CAPTURE_BEFORE_INFORMATION";
 
 export interface LegalDiscrepancyItemDto {
   kind: LegalDiscrepancyKind;
