@@ -19,6 +19,7 @@ Relacionar comportamiento observado con informacion declarada para identificar p
 
 - Objetivo unico: detectar ausencia de finalidad declarada para categoria observada.
 - Criterio de aceptacion: salida con estado de validacion requerida y evidencia trazable.
+- Estado: completada.
 
 ## E15-T03 - Discrepancias de consentimiento observable
 
@@ -33,6 +34,6 @@ Relacionar comportamiento observado con informacion declarada para identificar p
 ## Estado de cumplimiento parcial
 
 1. E15-T01: completada.
-2. E15-T02: pendiente.
+2. E15-T02: completada (finalidad no encontrada para categoria observada).
 3. E15-T03: pendiente.
 4. E15-T04: pendiente.

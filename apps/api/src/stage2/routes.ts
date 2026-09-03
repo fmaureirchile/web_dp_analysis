@@ -767,6 +767,43 @@ function normalizeDeclaredValues(values: string[] | undefined): string[] | undef
   return Array.from(new Set(normalized)).sort((a, b) => a.localeCompare(b));
 }
 
+function hasPurposeForCategory(category: string, declaredPurposes: string[]): boolean {
+  if (declaredPurposes.length === 0) {
+    return false;
+  }
+
+  const bag = declaredPurposes.join(" ");
+  if (category === "BEHAVIORAL_DATA") {
+    return /analit|analytics|medicion|personaliz|marketing|publicidad|seguimiento/.test(bag);
+  }
+
+  if (category === "TECHNICAL_DATA") {
+    return /seguridad|operacion|funcionamiento|tecnico|tecnica/.test(bag);
+  }
+
+  if (category === "CONTACT_DATA") {
+    return /contacto|soporte|comunicacion/.test(bag);
+  }
+
+  if (category === "AUTH_SECRET") {
+    return /seguridad|autentic|sesion|acceso|fraude|operacion/.test(bag);
+  }
+
+  if (category === "GOV_IDENTIFIER") {
+    return /identificacion|cumplimiento|regulator|verificacion|seguridad/.test(bag);
+  }
+
+  if (category === "FINANCIAL_DATA") {
+    return /pago|facturacion|financ|fraude|seguridad/.test(bag);
+  }
+
+  if (category === "HEALTH_DATA") {
+    return /salud|asistencia|servicio|seguridad/.test(bag);
+  }
+
+  return false;
+}
+
 export function createStage2Router(): Router {
   const router = Router();
 
@@ -2735,7 +2772,8 @@ export function createStage2Router(): Router {
 
     const declaredThirdParties = normalizeDeclaredValues(body.declaredThirdParties);
     const declaredCookieKeys = normalizeDeclaredValues(body.declaredCookieKeys);
-    if (!declaredThirdParties || !declaredCookieKeys) {
+    const declaredPurposes = normalizeDeclaredValues(body.declaredPurposes);
+    if (!declaredThirdParties || !declaredCookieKeys || !declaredPurposes) {
       return res
         .status(400)
         .setHeader("x-correlation-id", cid)
@@ -2754,6 +2792,23 @@ export function createStage2Router(): Router {
     try {
       const inventory = listTrackingInventoryByExecutionId(body.executionId);
       const discrepancies: LegalDiscrepancyItemDto[] = [];
+      const observedCategories = new Set<string>();
+
+      for (const networkItem of dynamicResult.data.network) {
+        if (networkItem.classificationLabel && networkItem.classificationLabel !== "UNCLASSIFIED") {
+          observedCategories.add(networkItem.classificationLabel);
+        }
+      }
+
+      for (const storageItem of dynamicResult.data.storage) {
+        if (storageItem.classificationLabel && storageItem.classificationLabel !== "UNCLASSIFIED") {
+          observedCategories.add(storageItem.classificationLabel);
+        }
+      }
+
+      if (observedCategories.size === 0 && (inventory.thirdParties.length > 0 || inventory.cookies.length > 0)) {
+        observedCategories.add("BEHAVIORAL_DATA");
+      }
 
       for (const thirdParty of inventory.thirdParties) {
         const normalized = thirdParty.domain.trim().toLowerCase();
@@ -2781,6 +2836,18 @@ export function createStage2Router(): Router {
         }
       }
 
+      for (const category of Array.from(observedCategories).sort((a, b) => a.localeCompare(b))) {
+        if (!hasPurposeForCategory(category, declaredPurposes)) {
+          discrepancies.push({
+            kind: "PURPOSE_NOT_FOUND_FOR_OBSERVED_CATEGORY",
+            observedValue: category,
+            declaredInPolicy: false,
+            message: `No se encontro finalidad declarada para categoria observada ${category}. Existe una posible discrepancia. Requiere validacion.`,
+            requiresValidation: true
+          });
+        }
+      }
+
       const success: LegalDiscrepancyDetectionResultDto = {
         ok: true,
         data: {
@@ -2789,11 +2856,13 @@ export function createStage2Router(): Router {
           totals: {
             observedThirdParties: inventory.thirdParties.length,
             observedCookies: inventory.cookies.length,
+            observedCategories: observedCategories.size,
             discrepancies: discrepancies.length
           },
           declared: {
             thirdParties: declaredThirdParties,
-            cookieKeys: declaredCookieKeys
+            cookieKeys: declaredCookieKeys,
+            purposes: declaredPurposes
           },
           discrepancies,
           summary:

@@ -24,7 +24,7 @@ async function buildExecution(entryUrl: string): Promise<string> {
       projectId: project.body.data.id,
       validFrom: isoNowPlus(-60),
       validTo: isoNowPlus(60),
-      allowedDomains: ["127.0.0.1", "localhost"],
+      allowedDomains: ["127.0.0.1"],
       allowSubdomains: false,
       permittedOperations: ["SCAN_PASSIVE"]
     });
@@ -81,16 +81,15 @@ afterEach(async () => {
   labBaseUrl = "";
 });
 
-describe("Etapa 15 T01 discrepancias legal-tecnicas iniciales", () => {
-  it("detecta tercero observado no declarado", async () => {
-    const localhostEntry = labBaseUrl.replace("127.0.0.1", "localhost");
-    const executionId = await buildExecution(`${localhostEntry}/sitio-a/redirect-host-swap`);
+describe("Etapa 15 T02 finalidad no encontrada baseline", () => {
+  it("detecta categoria observada sin finalidad declarada", async () => {
+    const executionId = await buildExecution(`${labBaseUrl}/sitio-a/storage-cookie`);
 
     const run = await request(app)
       .post("/api/v1/browser/observations/start")
       .send({
         executionId,
-        entryUrl: `${localhostEntry}/sitio-a/redirect-host-swap`,
+        entryUrl: `${labBaseUrl}/sitio-a/storage-cookie`,
         timeoutMs: 10000
       });
 
@@ -99,41 +98,49 @@ describe("Etapa 15 T01 discrepancias legal-tecnicas iniciales", () => {
 
     const start = await request(app).post("/api/v1/legal-analysis/discrepancies/start").send({
       executionId,
-      declaredThirdParties: ["analytics.example.com"],
-      declaredCookieKeys: [],
-      declaredPurposes: ["seguridad operacional"]
+      declaredThirdParties: [],
+      declaredCookieKeys: ["synthetic_session", "synthetic_pref"],
+      declaredPurposes: ["boletin informativo"]
     });
 
     expect(start.status).toBe(200);
     expect(start.body.ok).toBe(true);
-    expect(start.body.data.totals.discrepancies).toBeGreaterThanOrEqual(1);
+    expect(start.body.data.totals.observedCategories).toBeGreaterThanOrEqual(1);
 
-    const item = (start.body.data.discrepancies as Array<{ kind: string; message: string }>).find(
-      (entry) => entry.kind === "THIRD_PARTY_OBSERVED_NOT_DECLARED"
+    const purposeGap = (start.body.data.discrepancies as Array<{ kind: string; message: string }>).find(
+      (item) => item.kind === "PURPOSE_NOT_FOUND_FOR_OBSERVED_CATEGORY"
     );
 
-    expect(item).toBeDefined();
-    expect(item?.message).toContain("Existe una posible discrepancia");
-    expect(item?.message).toContain("Requiere validacion");
-
-    const result = await request(app).get(`/api/v1/legal-analysis/discrepancies/${executionId}/result`);
-    expect(result.status).toBe(200);
-    expect(result.body.ok).toBe(true);
-    expect(result.body.data.executionId).toBe(executionId);
+    expect(purposeGap).toBeDefined();
+    expect(purposeGap?.message).toContain("No se encontro finalidad declarada");
+    expect(purposeGap?.message).toContain("Existe una posible discrepancia");
+    expect(purposeGap?.message).toContain("Requiere validacion");
   });
 
-  it("retorna 422 cuando no existe observacion dinamica previa", async () => {
-    const executionId = await buildExecution(`${labBaseUrl}/sitio-a/home`);
+  it("no crea discrepancia de finalidad cuando existe finalidad compatible", async () => {
+    const executionId = await buildExecution(`${labBaseUrl}/sitio-a/storage-cookie`);
+
+    const run = await request(app)
+      .post("/api/v1/browser/observations/start")
+      .send({
+        executionId,
+        entryUrl: `${labBaseUrl}/sitio-a/storage-cookie`,
+        timeoutMs: 10000
+      });
+
+    expect(run.status).toBe(200);
 
     const start = await request(app).post("/api/v1/legal-analysis/discrepancies/start").send({
       executionId,
-      declaredThirdParties: ["127.0.0.1"],
-      declaredCookieKeys: ["synthetic_session"],
-      declaredPurposes: ["analitica de servicio"]
+      declaredThirdParties: [],
+      declaredCookieKeys: ["synthetic_session", "synthetic_pref"],
+      declaredPurposes: ["analitica de comportamiento", "seguridad operativa"]
     });
 
-    expect(start.status).toBe(422);
-    expect(start.body.ok).toBe(false);
-    expect(start.body.error.errorCode).toBe("tracking_inventory_not_available");
+    expect(start.status).toBe(200);
+    const purposeGaps = (start.body.data.discrepancies as Array<{ kind: string }>).filter(
+      (item) => item.kind === "PURPOSE_NOT_FOUND_FOR_OBSERVED_CATEGORY"
+    );
+    expect(purposeGaps.length).toBe(0);
   });
 });

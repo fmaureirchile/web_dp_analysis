@@ -59,7 +59,8 @@
     "lab:e14-2:gate": "corepack pnpm run lab:e14-1:gate && vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage14-dto-processing-correlation.integration.test.ts",
     "lab:e14-3:gate": "corepack pnpm run lab:e14-2:gate && vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage14-lineage-consolidated-view.integration.test.ts",
     "lab:e14:gate": "corepack pnpm run lab:e14-3:gate",
-    "lab:e15-1:gate": "corepack pnpm run lab:e14:gate && vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage15-legal-discrepancies.integration.test.ts"
+    "lab:e15-1:gate": "corepack pnpm run lab:e14:gate && vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage15-legal-discrepancies.integration.test.ts",
+    "lab:e15-2:gate": "corepack pnpm run lab:e15-1:gate && vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage15-legal-purpose-baseline.integration.test.ts"
   },
   "prisma": {
     "seed": "tsx database/seeds/stage2.seed.ts"

@@ -11,8 +11,14 @@
 corepack pnpm run lab:e15-1:gate
 ```
 
+## Comando de validacion E15-T02
+
+```bash
+corepack pnpm run lab:e15-2:gate
+```
+
 ## Cuando usarlo
 
 1. Despues de modificar reglas o payload de discrepancias legal-tecnicas.
-2. Antes de avanzar a finalidad no encontrada (E15-T02).
+2. Antes de avanzar a discrepancias de consentimiento observable (E15-T03).
 3. Para verificar que el lenguaje de salida no emite sentencia juridica automatica.

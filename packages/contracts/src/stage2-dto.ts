@@ -604,7 +604,10 @@ export interface LineageConsolidatedViewDto {
   };
 }
 
-export type LegalDiscrepancyKind = "THIRD_PARTY_OBSERVED_NOT_DECLARED" | "COOKIE_OBSERVED_NOT_DECLARED";
+export type LegalDiscrepancyKind =
+  | "THIRD_PARTY_OBSERVED_NOT_DECLARED"
+  | "COOKIE_OBSERVED_NOT_DECLARED"
+  | "PURPOSE_NOT_FOUND_FOR_OBSERVED_CATEGORY";
 
 export interface LegalDiscrepancyItemDto {
   kind: LegalDiscrepancyKind;
@@ -618,6 +621,7 @@ export interface StartLegalDiscrepancyDetectionDto {
   executionId: string;
   declaredThirdParties?: string[];
   declaredCookieKeys?: string[];
+  declaredPurposes?: string[];
 }
 
 export type LegalDiscrepancyDetectionErrorCode =
@@ -633,11 +637,13 @@ export interface LegalDiscrepancyDetectionSuccessDto {
   totals: {
     observedThirdParties: number;
     observedCookies: number;
+    observedCategories: number;
     discrepancies: number;
   };
   declared: {
     thirdParties: string[];
     cookieKeys: string[];
+    purposes: string[];
   };
   discrepancies: LegalDiscrepancyItemDto[];
   summary: string;
