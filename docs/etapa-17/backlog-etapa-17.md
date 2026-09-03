@@ -18,6 +18,7 @@ Elevar confiabilidad y controles operativos para uso con clientes reales.
 
 - Objetivo unico: definir regla minima de retencion configurable por ventana temporal.
 - Criterio de aceptacion: eliminacion por retencion con salida reproducible.
+- Estado: completada.
 
 ## E17-T03 - Runbook operativo inicial
 
@@ -32,6 +33,6 @@ Elevar confiabilidad y controles operativos para uso con clientes reales.
 ## Estado de cumplimiento parcial
 
 1. E17-T01: completada.
-2. E17-T02: pendiente.
+2. E17-T02: completada.
 3. E17-T03: pendiente.
 4. E17-T04: pendiente.

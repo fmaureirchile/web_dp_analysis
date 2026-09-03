@@ -1748,3 +1748,94 @@ export function purgeExecutionData(executionId: string): {
 
   return counts;
 }
+
+export function applyExecutionDataRetention(input: {
+  windowMinutes: number;
+  states: ExecutionState[];
+}): {
+  cutoffAt: string;
+  candidateExecutions: number;
+  purgedExecutions: number;
+  deletedTotals: {
+    evidences: number;
+    observations: number;
+    pages: number;
+    formFields: number;
+    passiveHtmlEvidences: number;
+    browserDomSnapshots: number;
+    browserScreenshots: number;
+    passiveSinglePageResult: number;
+    dynamicObservationResult: number;
+    frontendRepositoryIndexResult: number;
+    frontendPatternDetectionResult: number;
+    backendApiIndexResult: number;
+    backendProcessingDetectionResult: number;
+    legalDiscrepancyDetectionResult: number;
+    versionComparisons: number;
+    crawlerOperationalEvents: number;
+    executionTransitions: number;
+    findings: number;
+    reviewDecisions: number;
+  };
+} {
+  const cutoffEpoch = Date.now() - input.windowMinutes * 60_000;
+  const allowedStates = new Set<ExecutionState>(input.states);
+
+  const candidateExecutionIds = Array.from(store.executions.values())
+    .filter((execution) => allowedStates.has(execution.state))
+    .filter((execution) => Date.parse(execution.updatedAt) <= cutoffEpoch)
+    .map((execution) => execution.id)
+    .sort((a, b) => a.localeCompare(b));
+
+  const deletedTotals = {
+    evidences: 0,
+    observations: 0,
+    pages: 0,
+    formFields: 0,
+    passiveHtmlEvidences: 0,
+    browserDomSnapshots: 0,
+    browserScreenshots: 0,
+    passiveSinglePageResult: 0,
+    dynamicObservationResult: 0,
+    frontendRepositoryIndexResult: 0,
+    frontendPatternDetectionResult: 0,
+    backendApiIndexResult: 0,
+    backendProcessingDetectionResult: 0,
+    legalDiscrepancyDetectionResult: 0,
+    versionComparisons: 0,
+    crawlerOperationalEvents: 0,
+    executionTransitions: 0,
+    findings: 0,
+    reviewDecisions: 0
+  };
+
+  for (const executionId of candidateExecutionIds) {
+    const deleted = purgeExecutionData(executionId);
+    deletedTotals.evidences += deleted.evidences;
+    deletedTotals.observations += deleted.observations;
+    deletedTotals.pages += deleted.pages;
+    deletedTotals.formFields += deleted.formFields;
+    deletedTotals.passiveHtmlEvidences += deleted.passiveHtmlEvidences;
+    deletedTotals.browserDomSnapshots += deleted.browserDomSnapshots;
+    deletedTotals.browserScreenshots += deleted.browserScreenshots;
+    deletedTotals.passiveSinglePageResult += deleted.passiveSinglePageResult;
+    deletedTotals.dynamicObservationResult += deleted.dynamicObservationResult;
+    deletedTotals.frontendRepositoryIndexResult += deleted.frontendRepositoryIndexResult;
+    deletedTotals.frontendPatternDetectionResult += deleted.frontendPatternDetectionResult;
+    deletedTotals.backendApiIndexResult += deleted.backendApiIndexResult;
+    deletedTotals.backendProcessingDetectionResult += deleted.backendProcessingDetectionResult;
+    deletedTotals.legalDiscrepancyDetectionResult += deleted.legalDiscrepancyDetectionResult;
+    deletedTotals.versionComparisons += deleted.versionComparisons;
+    deletedTotals.crawlerOperationalEvents += deleted.crawlerOperationalEvents;
+    deletedTotals.executionTransitions += deleted.executionTransitions;
+    deletedTotals.findings += deleted.findings;
+    deletedTotals.reviewDecisions += deleted.reviewDecisions;
+  }
+
+  return {
+    cutoffAt: new Date(cutoffEpoch).toISOString(),
+    candidateExecutions: candidateExecutionIds.length,
+    purgedExecutions: candidateExecutionIds.length,
+    deletedTotals
+  };
+}

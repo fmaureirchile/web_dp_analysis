@@ -779,6 +779,37 @@ export interface ExecutionDataPurgeResultDto {
   error?: ExecutionDataPurgeErrorDto;
 }
 
+export type ExecutionRetentionState = "COMPLETED" | "COMPLETED_WITH_WARNINGS" | "FAILED";
+
+export interface StartExecutionDataRetentionDto {
+  windowMinutes: number;
+  states?: ExecutionRetentionState[];
+}
+
+export interface ExecutionDataRetentionSuccessDto {
+  appliedAt: string;
+  windowMinutes: number;
+  cutoffAt: string;
+  states: ExecutionRetentionState[];
+  candidateExecutions: number;
+  purgedExecutions: number;
+  deletedTotals: ExecutionDataPurgeDeletedCountsDto;
+  summary: string;
+}
+
+export type ExecutionDataRetentionErrorCode = "invalid_window_minutes" | "invalid_states" | "retention_failed";
+
+export interface ExecutionDataRetentionErrorDto {
+  errorCode: ExecutionDataRetentionErrorCode;
+  message: string;
+}
+
+export interface ExecutionDataRetentionResultDto {
+  ok: boolean;
+  data?: ExecutionDataRetentionSuccessDto;
+  error?: ExecutionDataRetentionErrorDto;
+}
+
 export type AuthenticatedEvaluationRole = "cliente" | "supervisor";
 
 export type AuthenticatedEvaluationErrorCode =

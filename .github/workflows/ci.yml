@@ -925,45 +925,48 @@ jobs:
 
       - name: Report Stage 17 gate coverage
         run: |
-          echo "E17 gate coverage: stage16 consolidated gate + execution data purge"
-          echo "- Stage 17 initial gate: npm run lab:e17-1:gate"
-          echo "- Integration suite: tests/integration/stage17-execution-data-purge.integration.test.ts"
+          echo "E17 gate coverage: stage16 consolidated gate + execution data purge + retention window"
+          echo "- Stage 17 incremental gate: npm run lab:e17-2:gate"
+          echo "- Integration suite 1: tests/integration/stage17-execution-data-purge.integration.test.ts"
+          echo "- Integration suite 2: tests/integration/stage17-retention-window.integration.test.ts"
 
-      - name: Stage 17 gate E17-T01
+      - name: Stage 17 gate E17-T02
         shell: bash
         run: |
           set -euo pipefail
-          npm run lab:e17-1:gate | tee e17_1_gate.log
+          npm run lab:e17-2:gate | tee e17_2_gate.log
 
       - name: Report Stage 17 gate result
         shell: bash
         run: |
           set -euo pipefail
-          stage17_suite_count="$(grep -Ec 'tests/integration/stage17-.*\.integration\.test\.ts \([0-9]+\)' e17_1_gate.log || true)"
-          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e17_1_gate.log)"
-          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e17_1_gate.log)"
+          stage17_suite_count="$(grep -Ec 'tests/integration/stage17-.*\.integration\.test\.ts \([0-9]+\)' e17_2_gate.log || true)"
+          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e17_2_gate.log)"
+          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e17_2_gate.log)"
 
-          if [ "${stage17_suite_count}" != "1" ]; then
-            echo "No se detecto la suite Stage 17 esperada en e17_1_gate.log. Detectadas: ${stage17_suite_count}."
+          if [ "${stage17_suite_count}" != "2" ]; then
+            echo "No se detectaron las 2 suites Stage 17 esperadas en e17_2_gate.log. Detectadas: ${stage17_suite_count}."
             exit 1
           fi
 
           if [ -z "$file_pairs" ] || [ -z "$test_pairs" ]; then
-            echo "No se pudieron extraer resultados del gate E17-T01 desde e17_1_gate.log"
+            echo "No se pudieron extraer resultados del gate E17-T02 desde e17_2_gate.log"
             exit 1
           fi
 
-          if ! echo "$file_pairs" | grep -q '^1/1$'; then
-            echo "No se detecto resultado esperado de archivos para Stage 17 (1/1)."
+          stage17_files_total="$(echo "$file_pairs" | grep -c '^1/1$' || true)"
+          if [ "${stage17_files_total}" -lt "2" ]; then
+            echo "No se detectaron resultados esperados de archivos para Stage 17 (1/1 + 1/1)."
             exit 1
           fi
 
-          if ! echo "$test_pairs" | grep -q '^2/2$'; then
-            echo "No se detecto resultado esperado de tests para Stage 17 (2/2)."
+          stage17_tests_total="$(echo "$test_pairs" | grep -c '^2/2$' || true)"
+          if [ "${stage17_tests_total}" -lt "2" ]; then
+            echo "No se detectaron resultados esperados de tests para Stage 17 (2/2 + 2/2)."
             exit 1
           fi
 
-          echo "E17-T01 gate result: execution_data_purge_integration=2/2; stage16_baseline=ok; typecheck=ok"
+          echo "E17-T02 gate result: execution_data_purge_integration=2/2; retention_window_integration=2/2; stage16_baseline=ok; typecheck=ok"
 
       - name: Build
         run: npm run build

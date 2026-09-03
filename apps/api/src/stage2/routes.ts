@@ -6,6 +6,9 @@ import {
   type BackendApiArtifactType,
   type BackendApiIndexedArtifactDto,
   type BackendApiIndexResultDto,
+  type ExecutionRetentionState,
+  type ExecutionDataRetentionResultDto,
+  type StartExecutionDataRetentionDto,
   type ExecutionDataPurgeResultDto,
   type BackendProcessingFileDetectionsDto,
   type BackendProcessingFlowViewDto,
@@ -104,6 +107,7 @@ import {
   recordBackendApiIndexResult,
   recordBackendProcessingDetectionResult,
   recordVersionComparisonResult,
+  applyExecutionDataRetention,
   purgeExecutionData,
   recordFrontendPatternDetectionResult,
   recordFrontendRepositoryIndexResult,
@@ -841,6 +845,39 @@ function executionDataPurgeError(
       message
     }
   };
+}
+
+function executionDataRetentionError(
+  errorCode: "invalid_window_minutes" | "invalid_states" | "retention_failed",
+  message: string
+): ExecutionDataRetentionResultDto {
+  return {
+    ok: false,
+    error: {
+      errorCode,
+      message
+    }
+  };
+}
+
+const RETENTION_ALLOWED_STATES: ExecutionRetentionState[] = ["COMPLETED", "COMPLETED_WITH_WARNINGS", "FAILED"];
+
+function parseRetentionStates(raw: ExecutionRetentionState[] | undefined): ExecutionState[] | undefined {
+  if (raw === undefined) {
+    return [ExecutionState.COMPLETED, ExecutionState.COMPLETED_WITH_WARNINGS, ExecutionState.FAILED];
+  }
+
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return undefined;
+  }
+
+  const normalized = raw.map((item) => String(item).toUpperCase()) as ExecutionRetentionState[];
+  if (normalized.some((item) => !RETENTION_ALLOWED_STATES.includes(item))) {
+    return undefined;
+  }
+
+  const unique = Array.from(new Set(normalized));
+  return unique.map((item) => ExecutionState[item]);
 }
 
 function toObservedEndpointSignature(method: string, rawUrl: string): string | undefined {
@@ -3250,6 +3287,55 @@ export function createStage2Router(): Router {
         .status(422)
         .setHeader("x-correlation-id", cid)
         .json(executionDataPurgeError(executionId, "purge_failed", (error as Error).message));
+    }
+  });
+
+  router.post("/privacy/retention/apply", async (req, res) => {
+    const cid = correlationId(req);
+    const body = req.body as StartExecutionDataRetentionDto;
+
+    const windowMinutes = Number(body?.windowMinutes);
+    if (!Number.isInteger(windowMinutes) || windowMinutes <= 0 || windowMinutes > 525_600) {
+      return res
+        .status(400)
+        .setHeader("x-correlation-id", cid)
+        .json(executionDataRetentionError("invalid_window_minutes", "window_minutes_must_be_integer_between_1_and_525600"));
+    }
+
+    const states = parseRetentionStates(body?.states);
+    if (!states) {
+      return res.status(400).setHeader("x-correlation-id", cid).json(executionDataRetentionError("invalid_states", "invalid_retention_states"));
+    }
+
+    try {
+      const retention = applyExecutionDataRetention({
+        windowMinutes,
+        states
+      });
+
+      const result: ExecutionDataRetentionResultDto = {
+        ok: true,
+        data: {
+          appliedAt: new Date().toISOString(),
+          windowMinutes,
+          cutoffAt: retention.cutoffAt,
+          states: states.map((state) => state as ExecutionRetentionState),
+          candidateExecutions: retention.candidateExecutions,
+          purgedExecutions: retention.purgedExecutions,
+          deletedTotals: retention.deletedTotals,
+          summary:
+            retention.purgedExecutions > 0
+              ? "Se aplico retencion y se eliminaron datos operativos de ejecuciones fuera de ventana. Requiere validacion de politica por cliente."
+              : "No se detectaron ejecuciones fuera de ventana para purga. Requiere validacion de politica por cliente."
+        }
+      };
+
+      return res.status(200).setHeader("x-correlation-id", cid).json(result);
+    } catch (error) {
+      return res
+        .status(422)
+        .setHeader("x-correlation-id", cid)
+        .json(executionDataRetentionError("retention_failed", (error as Error).message));
     }
   });
 
