@@ -877,6 +877,52 @@ jobs:
 
           echo "E15 gate result: legal_discrepancies_integration=2/2; legal_purpose_baseline_integration=2/2; legal_consent_discrepancies_integration=2/2; stage14_baseline=ok; typecheck=ok"
 
+      - name: Report Stage 16 gate coverage
+        run: |
+          echo "E16 gate coverage: version comparison + endpoint delta + alert classification"
+          echo "- Stage 16 consolidated gate: npm run lab:e16:gate"
+          echo "- Integration suite 1: tests/integration/stage16-version-comparison.integration.test.ts"
+          echo "- Integration suite 2: tests/integration/stage16-endpoint-delta.integration.test.ts"
+          echo "- Integration suite 3: tests/integration/stage16-alert-classification.integration.test.ts"
+
+      - name: Stage 16 gate E16
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run lab:e16:gate | tee e16_gate.log
+
+      - name: Report Stage 16 gate result
+        shell: bash
+        run: |
+          set -euo pipefail
+          stage16_suite_count="$(grep -Ec 'tests/integration/stage16-.*\.integration\.test\.ts \([0-9]+\)' e16_gate.log || true)"
+          files_passed="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1/p' e16_gate.log | tail -n1)"
+          files_total="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\2/p' e16_gate.log | tail -n1)"
+          tests_passed="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1/p' e16_gate.log | tail -n1)"
+          tests_total="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\2/p' e16_gate.log | tail -n1)"
+
+          if [ "${stage16_suite_count}" != "3" ]; then
+            echo "No se detectaron las 3 suites Stage 16 esperadas en e16_gate.log. Detectadas: ${stage16_suite_count}."
+            exit 1
+          fi
+
+          if [ -z "$files_passed" ] || [ -z "$files_total" ] || [ -z "$tests_passed" ] || [ -z "$tests_total" ]; then
+            echo "No se pudieron extraer resultados del gate E16 desde e16_gate.log"
+            exit 1
+          fi
+
+          if [ "$files_passed" != "3" ] || [ "$files_total" != "3" ]; then
+            echo "Cobertura inesperada de archivos Stage 16: ${files_passed}/${files_total}. Se esperaba 3/3."
+            exit 1
+          fi
+
+          if [ "$tests_passed" != "5" ] || [ "$tests_total" != "5" ]; then
+            echo "Cobertura inesperada de tests Stage 16: ${tests_passed}/${tests_total}. Se esperaba 5/5."
+            exit 1
+          fi
+
+          echo "E16 gate result: version_comparison_integration=2/2; endpoint_delta_integration=1/1; alert_classification_integration=2/2; stage15_baseline=ok; typecheck=ok"
+
       - name: Build
         run: npm run build
 
