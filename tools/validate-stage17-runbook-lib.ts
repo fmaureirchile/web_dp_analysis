@@ -23,9 +23,21 @@ const REQUIRED_CHECKS: RequiredCheck[] = [
     ]
   },
   {
+    file: "docs/etapa-17/checklist-piloto-e2e-autorizado.md",
+    requiredSnippets: [
+      "## Checklist pre-ejecucion",
+      "## Checklist post-ejecucion",
+      "alcance autorizado",
+      "cierre de credenciales",
+      "POST /api/v1/privacy/executions/<executionId>/purge",
+      "POST /api/v1/privacy/retention/apply"
+    ]
+  },
+  {
     file: "docs/etapa-17/README.md",
     requiredSnippets: [
       "runbook-operativo-piloto.md",
+      "checklist-piloto-e2e-autorizado.md",
       "npm run docs:stage17:runbook"
     ]
   },

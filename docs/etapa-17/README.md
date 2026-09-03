@@ -6,6 +6,7 @@
 2. backlog-etapa-17.md
 3. runbook-operativo-piloto.md
 4. acta-cierre-etapa-17.md
+5. checklist-piloto-e2e-autorizado.md
 
 ## Comando de validacion consolidado E17-T04
 

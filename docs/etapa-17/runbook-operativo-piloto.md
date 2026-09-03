@@ -28,7 +28,7 @@ Operar pilotos controlados con trazabilidad, reduciendo riesgo de retencion exce
 Comando:
 
 ```bash
-npm run lab:e17-2:gate
+npm run lab:e17:gate
 ```
 
 Cuando usar:
@@ -51,6 +51,17 @@ Archivo de evidencia:
 
 1. Log local del comando.
 2. En CI: bloque Stage 17 gate result.
+
+### 4) Checklist de corrida piloto E2E
+
+Documento:
+
+- docs/etapa-17/checklist-piloto-e2e-autorizado.md
+
+Cuando usar:
+
+1. Antes de iniciar la corrida para validar alcance y credenciales.
+2. Al finalizar la corrida para confirmar purga/retencion y cierre seguro.
 
 ### 2) Purga puntual por executionId
 
