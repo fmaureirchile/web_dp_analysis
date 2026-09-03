@@ -6,6 +6,7 @@ import {
   type BackendApiArtifactType,
   type BackendApiIndexedArtifactDto,
   type BackendApiIndexResultDto,
+  type ExecutionDataPurgeResultDto,
   type BackendProcessingFileDetectionsDto,
   type BackendProcessingFlowViewDto,
   type BackendProcessingMatchDto,
@@ -103,6 +104,7 @@ import {
   recordBackendApiIndexResult,
   recordBackendProcessingDetectionResult,
   recordVersionComparisonResult,
+  purgeExecutionData,
   recordFrontendPatternDetectionResult,
   recordFrontendRepositoryIndexResult,
   recordLegalDiscrepancyDetectionResult,
@@ -820,6 +822,21 @@ function versionComparisonError(
     error: {
       baselineExecutionId,
       currentExecutionId,
+      errorCode,
+      message
+    }
+  };
+}
+
+function executionDataPurgeError(
+  executionId: string,
+  errorCode: "invalid_execution_id" | "purge_failed",
+  message: string
+): ExecutionDataPurgeResultDto {
+  return {
+    ok: false,
+    error: {
+      executionId,
       errorCode,
       message
     }
@@ -3199,6 +3216,41 @@ export function createStage2Router(): Router {
     }
 
     return res.status(200).setHeader("x-correlation-id", cid).json(result);
+  });
+
+  router.post("/privacy/executions/:executionId/purge", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+
+    const execution = await getExecutionByIdWithFallback(executionId);
+    if (!execution) {
+      return res
+        .status(400)
+        .setHeader("x-correlation-id", cid)
+        .json(executionDataPurgeError(executionId, "invalid_execution_id", "execution_id_not_found"));
+    }
+
+    try {
+      const deletedCounts = purgeExecutionData(executionId);
+
+      const result: ExecutionDataPurgeResultDto = {
+        ok: true,
+        data: {
+          executionId,
+          purgedAt: new Date().toISOString(),
+          deletedCounts,
+          summary:
+            "Se eliminaron datos operativos asociados a la ejecucion. La ejecucion puede conservar metadatos administrativos. Requiere validacion de politicas de retencion."
+        }
+      };
+
+      return res.status(200).setHeader("x-correlation-id", cid).json(result);
+    } catch (error) {
+      return res
+        .status(422)
+        .setHeader("x-correlation-id", cid)
+        .json(executionDataPurgeError(executionId, "purge_failed", (error as Error).message));
+    }
   });
 
   router.post("/findings", (req, res) => {

@@ -1568,3 +1568,183 @@ export function listTrackingInventoryByExecutionId(executionId: string): {
     cookieObservations: result.data.storage.filter((item) => item.kind === "COOKIE").length
   };
 }
+
+export function purgeExecutionData(executionId: string): {
+  evidences: number;
+  observations: number;
+  pages: number;
+  formFields: number;
+  passiveHtmlEvidences: number;
+  browserDomSnapshots: number;
+  browserScreenshots: number;
+  passiveSinglePageResult: number;
+  dynamicObservationResult: number;
+  frontendRepositoryIndexResult: number;
+  frontendPatternDetectionResult: number;
+  backendApiIndexResult: number;
+  backendProcessingDetectionResult: number;
+  legalDiscrepancyDetectionResult: number;
+  versionComparisons: number;
+  crawlerOperationalEvents: number;
+  executionTransitions: number;
+  findings: number;
+  reviewDecisions: number;
+} {
+  const evidenceIdsToDelete = new Set<string>();
+  for (const evidence of store.evidences.values()) {
+    if (evidence.executionId === executionId) {
+      evidenceIdsToDelete.add(evidence.id);
+    }
+  }
+
+  const findingIdsToDelete = new Set<string>();
+  for (const finding of store.findings.values()) {
+    if (finding.evidenceIds.some((evidenceId) => evidenceIdsToDelete.has(evidenceId))) {
+      findingIdsToDelete.add(finding.id);
+    }
+  }
+
+  const counts = {
+    evidences: 0,
+    observations: 0,
+    pages: 0,
+    formFields: 0,
+    passiveHtmlEvidences: 0,
+    browserDomSnapshots: 0,
+    browserScreenshots: 0,
+    passiveSinglePageResult: 0,
+    dynamicObservationResult: 0,
+    frontendRepositoryIndexResult: 0,
+    frontendPatternDetectionResult: 0,
+    backendApiIndexResult: 0,
+    backendProcessingDetectionResult: 0,
+    legalDiscrepancyDetectionResult: 0,
+    versionComparisons: 0,
+    crawlerOperationalEvents: 0,
+    executionTransitions: 0,
+    findings: 0,
+    reviewDecisions: 0
+  };
+
+  for (const [id, record] of store.passiveHtmlEvidences.entries()) {
+    if (record.executionId === executionId) {
+      store.passiveHtmlEvidences.delete(id);
+      counts.passiveHtmlEvidences += 1;
+    }
+  }
+
+  for (const [id, record] of store.browserDomSnapshots.entries()) {
+    if (record.executionId === executionId) {
+      store.browserDomSnapshots.delete(id);
+      counts.browserDomSnapshots += 1;
+    }
+  }
+
+  for (const [id, record] of store.browserScreenshots.entries()) {
+    if (record.executionId === executionId) {
+      store.browserScreenshots.delete(id);
+      counts.browserScreenshots += 1;
+    }
+  }
+
+  for (const evidenceId of evidenceIdsToDelete) {
+    if (store.evidences.delete(evidenceId)) {
+      counts.evidences += 1;
+    }
+  }
+
+  for (const [id, observation] of store.observations.entries()) {
+    if (observation.executionId === executionId) {
+      store.observations.delete(id);
+      counts.observations += 1;
+    }
+  }
+
+  const pageIds = new Set<string>();
+  for (const [id, page] of store.pages.entries()) {
+    if (page.executionId === executionId) {
+      pageIds.add(id);
+      store.pages.delete(id);
+      counts.pages += 1;
+    }
+  }
+
+  for (const [id, field] of store.formFields.entries()) {
+    if (pageIds.has(field.pageId)) {
+      store.formFields.delete(id);
+      counts.formFields += 1;
+    }
+  }
+
+  if (store.passiveSinglePageResults.delete(executionId)) {
+    counts.passiveSinglePageResult += 1;
+  }
+
+  if (store.dynamicObservationResults.delete(executionId)) {
+    counts.dynamicObservationResult += 1;
+  }
+
+  if (store.frontendRepositoryIndexResults.delete(executionId)) {
+    counts.frontendRepositoryIndexResult += 1;
+  }
+
+  if (store.frontendPatternDetectionResults.delete(executionId)) {
+    counts.frontendPatternDetectionResult += 1;
+  }
+
+  if (store.backendApiIndexResults.delete(executionId)) {
+    counts.backendApiIndexResult += 1;
+  }
+
+  if (store.backendProcessingDetectionResults.delete(executionId)) {
+    counts.backendProcessingDetectionResult += 1;
+  }
+
+  if (store.legalDiscrepancyDetectionResults.delete(executionId)) {
+    counts.legalDiscrepancyDetectionResult += 1;
+  }
+
+  for (const [key, comparison] of store.versionComparisonResults.entries()) {
+    const baseline = comparison.result.data?.baselineExecutionId ?? comparison.result.error?.baselineExecutionId;
+    const current = comparison.result.data?.currentExecutionId ?? comparison.result.error?.currentExecutionId;
+    if (baseline === executionId || current === executionId || key.startsWith(`${executionId}::`) || key.endsWith(`::${executionId}`)) {
+      store.versionComparisonResults.delete(key);
+      counts.versionComparisons += 1;
+    }
+  }
+
+  const nextOperationalEvents: CrawlerOperationalEventRecord[] = [];
+  for (const event of store.crawlerOperationalEvents) {
+    if (event.executionId === executionId) {
+      counts.crawlerOperationalEvents += 1;
+      continue;
+    }
+    nextOperationalEvents.push(event);
+  }
+  store.crawlerOperationalEvents = nextOperationalEvents;
+
+  const nextTransitions: ExecutionStateTransitionRecord[] = [];
+  for (const transition of store.executionTransitions) {
+    if (transition.executionId === executionId) {
+      counts.executionTransitions += 1;
+      continue;
+    }
+    nextTransitions.push(transition);
+  }
+  store.executionTransitions = nextTransitions;
+
+  for (const findingId of findingIdsToDelete) {
+    if (store.findings.delete(findingId)) {
+      counts.findings += 1;
+    }
+  }
+
+  for (const [id, decision] of store.reviewDecisions.entries()) {
+    if (findingIdsToDelete.has(decision.findingId)) {
+      store.reviewDecisions.delete(id);
+      counts.reviewDecisions += 1;
+    }
+  }
+
+  return counts;
+}

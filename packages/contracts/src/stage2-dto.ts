@@ -736,6 +736,49 @@ export interface VersionComparisonResultDto {
   error?: VersionComparisonErrorDto;
 }
 
+export interface ExecutionDataPurgeDeletedCountsDto {
+  evidences: number;
+  observations: number;
+  pages: number;
+  formFields: number;
+  passiveHtmlEvidences: number;
+  browserDomSnapshots: number;
+  browserScreenshots: number;
+  passiveSinglePageResult: number;
+  dynamicObservationResult: number;
+  frontendRepositoryIndexResult: number;
+  frontendPatternDetectionResult: number;
+  backendApiIndexResult: number;
+  backendProcessingDetectionResult: number;
+  legalDiscrepancyDetectionResult: number;
+  versionComparisons: number;
+  crawlerOperationalEvents: number;
+  executionTransitions: number;
+  findings: number;
+  reviewDecisions: number;
+}
+
+export interface ExecutionDataPurgeSuccessDto {
+  executionId: string;
+  purgedAt: string;
+  deletedCounts: ExecutionDataPurgeDeletedCountsDto;
+  summary: string;
+}
+
+export type ExecutionDataPurgeErrorCode = "invalid_execution_id" | "purge_failed";
+
+export interface ExecutionDataPurgeErrorDto {
+  executionId: string;
+  errorCode: ExecutionDataPurgeErrorCode;
+  message: string;
+}
+
+export interface ExecutionDataPurgeResultDto {
+  ok: boolean;
+  data?: ExecutionDataPurgeSuccessDto;
+  error?: ExecutionDataPurgeErrorDto;
+}
+
 export type AuthenticatedEvaluationRole = "cliente" | "supervisor";
 
 export type AuthenticatedEvaluationErrorCode =
