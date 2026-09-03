@@ -24,6 +24,7 @@ Unificar resultados frontend y backend en enlaces de linaje explicables con esta
 
 - Objetivo unico: exponer vista de nodos/aristas preliminar por executionId.
 - Criterio de aceptacion: payload apto para evolucion a niveles de confirmacion humana.
+- Estado: completada.
 
 ## E14-T04 - Gate consolidado Etapa 14
 
@@ -34,5 +35,5 @@ Unificar resultados frontend y backend en enlaces de linaje explicables con esta
 
 1. E14-T01: completada (correlacion inicial frontend-backend por endpoint).
 2. E14-T02: completada (correlacion DTO/procesamiento por nombre/esquema basico).
-3. E14-T03: pendiente.
+3. E14-T03: completada (vista preliminar de nodos/aristas consolidada por executionId).
 4. E14-T04: pendiente.

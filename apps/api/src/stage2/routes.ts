@@ -11,6 +11,7 @@ import {
   type BackendProcessingMatchDto,
   type BackendProcessingDetectionResultDto,
   type LineageBackendReferenceDto,
+  type LineageConsolidatedViewDto,
   type LineageCorrelationStatus,
   type LineageDtoProcessingCorrelationViewDto,
   type LineageEndpointCorrelationViewDto,
@@ -719,6 +720,18 @@ function buildDtoCorrelationTokens(dtoName: string): string[] {
   }
 
   return Array.from(tokens).sort((a, b) => a.localeCompare(b));
+}
+
+function endpointNodeId(scope: "frontend" | "backend", endpoint: string): string {
+  return `${scope}:endpoint:${endpoint}`;
+}
+
+function dtoNodeId(relativePath: string): string {
+  return `dto:${relativePath}`;
+}
+
+function processingNodeId(relativePath: string): string {
+  return `processing:${relativePath}`;
 }
 
 export function createStage2Router(): Router {
@@ -2480,6 +2493,186 @@ export function createStage2Router(): Router {
       },
       correlations,
       evidenceIds: {
+        backendApiIndexEvidenceId: apiIndexData.evidenceId,
+        backendProcessingEvidenceId: processingData.evidenceId
+      }
+    };
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
+  });
+
+  router.get("/lineage/views/:executionId/consolidated", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const execution = await getExecutionByIdWithFallback(executionId);
+
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
+    }
+
+    const frontendResult = getFrontendPatternDetectionResult(executionId);
+    if (!frontendResult || !frontendResult.ok || !frontendResult.data) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "frontend_pattern_detection_result_not_available" });
+    }
+
+    const apiIndexResult = getBackendApiIndexResult(executionId);
+    if (!apiIndexResult || !apiIndexResult.ok || !apiIndexResult.data) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "backend_api_index_result_not_available" });
+    }
+
+    const processingResult = getBackendProcessingDetectionResult(executionId);
+    if (!processingResult || !processingResult.ok || !processingResult.data) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "backend_processing_detection_result_not_available" });
+    }
+
+    const frontendData = frontendResult.data;
+    const apiIndexData = apiIndexResult.data;
+    const processingData = processingResult.data;
+
+    const frontendEndpointMap = new Map<string, LineageFrontendReferenceDto[]>();
+    for (const file of frontendData.files) {
+      for (const match of file.matches) {
+        const endpoints = extractSnippetEndpoints(match.snippet);
+        for (const endpoint of endpoints) {
+          const references = frontendEndpointMap.get(endpoint) ?? [];
+          references.push({
+            relativePath: file.relativePath,
+            rule: match.rule,
+            line: match.line,
+            snippet: match.snippet
+          });
+          frontendEndpointMap.set(endpoint, references);
+        }
+      }
+    }
+
+    const backendEndpointMap = new Map<string, LineageBackendReferenceDto[]>();
+    for (const file of processingData.files) {
+      for (const match of file.matches) {
+        const endpoints = extractSnippetEndpoints(match.snippet);
+        for (const endpoint of endpoints) {
+          const references = backendEndpointMap.get(endpoint) ?? [];
+          references.push({
+            relativePath: file.relativePath,
+            rule: match.rule,
+            line: match.line,
+            snippet: match.snippet
+          });
+          backendEndpointMap.set(endpoint, references);
+        }
+      }
+    }
+
+    const nodeMap = new Map<string, LineageConsolidatedViewDto["nodes"][number]>();
+    const edges: LineageConsolidatedViewDto["edges"] = [];
+
+    const allEndpoints = Array.from(new Set<string>([...frontendEndpointMap.keys(), ...backendEndpointMap.keys()])).sort((a, b) => a.localeCompare(b));
+    for (const endpoint of allEndpoints) {
+      const frontendRefs = frontendEndpointMap.get(endpoint) ?? [];
+      const backendRefs = backendEndpointMap.get(endpoint) ?? [];
+
+      if (frontendRefs.length > 0) {
+        nodeMap.set(endpointNodeId("frontend", endpoint), {
+          id: endpointNodeId("frontend", endpoint),
+          type: "FRONTEND_ENDPOINT",
+          label: endpoint,
+          status: "INFERRED_HIGH"
+        });
+      }
+
+      if (backendRefs.length > 0) {
+        nodeMap.set(endpointNodeId("backend", endpoint), {
+          id: endpointNodeId("backend", endpoint),
+          type: "BACKEND_ENDPOINT",
+          label: endpoint,
+          status: "INFERRED_HIGH"
+        });
+      }
+
+      if (frontendRefs.length > 0 && backendRefs.length > 0) {
+        edges.push({
+          id: `edge:endpoint:${endpoint}`,
+          type: "CALLS_ENDPOINT",
+          sourceId: endpointNodeId("frontend", endpoint),
+          targetId: endpointNodeId("backend", endpoint),
+          status: "INFERRED_HIGH",
+          confidence: 0.8
+        });
+      }
+    }
+
+    const dtoArtifacts = apiIndexData.artifacts.filter((artifact) => artifact.artifactType === "DTO");
+    for (const artifact of dtoArtifacts) {
+      const dtoName = extractDtoNameFromPath(artifact.relativePath);
+      const tokens = buildDtoCorrelationTokens(dtoName);
+      const dtoId = dtoNodeId(artifact.relativePath);
+
+      nodeMap.set(dtoId, {
+        id: dtoId,
+        type: "DTO_ARTIFACT",
+        label: dtoName,
+        status: "PENDING"
+      });
+
+      for (const file of processingData.files) {
+        const processingId = processingNodeId(file.relativePath);
+        const normalizedPath = normalizeTokenSource(file.relativePath);
+        let hasTokenMatch = false;
+
+        for (const match of file.matches) {
+          const normalizedSnippet = normalizeTokenSource(match.snippet);
+          const found = tokens.some((token) => normalizedSnippet.includes(token) || normalizedPath.includes(token));
+          if (found) {
+            hasTokenMatch = true;
+            break;
+          }
+        }
+
+        if (!hasTokenMatch) {
+          continue;
+        }
+
+        nodeMap.set(dtoId, {
+          id: dtoId,
+          type: "DTO_ARTIFACT",
+          label: dtoName,
+          status: "INFERRED_HIGH"
+        });
+
+        nodeMap.set(processingId, {
+          id: processingId,
+          type: "BACKEND_PROCESSING_FILE",
+          label: file.relativePath,
+          status: "INFERRED_HIGH"
+        });
+
+        edges.push({
+          id: `edge:dto:${artifact.relativePath}->${file.relativePath}`,
+          type: "MAPPED_TO_PROCESSING",
+          sourceId: dtoId,
+          targetId: processingId,
+          status: "INFERRED_HIGH",
+          confidence: 0.78
+        });
+      }
+    }
+
+    const nodes = Array.from(nodeMap.values()).sort((a, b) => a.id.localeCompare(b.id));
+    edges.sort((a, b) => a.id.localeCompare(b.id));
+
+    const payload: LineageConsolidatedViewDto = {
+      executionId,
+      generatedAt: new Date().toISOString(),
+      totals: {
+        nodes: nodes.length,
+        edges: edges.length,
+        endpointLinks: edges.filter((edge) => edge.type === "CALLS_ENDPOINT").length,
+        dtoProcessingLinks: edges.filter((edge) => edge.type === "MAPPED_TO_PROCESSING").length
+      },
+      nodes,
+      edges,
+      evidenceIds: {
+        frontendPatternEvidenceId: frontendData.evidenceId,
         backendApiIndexEvidenceId: apiIndexData.evidenceId,
         backendProcessingEvidenceId: processingData.evidenceId
       }

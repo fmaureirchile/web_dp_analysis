@@ -566,6 +566,44 @@ export interface LineageDtoProcessingCorrelationViewDto {
   };
 }
 
+export type LineageNodeType = "FRONTEND_ENDPOINT" | "BACKEND_ENDPOINT" | "DTO_ARTIFACT" | "BACKEND_PROCESSING_FILE";
+
+export interface LineageGraphNodeDto {
+  id: string;
+  type: LineageNodeType;
+  label: string;
+  status: LineageCorrelationStatus;
+}
+
+export type LineageEdgeType = "CALLS_ENDPOINT" | "MAPPED_TO_PROCESSING";
+
+export interface LineageGraphEdgeDto {
+  id: string;
+  type: LineageEdgeType;
+  sourceId: string;
+  targetId: string;
+  status: LineageCorrelationStatus;
+  confidence: number;
+}
+
+export interface LineageConsolidatedViewDto {
+  executionId: string;
+  generatedAt: string;
+  totals: {
+    nodes: number;
+    edges: number;
+    endpointLinks: number;
+    dtoProcessingLinks: number;
+  };
+  nodes: LineageGraphNodeDto[];
+  edges: LineageGraphEdgeDto[];
+  evidenceIds: {
+    frontendPatternEvidenceId: string;
+    backendApiIndexEvidenceId: string;
+    backendProcessingEvidenceId: string;
+  };
+}
+
 export type AuthenticatedEvaluationRole = "cliente" | "supervisor";
 
 export type AuthenticatedEvaluationErrorCode =

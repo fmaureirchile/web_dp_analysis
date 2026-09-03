@@ -17,8 +17,14 @@ corepack pnpm run lab:e14-1:gate
 corepack pnpm run lab:e14-2:gate
 ```
 
+## Comando de validacion E14-T03
+
+```bash
+corepack pnpm run lab:e14-3:gate
+```
+
 ## Cuando usarlo
 
 1. Despues de modificar contratos o endpoint de correlacion de linaje.
-2. Antes de avanzar a vista consolidada de linaje (E14-T03).
-3. Como chequeo rapido de no regresion entre Etapa 13 y la correlacion inicial de Etapa 14.
+2. Antes de avanzar al gate consolidado de la etapa (E14-T04).
+3. Como chequeo rapido de no regresion entre Etapa 13 y las vistas de linaje de Etapa 14.
