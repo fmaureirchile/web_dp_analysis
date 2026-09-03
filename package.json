@@ -71,7 +71,9 @@
     "lab:e17-1:gate": "npm run lab:e16:gate && vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage17-execution-data-purge.integration.test.ts",
     "lab:e17-2:gate": "npm run lab:e17-1:gate && vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage17-retention-window.integration.test.ts",
     "lab:e17-3:gate": "npm run lab:e17-2:gate && npm run docs:stage17:runbook",
-    "lab:e17:gate": "npm run lab:e17-3:gate"
+    "lab:e17:gate": "npm run lab:e17-3:gate",
+    "lab:e17:legacy": "npm run lab:e17:gate",
+    "lab:e17": "npm run lab:e17:gate"
   },
   "prisma": {
     "seed": "tsx database/seeds/stage2.seed.ts"

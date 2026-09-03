@@ -30,10 +30,11 @@ Elevar confiabilidad y controles operativos para uso con clientes reales.
 
 - Objetivo unico: comando unico de validacion de hardening inicial.
 - Criterio de aceptacion: pipeline reproducible local/CI.
+- Estado: completada.
 
 ## Estado de cumplimiento parcial
 
 1. E17-T01: completada.
 2. E17-T02: completada.
 3. E17-T03: completada.
-4. E17-T04: pendiente.
+4. E17-T04: completada.
