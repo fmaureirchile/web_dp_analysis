@@ -12,6 +12,9 @@ import {
   type BackendProcessingDetectionResultDto,
   type LegalDiscrepancyDetectionResultDto,
   type LegalDiscrepancyItemDto,
+  type StartVersionComparisonDto,
+  type VersionComparisonChangeDto,
+  type VersionComparisonResultDto,
   type LineageBackendReferenceDto,
   type LineageConsolidatedViewDto,
   type LineageCorrelationStatus,
@@ -85,6 +88,7 @@ import {
   createTarget,
   getBackendApiIndexResult,
   getBackendProcessingDetectionResult,
+  getVersionComparisonResult,
   getFrontendPatternDetectionResult,
   getFrontendRepositoryIndexResult,
   getLegalDiscrepancyDetectionResult,
@@ -98,6 +102,7 @@ import {
   listOperationalExecutions,
   recordBackendApiIndexResult,
   recordBackendProcessingDetectionResult,
+  recordVersionComparisonResult,
   recordFrontendPatternDetectionResult,
   recordFrontendRepositoryIndexResult,
   recordLegalDiscrepancyDetectionResult,
@@ -802,6 +807,23 @@ function hasPurposeForCategory(category: string, declaredPurposes: string[]): bo
   }
 
   return false;
+}
+
+function versionComparisonError(
+  baselineExecutionId: string,
+  currentExecutionId: string,
+  errorCode: "invalid_execution_id" | "tracking_inventory_not_available" | "comparison_failed" | "result_not_available",
+  message: string
+): VersionComparisonResultDto {
+  return {
+    ok: false,
+    error: {
+      baselineExecutionId,
+      currentExecutionId,
+      errorCode,
+      message
+    }
+  };
 }
 
 export function createStage2Router(): Router {
@@ -2921,6 +2943,173 @@ export function createStage2Router(): Router {
         .status(422)
         .setHeader("x-correlation-id", cid)
         .json(legalDiscrepancyDetectionError(executionId, "result_not_available", "legal_discrepancy_result_not_available"));
+    }
+
+    return res.status(200).setHeader("x-correlation-id", cid).json(result);
+  });
+
+  router.post("/monitoring/version-comparisons/start", async (req, res) => {
+    const cid = correlationId(req);
+    const body = req.body as StartVersionComparisonDto;
+
+    if (!body.baselineExecutionId || !body.currentExecutionId) {
+      return res
+        .status(400)
+        .setHeader("x-correlation-id", cid)
+        .json(
+          versionComparisonError(
+            body.baselineExecutionId ?? "unknown_baseline",
+            body.currentExecutionId ?? "unknown_current",
+            "invalid_execution_id",
+            "baseline_execution_id_and_current_execution_id_required"
+          )
+        );
+    }
+
+    const baselineExecution = await getExecutionByIdWithFallback(body.baselineExecutionId);
+    const currentExecution = await getExecutionByIdWithFallback(body.currentExecutionId);
+    if (!baselineExecution || !currentExecution) {
+      return res
+        .status(400)
+        .setHeader("x-correlation-id", cid)
+        .json(versionComparisonError(body.baselineExecutionId, body.currentExecutionId, "invalid_execution_id", "execution_id_not_found"));
+    }
+
+    const baselineDynamic = getDynamicObservationResult(body.baselineExecutionId);
+    const currentDynamic = getDynamicObservationResult(body.currentExecutionId);
+    if (!baselineDynamic?.ok || !baselineDynamic.data || !currentDynamic?.ok || !currentDynamic.data) {
+      const failure = recordVersionComparisonResult(
+        body.baselineExecutionId,
+        body.currentExecutionId,
+        versionComparisonError(body.baselineExecutionId, body.currentExecutionId, "tracking_inventory_not_available", "dynamic_observation_result_not_available")
+      );
+      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
+    }
+
+    try {
+      const baselineInventory = listTrackingInventoryByExecutionId(body.baselineExecutionId);
+      const currentInventory = listTrackingInventoryByExecutionId(body.currentExecutionId);
+
+      const baselineThirdParties = new Set(baselineInventory.thirdParties.map((item) => item.domain.toLowerCase()));
+      const currentThirdParties = new Set(currentInventory.thirdParties.map((item) => item.domain.toLowerCase()));
+      const baselineCookies = new Set(baselineInventory.cookies.map((item) => item.key.toLowerCase()));
+      const currentCookies = new Set(currentInventory.cookies.map((item) => item.key.toLowerCase()));
+
+      const changes: VersionComparisonChangeDto[] = [];
+
+      for (const item of Array.from(currentThirdParties).sort((a, b) => a.localeCompare(b))) {
+        if (!baselineThirdParties.has(item)) {
+          changes.push({
+            kind: "NEW_THIRD_PARTY",
+            value: item,
+            severity: "WARNING",
+            probableCause: "SITE_CHANGE",
+            message: `No se observo ${item} en baseline y ahora si se observo. Existe un cambio tecnico probable. Requiere validacion.`,
+            requiresValidation: true
+          });
+        }
+      }
+
+      for (const item of Array.from(baselineThirdParties).sort((a, b) => a.localeCompare(b))) {
+        if (!currentThirdParties.has(item)) {
+          changes.push({
+            kind: "REMOVED_THIRD_PARTY",
+            value: item,
+            severity: "INFO",
+            probableCause: "SITE_CHANGE",
+            message: `Se observo ${item} en baseline y ahora no se observo. Existe un cambio tecnico probable. Requiere validacion.`,
+            requiresValidation: true
+          });
+        }
+      }
+
+      for (const item of Array.from(currentCookies).sort((a, b) => a.localeCompare(b))) {
+        if (!baselineCookies.has(item)) {
+          changes.push({
+            kind: "NEW_COOKIE",
+            value: item,
+            severity: "WARNING",
+            probableCause: "SITE_CHANGE",
+            message: `No se observo cookie ${item} en baseline y ahora si se observo. Existe un cambio tecnico probable. Requiere validacion.`,
+            requiresValidation: true
+          });
+        }
+      }
+
+      for (const item of Array.from(baselineCookies).sort((a, b) => a.localeCompare(b))) {
+        if (!currentCookies.has(item)) {
+          changes.push({
+            kind: "REMOVED_COOKIE",
+            value: item,
+            severity: "INFO",
+            probableCause: "SITE_CHANGE",
+            message: `Se observo cookie ${item} en baseline y ahora no se observo. Existe un cambio tecnico probable. Requiere validacion.`,
+            requiresValidation: true
+          });
+        }
+      }
+
+      const result: VersionComparisonResultDto = {
+        ok: true,
+        data: {
+          baselineExecutionId: body.baselineExecutionId,
+          currentExecutionId: body.currentExecutionId,
+          comparedAt: new Date().toISOString(),
+          totals: {
+            baselineThirdParties: baselineInventory.thirdParties.length,
+            currentThirdParties: currentInventory.thirdParties.length,
+            baselineCookies: baselineInventory.cookies.length,
+            currentCookies: currentInventory.cookies.length,
+            changes: changes.length
+          },
+          changes,
+          alert:
+            changes.length === 0
+              ? {
+                  status: "NO_CHANGES",
+                  probableCause: "NO_RELEVANT_CHANGE",
+                  message: "No se observaron cambios relevantes entre baseline y version actual."
+                }
+              : {
+                  status: "CHANGES_DETECTED",
+                  probableCause: "MIXED_CHANGE_REQUIRES_REVIEW",
+                  message: "Se observaron cambios entre baseline y version actual. Requiere validacion para determinar causa probable."
+                }
+        }
+      };
+
+      recordVersionComparisonResult(body.baselineExecutionId, body.currentExecutionId, result);
+      return res.status(200).setHeader("x-correlation-id", cid).json(result);
+    } catch (error) {
+      const failure = recordVersionComparisonResult(
+        body.baselineExecutionId,
+        body.currentExecutionId,
+        versionComparisonError(body.baselineExecutionId, body.currentExecutionId, "comparison_failed", (error as Error).message)
+      );
+      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
+    }
+  });
+
+  router.get("/monitoring/version-comparisons/:baselineExecutionId/:currentExecutionId/result", async (req, res) => {
+    const cid = correlationId(req);
+    const baselineExecutionId = req.params.baselineExecutionId;
+    const currentExecutionId = req.params.currentExecutionId;
+
+    const baselineExecution = await getExecutionByIdWithFallback(baselineExecutionId);
+    const currentExecution = await getExecutionByIdWithFallback(currentExecutionId);
+    if (!baselineExecution || !currentExecution) {
+      return res
+        .status(400)
+        .setHeader("x-correlation-id", cid)
+        .json(versionComparisonError(baselineExecutionId, currentExecutionId, "invalid_execution_id", "execution_id_not_found"));
+    }
+
+    const result = getVersionComparisonResult(baselineExecutionId, currentExecutionId);
+    if (!result) {
+      return res
+        .status(422)
+        .setHeader("x-correlation-id", cid)
+        .json(versionComparisonError(baselineExecutionId, currentExecutionId, "result_not_available", "version_comparison_result_not_available"));
     }
 
     return res.status(200).setHeader("x-correlation-id", cid).json(result);

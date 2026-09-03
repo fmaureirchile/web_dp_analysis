@@ -5,6 +5,7 @@ import {
   type FrontendPatternDetectionResultDto,
   type FrontendRepositoryIndexResultDto,
   type LegalDiscrepancyDetectionResultDto,
+  type VersionComparisonResultDto,
   type DynamicObservationErrorDto,
   type DynamicObservationResultDto,
   type DynamicObservationSuccessDto,
@@ -112,6 +113,12 @@ type BackendProcessingDetectionResultRecord = {
 type LegalDiscrepancyDetectionResultRecord = {
   executionId: string;
   result: LegalDiscrepancyDetectionResultDto;
+  updatedAt: string;
+};
+
+type VersionComparisonResultRecord = {
+  comparisonKey: string;
+  result: VersionComparisonResultDto;
   updatedAt: string;
 };
 
@@ -328,6 +335,7 @@ export const store = {
   backendApiIndexResults: new Map<string, BackendApiIndexResultRecord>(),
   backendProcessingDetectionResults: new Map<string, BackendProcessingDetectionResultRecord>(),
   legalDiscrepancyDetectionResults: new Map<string, LegalDiscrepancyDetectionResultRecord>(),
+  versionComparisonResults: new Map<string, VersionComparisonResultRecord>(),
   browserDomSnapshots: new Map<string, BrowserDomSnapshotRecord>(),
   browserScreenshots: new Map<string, BrowserScreenshotRecord>()
 };
@@ -355,6 +363,7 @@ export function resetStore(): void {
   store.backendApiIndexResults.clear();
   store.backendProcessingDetectionResults.clear();
   store.legalDiscrepancyDetectionResults.clear();
+  store.versionComparisonResults.clear();
   store.browserDomSnapshots.clear();
   store.browserScreenshots.clear();
 }
@@ -706,6 +715,33 @@ export function getLegalDiscrepancyDetectionResult(
   executionId: string
 ): LegalDiscrepancyDetectionResultDto | undefined {
   return store.legalDiscrepancyDetectionResults.get(executionId)?.result;
+}
+
+export function buildVersionComparisonKey(baselineExecutionId: string, currentExecutionId: string): string {
+  return `${baselineExecutionId}::${currentExecutionId}`;
+}
+
+export function recordVersionComparisonResult(
+  baselineExecutionId: string,
+  currentExecutionId: string,
+  result: VersionComparisonResultDto
+): VersionComparisonResultDto {
+  const comparisonKey = buildVersionComparisonKey(baselineExecutionId, currentExecutionId);
+  store.versionComparisonResults.set(comparisonKey, {
+    comparisonKey,
+    result,
+    updatedAt: nowIso()
+  });
+
+  return result;
+}
+
+export function getVersionComparisonResult(
+  baselineExecutionId: string,
+  currentExecutionId: string
+): VersionComparisonResultDto | undefined {
+  const comparisonKey = buildVersionComparisonKey(baselineExecutionId, currentExecutionId);
+  return store.versionComparisonResults.get(comparisonKey)?.result;
 }
 
 export async function getExecutionByIdWithFallback(executionId: string): Promise<Execution | undefined> {

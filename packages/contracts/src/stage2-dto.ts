@@ -663,6 +663,66 @@ export interface LegalDiscrepancyDetectionResultDto {
   error?: LegalDiscrepancyDetectionErrorDto;
 }
 
+export interface StartVersionComparisonDto {
+  baselineExecutionId: string;
+  currentExecutionId: string;
+}
+
+export type VersionChangeKind = "NEW_THIRD_PARTY" | "REMOVED_THIRD_PARTY" | "NEW_COOKIE" | "REMOVED_COOKIE";
+
+export type VersionComparisonSeverity = "INFO" | "WARNING";
+
+export interface VersionComparisonChangeDto {
+  kind: VersionChangeKind;
+  value: string;
+  severity: VersionComparisonSeverity;
+  probableCause: "SITE_CHANGE" | "RULE_CHANGE_OR_INSTRUMENTATION" | "DOCUMENTATION_GAP";
+  message: string;
+  requiresValidation: true;
+}
+
+export type VersionComparisonAlertStatus = "NO_CHANGES" | "CHANGES_DETECTED";
+
+export interface VersionComparisonAlertDto {
+  status: VersionComparisonAlertStatus;
+  probableCause: "NO_RELEVANT_CHANGE" | "SITE_CHANGE" | "MIXED_CHANGE_REQUIRES_REVIEW";
+  message: string;
+}
+
+export interface VersionComparisonSuccessDto {
+  baselineExecutionId: string;
+  currentExecutionId: string;
+  comparedAt: string;
+  totals: {
+    baselineThirdParties: number;
+    currentThirdParties: number;
+    baselineCookies: number;
+    currentCookies: number;
+    changes: number;
+  };
+  changes: VersionComparisonChangeDto[];
+  alert: VersionComparisonAlertDto;
+}
+
+export type VersionComparisonErrorCode =
+  | "invalid_execution_id"
+  | "tracking_inventory_not_available"
+  | "comparison_failed"
+  | "result_not_available";
+
+export interface VersionComparisonErrorDto {
+  baselineExecutionId: string;
+  currentExecutionId: string;
+  errorCode: VersionComparisonErrorCode;
+  message: string;
+}
+
+export interface VersionComparisonResultDto {
+  ok: boolean;
+  data?: VersionComparisonSuccessDto;
+  error?: VersionComparisonErrorDto;
+}
+
 export type AuthenticatedEvaluationRole = "cliente" | "supervisor";
 
 export type AuthenticatedEvaluationErrorCode =
