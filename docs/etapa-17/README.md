@@ -7,6 +7,7 @@
 3. runbook-operativo-piloto.md
 4. acta-cierre-etapa-17.md
 5. checklist-piloto-e2e-autorizado.md
+6. bitacora-simulacro-piloto-e2e-2026-09-03.md
 
 ## Comando de validacion consolidado E17-T04
 
