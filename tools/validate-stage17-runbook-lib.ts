@@ -64,7 +64,12 @@ const REQUIRED_CHECKS: RequiredCheck[] = [
   },
   {
     file: ".github/workflows/ci.yml",
-    requiredSnippets: ["Report Stage 17 gate coverage", "Stage 17 gate E17-T03", "docs_stage17_runbook=ok"]
+    requiredSnippets: [
+      "Report Stage 17 gate coverage",
+      "Stage 17 gate E17-T03",
+      "docs_stage17_runbook=ok",
+      "docs_stage17_evidence=ok"
+    ]
   }
 ];
 

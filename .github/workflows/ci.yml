@@ -925,11 +925,12 @@ jobs:
 
       - name: Report Stage 17 gate coverage
         run: |
-          echo "E17 gate coverage: stage16 consolidated gate + execution data purge + retention window + runbook validation"
+          echo "E17 gate coverage: stage16 consolidated gate + execution data purge + retention window + runbook validation + pilot evidence validation"
           echo "- Stage 17 consolidated gate: npm run lab:e17:gate"
           echo "- Integration suite 1: tests/integration/stage17-execution-data-purge.integration.test.ts"
           echo "- Integration suite 2: tests/integration/stage17-retention-window.integration.test.ts"
           echo "- Document validation: npm run docs:stage17:runbook"
+          echo "- Evidence validation: npm run docs:stage17:evidence"
 
       - name: Stage 17 gate E17-T03
         shell: bash
@@ -972,7 +973,12 @@ jobs:
             exit 1
           fi
 
-          echo "E17-T04 gate result: execution_data_purge_integration=2/2; retention_window_integration=2/2; docs_stage17_runbook=ok; stage16_baseline=ok; typecheck=ok"
+          if ! grep -Fq "[docs:stage17:evidence] OK" e17_gate.log; then
+            echo "No se detecto confirmacion de evidencia minima Stage 17 en gate E17-T04."
+            exit 1
+          fi
+
+          echo "E17-T04 gate result: execution_data_purge_integration=2/2; retention_window_integration=2/2; docs_stage17_runbook=ok; docs_stage17_evidence=ok; stage16_baseline=ok; typecheck=ok"
 
       - name: Build
         run: npm run build
