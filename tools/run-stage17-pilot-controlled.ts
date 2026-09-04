@@ -135,7 +135,8 @@ async function main(): Promise<void> {
 
     const outputDir = path.join(process.cwd(), "docs", "etapa-17", "evidencias");
     await fs.mkdir(outputDir, { recursive: true });
-    const outputPath = path.join(outputDir, "piloto-e2e-controlado-2026-09-03.json");
+    const dateToken = new Date().toISOString().slice(0, 10);
+    const outputPath = path.join(outputDir, `piloto-e2e-controlado-${dateToken}.json`);
     await fs.writeFile(outputPath, `${JSON.stringify(evidence, null, 2)}\n`, "utf8");
 
     process.stdout.write(`[pilot:e2e:stage17] OK\n`);

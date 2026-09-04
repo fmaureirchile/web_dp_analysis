@@ -1,0 +1,77 @@
+{
+  "executedAt": "2026-09-04T01:59:35.386Z",
+  "baseUrl": "http://127.0.0.1:50308",
+  "executionIds": {
+    "baselineExecutionId": "3a817633-d2ac-4520-819c-96a0a3423b49",
+    "currentExecutionId": "257e02d5-737a-4113-a195-55c333162d64",
+    "retentionExecutionId": "1c870d1c-89a4-40c9-b48c-e144a4c57ee5"
+  },
+  "status": {
+    "baselineRun": 200,
+    "currentRun": 200,
+    "retentionRun": 200,
+    "comparison": 200,
+    "purge": 200,
+    "retention": 200
+  },
+  "comparisonSummary": {
+    "ok": true,
+    "changes": 6,
+    "newEndpoints": 4,
+    "alert": {
+      "status": "CHANGES_DETECTED",
+      "probableCause": "MIXED_CHANGE_REQUIRES_REVIEW",
+      "message": "Se observaron cambios mixtos entre baseline y version actual. Requiere validacion para determinar causa probable."
+    }
+  },
+  "purgeSummary": {
+    "ok": true,
+    "deletedCounts": {
+      "evidences": 2,
+      "observations": 0,
+      "pages": 0,
+      "formFields": 0,
+      "passiveHtmlEvidences": 0,
+      "browserDomSnapshots": 1,
+      "browserScreenshots": 1,
+      "passiveSinglePageResult": 0,
+      "dynamicObservationResult": 1,
+      "frontendRepositoryIndexResult": 0,
+      "frontendPatternDetectionResult": 0,
+      "backendApiIndexResult": 0,
+      "backendProcessingDetectionResult": 0,
+      "legalDiscrepancyDetectionResult": 0,
+      "versionComparisons": 1,
+      "crawlerOperationalEvents": 0,
+      "executionTransitions": 3,
+      "findings": 0,
+      "reviewDecisions": 0
+    }
+  },
+  "retentionSummary": {
+    "ok": true,
+    "candidateExecutions": 1,
+    "purgedExecutions": 1,
+    "deletedTotals": {
+      "evidences": 2,
+      "observations": 0,
+      "pages": 0,
+      "formFields": 0,
+      "passiveHtmlEvidences": 0,
+      "browserDomSnapshots": 1,
+      "browserScreenshots": 1,
+      "passiveSinglePageResult": 0,
+      "dynamicObservationResult": 1,
+      "frontendRepositoryIndexResult": 0,
+      "frontendPatternDetectionResult": 0,
+      "backendApiIndexResult": 0,
+      "backendProcessingDetectionResult": 0,
+      "legalDiscrepancyDetectionResult": 0,
+      "versionComparisons": 0,
+      "crawlerOperationalEvents": 0,
+      "executionTransitions": 3,
+      "findings": 0,
+      "reviewDecisions": 0
+    }
+  }
+}

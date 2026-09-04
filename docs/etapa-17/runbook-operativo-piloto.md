@@ -104,6 +104,35 @@ Archivo de evidencia:
 1. Log local del comando.
 2. Gate Stage 17 en CI/local con validacion documental reforzada.
 
+### 7) Corrida diaria semiautomatica (validacion + piloto + bitacora)
+
+Comando:
+
+```bash
+npm run pilot:e2e:stage17:daily
+```
+
+Cuando usar:
+
+1. Para ejecucion recurrente diaria de piloto controlado.
+2. Cuando se requiere un solo comando para prechecks, corrida y evidencia.
+
+Parametros:
+
+1. No recibe parametros.
+
+Salida esperada:
+
+1. Exit code 0.
+2. Evidencia JSON diaria y bitacora diaria generadas.
+3. Validadores docs:stage17:runbook y docs:stage17:evidence en OK.
+
+Archivo de evidencia:
+
+1. docs/etapa-17/evidencias/piloto-e2e-controlado-YYYY-MM-DD.json
+2. docs/etapa-17/bitacora-corrida-piloto-e2e-YYYY-MM-DD.md
+3. docs/etapa-17/programacion-corrida-piloto.md
+
 ### 2) Purga puntual por executionId
 
 Comando:

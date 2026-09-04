@@ -13,6 +13,7 @@
 9. evidencias/piloto-e2e-controlado-2026-09-03.json
 10. plantilla-bitacora-corrida-piloto-e2e.md
 11. cadencia-operativa-corridas-piloto.md
+12. programacion-corrida-piloto.md
 
 ## Comando de validacion consolidado E17-T04
 

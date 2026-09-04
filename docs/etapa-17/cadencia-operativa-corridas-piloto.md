@@ -105,3 +105,6 @@ Cuando usarlo: para confirmar que existe evidencia JSON y bitacora real antes de
 
 4. npm run pilot:e2e:stage17
 Cuando usarlo: para ejecutar una corrida completa con evidencia concreta.
+
+5. npm run pilot:e2e:stage17:daily
+Cuando usarlo: para operar una ventana diaria con validacion + corrida + bitacora en un solo paso.
