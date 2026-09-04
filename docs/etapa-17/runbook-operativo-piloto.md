@@ -105,6 +105,10 @@ Salida esperada:
 - comparisonSummary.ok, purgeSummary.ok y retentionSummary.ok
 - retentionSummary.candidateExecutions y retentionSummary.purgedExecutions
 5. Confirmacion de bitacora asociada a la fecha del ultimo JSON.
+6. Validacion semantica de corrida controlada:
+- status.* debe ser 200
+- comparisonSummary.ok, purgeSummary.ok y retentionSummary.ok deben ser true
+- purgedExecutions no puede exceder candidateExecutions
 
 Archivo de evidencia:
 

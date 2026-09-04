@@ -159,4 +159,100 @@ describe("validateStage17PilotEvidence", () => {
       "No existe bitacora real asociada al ultimo JSON"
     );
   });
+
+  it("falla cuando algun status no es 200", () => {
+    const root = createTempWorkspace();
+    writeFile(
+      root,
+      "docs/etapa-17/evidencias/piloto-e2e-controlado-2026-09-04.json",
+      JSON.stringify({
+        executedAt: "2026-09-04T05:36:56.950Z",
+        executionIds: {
+          baselineExecutionId: "baseline-id",
+          currentExecutionId: "current-id",
+          retentionExecutionId: "retention-id"
+        },
+        status: {
+          baselineRun: 200,
+          currentRun: 200,
+          retentionRun: 500,
+          comparison: 200,
+          purge: 200,
+          retention: 200
+        },
+        comparisonSummary: { ok: true },
+        purgeSummary: { ok: true },
+        retentionSummary: { ok: true, candidateExecutions: 1, purgedExecutions: 1 }
+      })
+    );
+    writeFile(root, "docs/etapa-17/bitacora-corrida-piloto-e2e-2026-09-04.md", "# bitacora\n");
+
+    expect(() => validateStage17PilotEvidence({ rootDir: root, silent: true })).toThrowError(
+      "status.retentionRun debe ser 200"
+    );
+  });
+
+  it("falla cuando purgedExecutions excede candidateExecutions", () => {
+    const root = createTempWorkspace();
+    writeFile(
+      root,
+      "docs/etapa-17/evidencias/piloto-e2e-controlado-2026-09-04.json",
+      JSON.stringify({
+        executedAt: "2026-09-04T05:36:56.950Z",
+        executionIds: {
+          baselineExecutionId: "baseline-id",
+          currentExecutionId: "current-id",
+          retentionExecutionId: "retention-id"
+        },
+        status: {
+          baselineRun: 200,
+          currentRun: 200,
+          retentionRun: 200,
+          comparison: 200,
+          purge: 200,
+          retention: 200
+        },
+        comparisonSummary: { ok: true },
+        purgeSummary: { ok: true },
+        retentionSummary: { ok: true, candidateExecutions: 1, purgedExecutions: 2 }
+      })
+    );
+    writeFile(root, "docs/etapa-17/bitacora-corrida-piloto-e2e-2026-09-04.md", "# bitacora\n");
+
+    expect(() => validateStage17PilotEvidence({ rootDir: root, silent: true })).toThrowError(
+      "purgedExecutions no puede exceder candidateExecutions"
+    );
+  });
+
+  it("falla cuando executedAt no coincide con fecha de archivo", () => {
+    const root = createTempWorkspace();
+    writeFile(
+      root,
+      "docs/etapa-17/evidencias/piloto-e2e-controlado-2026-09-04.json",
+      JSON.stringify({
+        executedAt: "2026-09-03T23:59:00.000Z",
+        executionIds: {
+          baselineExecutionId: "baseline-id",
+          currentExecutionId: "current-id",
+          retentionExecutionId: "retention-id"
+        },
+        status: {
+          baselineRun: 200,
+          currentRun: 200,
+          retentionRun: 200,
+          comparison: 200,
+          purge: 200,
+          retention: 200
+        },
+        comparisonSummary: { ok: true },
+        purgeSummary: { ok: true },
+        retentionSummary: { ok: true, candidateExecutions: 1, purgedExecutions: 1 }
+      })
+    );
+    writeFile(root, "docs/etapa-17/bitacora-corrida-piloto-e2e-2026-09-04.md", "# bitacora\n");
+
+    expect(() => validateStage17PilotEvidence({ rootDir: root, silent: true })).toThrowError(
+      "executedAt no coincide con la fecha del archivo"
+    );
+  });
 });

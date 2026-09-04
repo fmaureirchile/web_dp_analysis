@@ -35,6 +35,7 @@ Salida esperada:
 3. Bitacora diaria en docs/etapa-17/bitacora-corrida-piloto-e2e-YYYY-MM-DD.md.
 4. Mensajes OK en validadores documentales.
 5. JSON diario validado con estructura minima obligatoria y bitacora asociada por fecha.
+6. JSON diario validado con coherencia semantica (status 200, ok=true y retencion consistente).
 
 ## Parametros operativos
 

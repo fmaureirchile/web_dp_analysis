@@ -113,6 +113,50 @@ function validateEvidenceShape(evidence: PilotEvidence, issues: string[]): void 
   }
 }
 
+function validateEvidenceSemantics(evidence: PilotEvidence, dateToken: string, issues: string[]): void {
+  const executedAt = evidence.executedAt;
+  if (isNonEmptyString(executedAt)) {
+    const executedDateToken = new Date(executedAt).toISOString().slice(0, 10);
+    if (executedDateToken !== dateToken) {
+      issues.push("evidencia JSON inconsistente: executedAt no coincide con la fecha del archivo");
+    }
+  }
+
+  const statuses = evidence.status;
+  const expectedStatusFields: Array<keyof NonNullable<PilotEvidence["status"]>> = [
+    "baselineRun",
+    "currentRun",
+    "retentionRun",
+    "comparison",
+    "purge",
+    "retention"
+  ];
+
+  for (const field of expectedStatusFields) {
+    if (statuses?.[field] !== 200) {
+      issues.push(`evidencia JSON inconsistente: status.${field} debe ser 200 en corrida controlada`);
+    }
+  }
+
+  if (evidence.comparisonSummary?.ok !== true) {
+    issues.push("evidencia JSON inconsistente: comparisonSummary.ok debe ser true");
+  }
+  if (evidence.purgeSummary?.ok !== true) {
+    issues.push("evidencia JSON inconsistente: purgeSummary.ok debe ser true");
+  }
+  if (evidence.retentionSummary?.ok !== true) {
+    issues.push("evidencia JSON inconsistente: retentionSummary.ok debe ser true");
+  }
+
+  const candidateExecutions = evidence.retentionSummary?.candidateExecutions;
+  const purgedExecutions = evidence.retentionSummary?.purgedExecutions;
+  if (isNonNegativeInteger(candidateExecutions) && isNonNegativeInteger(purgedExecutions)) {
+    if (purgedExecutions > candidateExecutions) {
+      issues.push("evidencia JSON inconsistente: purgedExecutions no puede exceder candidateExecutions");
+    }
+  }
+}
+
 export function validateStage17PilotEvidence(input?: { rootDir?: string; silent?: boolean }): void {
   const rootDir = input?.rootDir ?? ROOT;
   const stage17Dir = path.join(rootDir, "docs", "etapa-17");
@@ -147,6 +191,7 @@ export function validateStage17PilotEvidence(input?: { rootDir?: string; silent?
 
     if (parsedEvidence) {
       validateEvidenceShape(parsedEvidence, issues);
+      validateEvidenceSemantics(parsedEvidence, dateToken, issues);
     }
 
     const expectedBitacora = `bitacora-corrida-piloto-e2e-${dateToken}.md`;
