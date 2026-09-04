@@ -50,7 +50,8 @@ const REQUIRED_CHECKS: RequiredCheck[] = [
       "runbook-operativo-piloto.md",
       "checklist-piloto-e2e-autorizado.md",
       "plan-primera-corrida-piloto-e2e.md",
-      "npm run docs:stage17:runbook"
+      "npm run docs:stage17:runbook",
+      "npm run docs:stage17:evidence"
     ]
   },
   {
@@ -59,7 +60,7 @@ const REQUIRED_CHECKS: RequiredCheck[] = [
   },
   {
     file: "package.json",
-    requiredSnippets: ["docs:stage17:runbook", "lab:e17-3:gate"]
+    requiredSnippets: ["docs:stage17:runbook", "docs:stage17:evidence", "lab:e17-3:gate"]
   },
   {
     file: ".github/workflows/ci.yml",

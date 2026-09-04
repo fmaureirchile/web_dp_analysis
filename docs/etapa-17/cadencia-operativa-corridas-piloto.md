@@ -37,13 +37,15 @@ Definir una cadencia estandar por cliente para ejecutar corridas piloto E2E con 
 1. Confirmar alcance autorizado vigente y sin cambios no aprobados.
 2. Ejecutar npm run docs:stage17:runbook.
 3. Ejecutar npm run lab:e17:gate.
-4. Preparar credenciales temporales y contacto de kill switch.
+4. Ejecutar npm run docs:stage17:evidence.
+5. Preparar credenciales temporales y contacto de kill switch.
 
 Salida esperada:
 
 1. docs:stage17:runbook en OK.
 2. lab:e17:gate en verde.
-3. Ventana y responsables documentados para la corrida.
+3. docs:stage17:evidence en OK.
+4. Ventana y responsables documentados para la corrida.
 
 ### 2) Ejecucion
 
@@ -81,7 +83,7 @@ Salida esperada:
 1. Archivo JSON de corrida controlada.
 2. Bitacora fechada por corrida.
 3. Registro de cierre de credenciales.
-4. Resultado de validaciones docs:stage17:runbook y lab:e17:gate.
+4. Resultado de validaciones docs:stage17:runbook, docs:stage17:evidence y lab:e17:gate.
 
 ## Criterio de suspension temporal
 
@@ -98,5 +100,8 @@ Cuando usarlo: al inicio de cada ventana y tras cambios documentales.
 2. npm run lab:e17:gate
 Cuando usarlo: previo a cualquier corrida piloto controlada.
 
-3. npm run pilot:e2e:stage17
+3. npm run docs:stage17:evidence
+Cuando usarlo: para confirmar que existe evidencia JSON y bitacora real antes de cierre.
+
+4. npm run pilot:e2e:stage17
 Cuando usarlo: para ejecutar una corrida completa con evidencia concreta.

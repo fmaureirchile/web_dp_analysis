@@ -74,6 +74,36 @@ Cuando usar:
 1. Para preparar la primera corrida real post-simulacro.
 2. Para documentar parametros, evidencia y cierre de credenciales en un formato unico.
 
+### 6) Validacion de evidencia minima de piloto
+
+Comando:
+
+```bash
+npm run docs:stage17:evidence
+```
+
+Cuando usar:
+
+1. Antes de cerrar una ventana de piloto en PR o corte diario.
+2. Despues de generar una corrida real con evidencia JSON y bitacora.
+
+Parametros:
+
+1. No recibe parametros.
+
+Salida esperada:
+
+1. Exit code 0.
+2. Mensaje [docs:stage17:evidence] OK.
+3. Confirmacion de existencia de:
+- docs/etapa-17/evidencias/piloto-e2e-controlado-YYYY-MM-DD.json
+- docs/etapa-17/bitacora-corrida-piloto-e2e-YYYY-MM-DD.md
+
+Archivo de evidencia:
+
+1. Log local del comando.
+2. Gate Stage 17 en CI/local con validacion documental reforzada.
+
 ### 2) Purga puntual por executionId
 
 Comando:

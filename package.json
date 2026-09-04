@@ -13,6 +13,7 @@
     "secret:check": "tsx tools/check-hardcoded-secrets.ts",
     "docs:stage5:coherence": "tsx tools/validate-stage5-doc-coherence.ts",
     "docs:stage17:runbook": "tsx tools/validate-stage17-runbook.ts",
+    "docs:stage17:evidence": "tsx tools/validate-stage17-pilot-evidence.ts",
     "pilot:e2e:stage17": "tsx tools/run-stage17-pilot-controlled.ts",
     "api:start": "tsx apps/api/src/server.ts",
     "db:generate": "prisma generate",
@@ -71,7 +72,7 @@
     "lab:e16:gate": "vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage16-version-comparison.integration.test.ts tests/integration/stage16-endpoint-delta.integration.test.ts tests/integration/stage16-alert-classification.integration.test.ts",
     "lab:e17-1:gate": "npm run lab:e16:gate && vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage17-execution-data-purge.integration.test.ts",
     "lab:e17-2:gate": "npm run lab:e17-1:gate && vitest run --config vitest.integration.config.ts --run --pool=forks tests/integration/stage17-retention-window.integration.test.ts",
-    "lab:e17-3:gate": "npm run lab:e17-2:gate && npm run docs:stage17:runbook",
+    "lab:e17-3:gate": "npm run lab:e17-2:gate && npm run docs:stage17:runbook && npm run docs:stage17:evidence",
     "lab:e17:gate": "npm run lab:e17-3:gate",
     "lab:e17:legacy": "npm run lab:e17:gate",
     "lab:e17": "npm run lab:e17:gate"
