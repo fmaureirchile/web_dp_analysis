@@ -4,11 +4,12 @@
 
 1. acta-inicio-etapa-9.md
 2. backlog-etapa-9.md
+3. acta-cierre-etapa-9.md
 
 ## Comando de validacion inicial
 
 ```bash
-corepack pnpm run lab:e9:gate
+npm run lab:e9:gate
 ```
 
 ## Cuando usarlo

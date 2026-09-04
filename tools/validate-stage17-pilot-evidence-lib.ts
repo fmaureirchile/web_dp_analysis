@@ -74,7 +74,7 @@ function isBoolean(value: unknown): value is boolean {
   return typeof value === "boolean";
 }
 
-function isNonNegativeInteger(value: unknown): boolean {
+function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }
 
