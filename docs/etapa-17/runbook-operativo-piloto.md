@@ -114,6 +114,7 @@ Archivo de evidencia:
 
 1. Log local del comando.
 2. Gate Stage 17 en CI/local con validacion documental reforzada.
+3. Para consumo automatizado: npm run docs:stage17:evidence:json (salida estructurada).
 
 ### 7) Corrida diaria semiautomatica (validacion + piloto + bitacora)
 

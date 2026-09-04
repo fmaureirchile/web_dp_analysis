@@ -14,6 +14,7 @@
     "docs:stage5:coherence": "tsx tools/validate-stage5-doc-coherence.ts",
     "docs:stage17:runbook": "tsx tools/validate-stage17-runbook.ts",
     "docs:stage17:evidence": "tsx tools/validate-stage17-pilot-evidence.ts",
+    "docs:stage17:evidence:json": "tsx tools/validate-stage17-pilot-evidence.ts --json",
     "pilot:e2e:stage17": "tsx tools/run-stage17-pilot-controlled.ts",
     "pilot:e2e:stage17:bitacora": "tsx tools/generate-stage17-pilot-bitacora.ts",
     "pilot:e2e:stage17:daily": "npm run docs:stage17:runbook && npm run lab:e17:gate && npm run pilot:e2e:stage17 && npm run pilot:e2e:stage17:bitacora && npm run docs:stage17:evidence",

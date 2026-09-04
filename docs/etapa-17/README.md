@@ -29,6 +29,7 @@ npm run lab:e17-2:gate
 npm run lab:e17-3:gate
 npm run docs:stage17:runbook
 npm run docs:stage17:evidence
+npm run docs:stage17:evidence:json
 ```
 
 ## Cuando usarlo

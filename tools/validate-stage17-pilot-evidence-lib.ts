@@ -32,6 +32,22 @@ type PilotEvidence = {
   };
 };
 
+export type Stage17EvidenceValidationReport = {
+  ok: boolean;
+  checkedAt: string;
+  latestEvidenceFile: string | null;
+  expectedBitacoraFile: string | null;
+  issues: string[];
+  checks: {
+    stage17DirExists: boolean;
+    evidenceDirExists: boolean;
+    hasEvidenceJson: boolean;
+    hasAnyBitacora: boolean;
+    latestEvidenceJsonValid: boolean;
+    latestBitacoraExists: boolean;
+  };
+};
+
 function fail(messages: string[]): never {
   throw new Error(`[docs:stage17:evidence] FAIL\n${messages.map((msg) => `- ${msg}`).join("\n")}`);
 }
@@ -158,35 +174,75 @@ function validateEvidenceSemantics(evidence: PilotEvidence, dateToken: string, i
 }
 
 export function validateStage17PilotEvidence(input?: { rootDir?: string; silent?: boolean }): void {
+  const report = getStage17PilotEvidenceReport(input);
+
+  if (!report.ok) {
+    fail(report.issues);
+  }
+
+  if (!input?.silent) {
+    process.stdout.write("[docs:stage17:evidence] OK\n");
+  }
+}
+
+export function getStage17PilotEvidenceReport(input?: { rootDir?: string }): Stage17EvidenceValidationReport {
   const rootDir = input?.rootDir ?? ROOT;
   const stage17Dir = path.join(rootDir, "docs", "etapa-17");
   const evidenceDir = path.join(stage17Dir, "evidencias");
 
   const issues: string[] = [];
+  const checks: Stage17EvidenceValidationReport["checks"] = {
+    stage17DirExists: false,
+    evidenceDirExists: false,
+    hasEvidenceJson: false,
+    hasAnyBitacora: false,
+    latestEvidenceJsonValid: false,
+    latestBitacoraExists: false
+  };
 
-  if (!fs.existsSync(stage17Dir)) {
-    fail(["No existe docs/etapa-17"]);
+  let latestEvidenceFile: string | null = null;
+  let expectedBitacoraFile: string | null = null;
+
+  checks.stage17DirExists = fs.existsSync(stage17Dir);
+
+  if (!checks.stage17DirExists) {
+    issues.push("No existe docs/etapa-17");
+    return {
+      ok: false,
+      checkedAt: new Date().toISOString(),
+      latestEvidenceFile,
+      expectedBitacoraFile,
+      issues,
+      checks
+    };
   }
 
-  if (!fs.existsSync(evidenceDir)) {
+  checks.evidenceDirExists = fs.existsSync(evidenceDir);
+
+  if (!checks.evidenceDirExists) {
     issues.push("No existe docs/etapa-17/evidencias");
   }
 
   const evidenceFiles = fs.existsSync(evidenceDir) ? listMatchingFiles(evidenceDir, EVIDENCE_FILE_REGEX).sort() : [];
+  checks.hasEvidenceJson = evidenceFiles.length > 0;
+
   if (evidenceFiles.length === 0) {
     issues.push("No existe evidencia JSON de corrida piloto controlada (piloto-e2e-controlado-YYYY-MM-DD.json)");
   }
 
   if (evidenceFiles.length > 0) {
-    const latestEvidenceFile = evidenceFiles[evidenceFiles.length - 1];
-    const evidencePath = path.join(evidenceDir, latestEvidenceFile);
-    const dateToken = latestEvidenceFile.match(EVIDENCE_FILE_REGEX)?.[1] ?? "";
+    const latestEvidenceFileName = evidenceFiles[evidenceFiles.length - 1];
+    const evidencePath = path.join(evidenceDir, latestEvidenceFileName);
+    const dateToken = latestEvidenceFileName.match(EVIDENCE_FILE_REGEX)?.[1] ?? "";
+    expectedBitacoraFile = `bitacora-corrida-piloto-e2e-${dateToken}.md`;
+    checks.latestBitacoraExists = fs.existsSync(path.join(stage17Dir, expectedBitacoraFile));
 
     let parsedEvidence: PilotEvidence | null = null;
     try {
       parsedEvidence = JSON.parse(fs.readFileSync(evidencePath, "utf8")) as PilotEvidence;
+      checks.latestEvidenceJsonValid = true;
     } catch {
-      issues.push(`evidencia JSON invalida: no se pudo parsear ${latestEvidenceFile}`);
+      issues.push(`evidencia JSON invalida: no se pudo parsear ${latestEvidenceFileName}`);
     }
 
     if (parsedEvidence) {
@@ -194,21 +250,24 @@ export function validateStage17PilotEvidence(input?: { rootDir?: string; silent?
       validateEvidenceSemantics(parsedEvidence, dateToken, issues);
     }
 
-    const expectedBitacora = `bitacora-corrida-piloto-e2e-${dateToken}.md`;
-    if (!fs.existsSync(path.join(stage17Dir, expectedBitacora))) {
-      issues.push(`No existe bitacora real asociada al ultimo JSON: ${expectedBitacora}`);
+    if (!checks.latestBitacoraExists) {
+      issues.push(`No existe bitacora real asociada al ultimo JSON: ${expectedBitacoraFile}`);
     }
+
+    latestEvidenceFile = latestEvidenceFileName;
   }
 
-  if (listMatchingFiles(stage17Dir, /^bitacora-corrida-piloto-e2e-\d{4}-\d{2}-\d{2}\.md$/).length === 0) {
+  checks.hasAnyBitacora = listMatchingFiles(stage17Dir, /^bitacora-corrida-piloto-e2e-\d{4}-\d{2}-\d{2}\.md$/).length > 0;
+  if (!checks.hasAnyBitacora) {
     issues.push("No existe bitacora real de corrida piloto (bitacora-corrida-piloto-e2e-YYYY-MM-DD.md)");
   }
 
-  if (issues.length > 0) {
-    fail(issues);
-  }
-
-  if (!input?.silent) {
-    process.stdout.write("[docs:stage17:evidence] OK\n");
-  }
+  return {
+    ok: issues.length === 0,
+    checkedAt: new Date().toISOString(),
+    latestEvidenceFile,
+    expectedBitacoraFile,
+    issues,
+    checks
+  };
 }

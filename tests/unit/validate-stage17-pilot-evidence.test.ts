@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { validateStage17PilotEvidence } from "../../tools/validate-stage17-pilot-evidence-lib";
+import { getStage17PilotEvidenceReport, validateStage17PilotEvidence } from "../../tools/validate-stage17-pilot-evidence-lib";
 
 const tempRoots: string[] = [];
 
@@ -254,5 +254,43 @@ describe("validateStage17PilotEvidence", () => {
     expect(() => validateStage17PilotEvidence({ rootDir: root, silent: true })).toThrowError(
       "executedAt no coincide con la fecha del archivo"
     );
+  });
+
+  it("genera reporte machine-readable con checks y archivos", () => {
+    const root = createTempWorkspace();
+    writeFile(
+      root,
+      "docs/etapa-17/evidencias/piloto-e2e-controlado-2026-09-04.json",
+      JSON.stringify({
+        executedAt: "2026-09-04T05:36:56.950Z",
+        executionIds: {
+          baselineExecutionId: "baseline-id",
+          currentExecutionId: "current-id",
+          retentionExecutionId: "retention-id"
+        },
+        status: {
+          baselineRun: 200,
+          currentRun: 200,
+          retentionRun: 200,
+          comparison: 200,
+          purge: 200,
+          retention: 200
+        },
+        comparisonSummary: { ok: true },
+        purgeSummary: { ok: true },
+        retentionSummary: { ok: true, candidateExecutions: 1, purgedExecutions: 1 }
+      })
+    );
+    writeFile(root, "docs/etapa-17/bitacora-corrida-piloto-e2e-2026-09-04.md", "# bitacora\n");
+
+    const report = getStage17PilotEvidenceReport({ rootDir: root });
+
+    expect(report.ok).toBe(true);
+    expect(report.latestEvidenceFile).toBe("piloto-e2e-controlado-2026-09-04.json");
+    expect(report.expectedBitacoraFile).toBe("bitacora-corrida-piloto-e2e-2026-09-04.md");
+    expect(report.checks.latestEvidenceJsonValid).toBe(true);
+    expect(report.checks.latestBitacoraExists).toBe(true);
+    expect(Array.isArray(report.issues)).toBe(true);
+    expect(report.issues.length).toBe(0);
   });
 });

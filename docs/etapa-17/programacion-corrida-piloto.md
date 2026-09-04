@@ -51,6 +51,22 @@ Salida esperada:
 1. Mensaje [pilot:e2e:stage17:bitacora] OK.
 2. Ruta de evidence_file y bitacora_file en consola.
 
+3. Para salida machine-readable del validador de evidencia:
+
+```bash
+npm run docs:stage17:evidence:json
+```
+
+Cuando usarlo:
+
+1. En jobs automáticos que necesitan parsear resultado sin regex sobre texto humano.
+2. En dashboards internos de observabilidad operativa.
+
+Salida esperada:
+
+1. JSON con campos: ok, checkedAt, latestEvidenceFile, expectedBitacoraFile, issues y checks.
+2. Exit code 0 si ok=true; exit code 1 si ok=false.
+
 ## Programacion en Windows (Task Scheduler)
 
 Comando de alta de tarea diaria (ejemplo 07:30):
