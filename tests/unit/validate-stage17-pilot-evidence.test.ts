@@ -31,7 +31,29 @@ describe("validateStage17PilotEvidence", () => {
   it("pasa cuando existe JSON de evidencia y bitacora real", () => {
     const root = createTempWorkspace();
 
-    writeFile(root, "docs/etapa-17/evidencias/piloto-e2e-controlado-2026-09-03.json", "{}");
+    writeFile(
+      root,
+      "docs/etapa-17/evidencias/piloto-e2e-controlado-2026-09-03.json",
+      JSON.stringify({
+        executedAt: "2026-09-03T05:36:56.950Z",
+        executionIds: {
+          baselineExecutionId: "baseline-id",
+          currentExecutionId: "current-id",
+          retentionExecutionId: "retention-id"
+        },
+        status: {
+          baselineRun: 200,
+          currentRun: 200,
+          retentionRun: 200,
+          comparison: 200,
+          purge: 200,
+          retention: 200
+        },
+        comparisonSummary: { ok: true },
+        purgeSummary: { ok: true },
+        retentionSummary: { ok: true, candidateExecutions: 1, purgedExecutions: 1 }
+      })
+    );
     writeFile(root, "docs/etapa-17/bitacora-corrida-piloto-e2e-2026-09-03.md", "# bitacora\n");
 
     expect(() => validateStage17PilotEvidence({ rootDir: root, silent: true })).not.toThrow();
@@ -46,8 +68,95 @@ describe("validateStage17PilotEvidence", () => {
 
   it("falla cuando no existe bitacora real", () => {
     const root = createTempWorkspace();
-    writeFile(root, "docs/etapa-17/evidencias/piloto-e2e-controlado-2026-09-03.json", "{}");
+    writeFile(
+      root,
+      "docs/etapa-17/evidencias/piloto-e2e-controlado-2026-09-03.json",
+      JSON.stringify({
+        executedAt: "2026-09-03T05:36:56.950Z",
+        executionIds: {
+          baselineExecutionId: "baseline-id",
+          currentExecutionId: "current-id",
+          retentionExecutionId: "retention-id"
+        },
+        status: {
+          baselineRun: 200,
+          currentRun: 200,
+          retentionRun: 200,
+          comparison: 200,
+          purge: 200,
+          retention: 200
+        },
+        comparisonSummary: { ok: true },
+        purgeSummary: { ok: true },
+        retentionSummary: { ok: true, candidateExecutions: 1, purgedExecutions: 1 }
+      })
+    );
 
     expect(() => validateStage17PilotEvidence({ rootDir: root, silent: true })).toThrowError("No existe bitacora real");
+  });
+
+  it("falla cuando JSON esta mal formado", () => {
+    const root = createTempWorkspace();
+    writeFile(root, "docs/etapa-17/evidencias/piloto-e2e-controlado-2026-09-03.json", "{ bad json");
+    writeFile(root, "docs/etapa-17/bitacora-corrida-piloto-e2e-2026-09-03.md", "# bitacora\n");
+
+    expect(() => validateStage17PilotEvidence({ rootDir: root, silent: true })).toThrowError("no se pudo parsear");
+  });
+
+  it("falla cuando faltan campos estructurales obligatorios", () => {
+    const root = createTempWorkspace();
+    writeFile(
+      root,
+      "docs/etapa-17/evidencias/piloto-e2e-controlado-2026-09-03.json",
+      JSON.stringify({
+        executedAt: "2026-09-03T05:36:56.950Z",
+        executionIds: {
+          baselineExecutionId: "baseline-id"
+        },
+        status: {
+          baselineRun: 200
+        },
+        comparisonSummary: { ok: true },
+        purgeSummary: { ok: true },
+        retentionSummary: { ok: true, candidateExecutions: 1, purgedExecutions: 1 }
+      })
+    );
+    writeFile(root, "docs/etapa-17/bitacora-corrida-piloto-e2e-2026-09-03.md", "# bitacora\n");
+
+    expect(() => validateStage17PilotEvidence({ rootDir: root, silent: true })).toThrowError(
+      "executionIds.currentExecutionId requerido"
+    );
+  });
+
+  it("falla cuando no existe bitacora asociada al ultimo JSON", () => {
+    const root = createTempWorkspace();
+    writeFile(
+      root,
+      "docs/etapa-17/evidencias/piloto-e2e-controlado-2026-09-04.json",
+      JSON.stringify({
+        executedAt: "2026-09-04T05:36:56.950Z",
+        executionIds: {
+          baselineExecutionId: "baseline-id",
+          currentExecutionId: "current-id",
+          retentionExecutionId: "retention-id"
+        },
+        status: {
+          baselineRun: 200,
+          currentRun: 200,
+          retentionRun: 200,
+          comparison: 200,
+          purge: 200,
+          retention: 200
+        },
+        comparisonSummary: { ok: true },
+        purgeSummary: { ok: true },
+        retentionSummary: { ok: true, candidateExecutions: 1, purgedExecutions: 1 }
+      })
+    );
+    writeFile(root, "docs/etapa-17/bitacora-corrida-piloto-e2e-2026-09-03.md", "# bitacora\n");
+
+    expect(() => validateStage17PilotEvidence({ rootDir: root, silent: true })).toThrowError(
+      "No existe bitacora real asociada al ultimo JSON"
+    );
   });
 });

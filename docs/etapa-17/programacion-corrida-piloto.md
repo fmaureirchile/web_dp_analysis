@@ -34,6 +34,7 @@ Salida esperada:
 2. Evidencia JSON diaria en docs/etapa-17/evidencias/piloto-e2e-controlado-YYYY-MM-DD.json.
 3. Bitacora diaria en docs/etapa-17/bitacora-corrida-piloto-e2e-YYYY-MM-DD.md.
 4. Mensajes OK en validadores documentales.
+5. JSON diario validado con estructura minima obligatoria y bitacora asociada por fecha.
 
 ## Parametros operativos
 

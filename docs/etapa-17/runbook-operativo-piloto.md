@@ -98,6 +98,13 @@ Salida esperada:
 3. Confirmacion de existencia de:
 - docs/etapa-17/evidencias/piloto-e2e-controlado-YYYY-MM-DD.json
 - docs/etapa-17/bitacora-corrida-piloto-e2e-YYYY-MM-DD.md
+4. Validacion de estructura minima del ultimo JSON de evidencia:
+- executedAt valido
+- executionIds baseline/current/retention
+- status baselineRun/currentRun/retentionRun/comparison/purge/retention
+- comparisonSummary.ok, purgeSummary.ok y retentionSummary.ok
+- retentionSummary.candidateExecutions y retentionSummary.purgedExecutions
+5. Confirmacion de bitacora asociada a la fecha del ultimo JSON.
 
 Archivo de evidencia:
 
