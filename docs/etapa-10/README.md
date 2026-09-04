@@ -4,11 +4,12 @@
 
 1. acta-inicio-etapa-10.md
 2. backlog-etapa-10.md
+3. acta-cierre-etapa-10.md
 
 ## Comando de validacion inicial
 
 ```bash
-corepack pnpm run lab:e10:gate
+npm run lab:e10:gate
 ```
 
 ## Cuando usarlo
