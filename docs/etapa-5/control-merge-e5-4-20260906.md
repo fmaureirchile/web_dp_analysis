@@ -49,6 +49,11 @@ Ejecutar control minimo de 3 items previo a merge, manteniendo alcance estricto 
 14. Causa reproducida localmente con el mismo comando de CI: `Error: Worker exited unexpectedly` (tinypool/Vitest) con tests funcionalmente en verde.
 15. Remediacion aplicada para estabilizar CI: ajuste de `test:integration` en `package.json` para usar `--pool=forks`.
 16. Validacion local de la remediacion: `npm run test:integration -- --run --reporter=basic` en verde (47/47 archivos, 112/112 tests).
+17. Run #108: https://github.com/fmaureirchile/web_dp_analysis/actions/runs/34049319422
+18. Resultado #108: FAIL en Integration tests.
+19. Evidencia de anotaciones remotas (run #107): asercion en `tests/integration/stage3-safeguards.integration.test.ts` (esperado 201, recibido 400), ademas de salida con codigo 1 en Integration tests.
+20. Remediacion adicional aplicada: ajuste de `test:integration` para ejecutar en modo determinista `--pool=forks --maxWorkers=1`.
+21. Validacion local posterior (3 corridas consecutivas y corrida final determinista): 47/47 archivos y 112/112 tests en verde.
 
 ## Remediacion aplicada
 1. Se corrigio lint en `apps/worker-crawler/src/passive-http-client.ts` (tipado de headers sin dependencia de global `Headers`).
@@ -64,4 +69,4 @@ Ejecutar control minimo de 3 items previo a merge, manteniendo alcance estricto 
 
 ## Cierre operativo
 Estado del control de merge: APTO CONDICIONADO (remediaciones aplicadas; espera validacion remota final).
-Condicion para cierre completo: nuevo run de CI posterior a la remediacion de pool en estado Success y publicacion de resumen final de validate.
+Condicion para cierre completo: nuevo run de CI posterior a la remediacion determinista en estado Success y publicacion de resumen final de validate.
