@@ -7,7 +7,7 @@
     "lint": "eslint . --ext .ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts --pool=forks",
     "build": "tsc -p tsconfig.json",
     "env:validate": "tsx tools/validate-env.ts",
     "secret:check": "tsx tools/check-hardcoded-secrets.ts",
