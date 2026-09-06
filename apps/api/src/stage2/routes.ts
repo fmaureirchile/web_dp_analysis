@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { readdir, readFile, stat } from "node:fs/promises";
+import path from "node:path";
 import { Router, type Request, type Response } from "express";
 import {
   DynamicObservationResultDto,
@@ -104,6 +106,67 @@ type VersionComparisonResult =
     };
 
 const versionComparisonResults = new Map<string, VersionComparisonResult>();
+
+type FileItem = {
+  absolutePath: string;
+  relativePath: string;
+};
+
+type RuleMatch = {
+  rule: string;
+  line: number;
+};
+
+type FrontendIndexResult = {
+  ok: true;
+  data: {
+    executionId: string;
+    framework: "REACT" | "UNKNOWN";
+    totalFiles: number;
+    sampleFiles: Array<{ relativePath: string }>;
+    evidenceId: string;
+  };
+};
+
+type FrontendPatternResult = {
+  ok: true;
+  data: {
+    executionId: string;
+    totalFilesScanned: number;
+    totalFilesWithMatches: number;
+    totalMatches: number;
+    files: Array<{ relativePath: string; matches: RuleMatch[] }>;
+    evidenceId: string;
+  };
+};
+
+type BackendApiIndexResult = {
+  ok: true;
+  data: {
+    executionId: string;
+    totalArtifacts: number;
+    artifactTypeCounts: Array<{ artifactType: "OPENAPI" | "ROUTE" | "GRAPHQL" | "DTO"; count: number }>;
+    artifacts: Array<{ relativePath: string; artifactType: "OPENAPI" | "ROUTE" | "GRAPHQL" | "DTO" }>;
+    evidenceId: string;
+  };
+};
+
+type BackendProcessingResult = {
+  ok: true;
+  data: {
+    executionId: string;
+    totalFilesScanned: number;
+    totalFilesWithMatches: number;
+    totalMatches: number;
+    files: Array<{ relativePath: string; matches: RuleMatch[] }>;
+    evidenceId: string;
+  };
+};
+
+const frontendIndexResults = new Map<string, FrontendIndexResult>();
+const frontendPatternResults = new Map<string, FrontendPatternResult>();
+const backendApiIndexResults = new Map<string, BackendApiIndexResult>();
+const backendProcessingResults = new Map<string, BackendProcessingResult>();
 
 function versionComparisonKey(baselineExecutionId: string, currentExecutionId: string): string {
   return `${baselineExecutionId}::${currentExecutionId}`;
@@ -269,6 +332,112 @@ function parseCursorFilter(raw: unknown): number {
 
 function normalizeDomain(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function toPosixPath(value: string): string {
+  return value.split(path.sep).join("/");
+}
+
+async function collectRepositoryFiles(repositoryPath: string, maxFiles: number): Promise<FileItem[]> {
+  try {
+    const info = await stat(repositoryPath);
+    if (!info.isDirectory()) {
+      throw new Error("repository_path_not_found");
+    }
+  } catch {
+    throw new Error("repository_path_not_found");
+  }
+
+  const collected: FileItem[] = [];
+  const queue: string[] = [repositoryPath];
+
+  while (queue.length > 0 && collected.length < maxFiles) {
+    const current = queue.shift()!;
+    const entries = await readdir(current, { withFileTypes: true });
+    entries.sort((left, right) => left.name.localeCompare(right.name));
+
+    for (const entry of entries) {
+      if (collected.length >= maxFiles) {
+        break;
+      }
+
+      const absolutePath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        queue.push(absolutePath);
+      } else if (entry.isFile()) {
+        collected.push({
+          absolutePath,
+          relativePath: toPosixPath(path.relative(repositoryPath, absolutePath))
+        });
+      }
+    }
+  }
+
+  return collected;
+}
+
+function matchesFrontendCandidate(relativePath: string): boolean {
+  const normalized = relativePath.toLowerCase();
+  return (
+    normalized.endsWith(".ts") ||
+    normalized.endsWith(".tsx") ||
+    normalized.endsWith(".js") ||
+    normalized.endsWith(".jsx") ||
+    normalized.endsWith(".html")
+  );
+}
+
+function detectFrontendRules(content: string, maxMatchesPerFile: number): RuleMatch[] {
+  const rules: Array<{ rule: string; pattern: RegExp }> = [
+    { rule: "FORM_INPUT", pattern: /<input\b/i },
+    { rule: "NETWORK_FETCH", pattern: /\bfetch\s*\(/i },
+    { rule: "COOKIE_ACCESS", pattern: /document\.cookie/i },
+    { rule: "STORAGE_ACCESS", pattern: /\b(localStorage|sessionStorage)\b/i },
+    { rule: "ANALYTICS_BEACON", pattern: /sendBeacon\s*\(/i }
+  ];
+
+  const lines = content.split(/\r?\n/);
+  const matches: RuleMatch[] = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? "";
+    for (const candidate of rules) {
+      if (candidate.pattern.test(line)) {
+        matches.push({ rule: candidate.rule, line: index + 1 });
+        if (matches.length >= maxMatchesPerFile) {
+          return matches;
+        }
+      }
+    }
+  }
+
+  return matches;
+}
+
+function detectBackendProcessingRules(content: string, maxMatchesPerFile: number): RuleMatch[] {
+  const rules: Array<{ rule: string; pattern: RegExp }> = [
+    { rule: "ROUTE_HANDLER", pattern: /\brouter\.(get|post|put|patch|delete)\s*\(/i },
+    { rule: "CONTROLLER_USAGE", pattern: /controller/i },
+    { rule: "SERVICE_USAGE", pattern: /service/i },
+    { rule: "INTEGRATION_USAGE", pattern: /\b(prisma|axios|fetch)\b/i }
+  ];
+
+  const lines = content.split(/\r?\n/);
+  const matches: RuleMatch[] = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? "";
+    for (const candidate of rules) {
+      if (candidate.pattern.test(line)) {
+        matches.push({ rule: candidate.rule, line: index + 1 });
+        if (matches.length >= maxMatchesPerFile) {
+          return matches;
+        }
+      }
+    }
+  }
+
+  return matches;
 }
 
 function persistEvidenceLocation(evidenceId: string, location: string): void {
@@ -1321,6 +1490,305 @@ export function createStage2Router(): Router {
         }
       });
     }
+  });
+
+  router.post("/code-analysis/frontend/index/start", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = String(req.body?.executionId ?? "").trim();
+    const repositoryPath = String(req.body?.repositoryPath ?? "").trim();
+    const maxFiles = parseLimitFilter(req.body?.maxFiles);
+
+    if (!store.executions.has(executionId)) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ ok: false, error: { errorCode: "invalid_execution_id" } });
+    }
+
+    try {
+      const files = (await collectRepositoryFiles(repositoryPath, maxFiles)).filter((item) => matchesFrontendCandidate(item.relativePath));
+
+      let framework: "REACT" | "UNKNOWN" = "UNKNOWN";
+      try {
+        const packageJsonPath = path.join(repositoryPath, "package.json");
+        const content = await readFile(packageJsonPath, "utf8");
+        const parsed = JSON.parse(content) as {
+          dependencies?: Record<string, string>;
+          devDependencies?: Record<string, string>;
+        };
+        if (parsed.dependencies?.react || parsed.devDependencies?.react) {
+          framework = "REACT";
+        }
+      } catch {
+        framework = "UNKNOWN";
+      }
+
+      const evidence = createEvidence(executionId, EvidenceLevel.E2, "FRONTEND_INDEX_SUMMARY", "memory://frontend-index/pending", cid);
+      persistEvidenceLocation(evidence.id, `memory://frontend-index/${evidence.id}`);
+
+      const result: FrontendIndexResult = {
+        ok: true,
+        data: {
+          executionId,
+          framework,
+          totalFiles: files.length,
+          sampleFiles: files.map((item) => ({ relativePath: item.relativePath })),
+          evidenceId: evidence.id
+        }
+      };
+
+      frontendIndexResults.set(executionId, result);
+      return res.status(200).setHeader("x-correlation-id", cid).json(result);
+    } catch (error) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({
+        ok: false,
+        error: {
+          executionId,
+          errorCode: (error as Error).message,
+          message: (error as Error).message
+        }
+      });
+    }
+  });
+
+  router.get("/code-analysis/frontend/index/:executionId/result", (req, res) => {
+    const cid = correlationId(req);
+    const result = frontendIndexResults.get(req.params.executionId);
+    if (!result) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ ok: false, error: "frontend_index_result_not_available" });
+    }
+    return res.status(200).setHeader("x-correlation-id", cid).json(result);
+  });
+
+  router.post("/code-analysis/frontend/patterns/start", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = String(req.body?.executionId ?? "").trim();
+    const repositoryPath = String(req.body?.repositoryPath ?? "").trim();
+    const maxFiles = parseLimitFilter(req.body?.maxFiles);
+    const maxMatchesPerFile = Number.isInteger(req.body?.maxMatchesPerFile) ? Number(req.body.maxMatchesPerFile) : 10;
+
+    if (!store.executions.has(executionId)) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ ok: false, error: { errorCode: "invalid_execution_id" } });
+    }
+
+    try {
+      const files = (await collectRepositoryFiles(repositoryPath, maxFiles)).filter((item) => matchesFrontendCandidate(item.relativePath));
+      const analyzed: Array<{ relativePath: string; matches: RuleMatch[] }> = [];
+
+      for (const file of files) {
+        const content = await readFile(file.absolutePath, "utf8");
+        const matches = detectFrontendRules(content, maxMatchesPerFile);
+        analyzed.push({ relativePath: file.relativePath, matches });
+      }
+
+      const filesWithMatches = analyzed.filter((item) => item.matches.length > 0);
+      const totalMatches = filesWithMatches.reduce((acc, item) => acc + item.matches.length, 0);
+
+      const evidence = createEvidence(executionId, EvidenceLevel.E2, "FRONTEND_PATTERN_SUMMARY", "memory://frontend-pattern/pending", cid);
+      persistEvidenceLocation(evidence.id, `memory://frontend-pattern/${evidence.id}`);
+
+      const result: FrontendPatternResult = {
+        ok: true,
+        data: {
+          executionId,
+          totalFilesScanned: files.length,
+          totalFilesWithMatches: filesWithMatches.length,
+          totalMatches,
+          files: filesWithMatches,
+          evidenceId: evidence.id
+        }
+      };
+
+      frontendPatternResults.set(executionId, result);
+      return res.status(200).setHeader("x-correlation-id", cid).json(result);
+    } catch (error) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({
+        ok: false,
+        error: {
+          executionId,
+          errorCode: (error as Error).message,
+          message: (error as Error).message
+        }
+      });
+    }
+  });
+
+  router.get("/code-analysis/frontend/patterns/:executionId/result", (req, res) => {
+    const cid = correlationId(req);
+    const result = frontendPatternResults.get(req.params.executionId);
+    if (!result) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ ok: false, error: "frontend_pattern_detection_result_not_available" });
+    }
+    return res.status(200).setHeader("x-correlation-id", cid).json(result);
+  });
+
+  router.get("/code-analysis/frontend/findings/:executionId/view", (req, res) => {
+    const cid = correlationId(req);
+    const result = frontendPatternResults.get(req.params.executionId);
+    if (!result) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "frontend_pattern_detection_result_not_available" });
+    }
+
+    const byRule = new Map<string, { rule: string; matchCount: number; files: Set<string> }>();
+    for (const file of result.data.files) {
+      for (const match of file.matches) {
+        const row = byRule.get(match.rule) ?? { rule: match.rule, matchCount: 0, files: new Set<string>() };
+        row.matchCount += 1;
+        row.files.add(file.relativePath);
+        byRule.set(match.rule, row);
+      }
+    }
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({
+      data: {
+        executionId: req.params.executionId,
+        totals: {
+          scannedFiles: result.data.totalFilesScanned,
+          filesWithMatches: result.data.totalFilesWithMatches,
+          matches: result.data.totalMatches,
+          distinctRules: byRule.size
+        },
+        byRule: Array.from(byRule.values())
+          .map((item) => ({ rule: item.rule, matchCount: item.matchCount, filesCount: item.files.size }))
+          .sort((left, right) => left.rule.localeCompare(right.rule)),
+        files: result.data.files
+          .map((item) => ({
+            relativePath: item.relativePath,
+            matchCount: item.matches.length,
+            rules: Array.from(new Set(item.matches.map((match) => match.rule))).sort((left, right) => left.localeCompare(right))
+          }))
+          .sort((left, right) => left.relativePath.localeCompare(right.relativePath))
+      }
+    });
+  });
+
+  router.post("/code-analysis/backend/api-index/start", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = String(req.body?.executionId ?? "").trim();
+    const repositoryPath = String(req.body?.repositoryPath ?? "").trim();
+    const maxFiles = parseLimitFilter(req.body?.maxFiles);
+
+    if (!store.executions.has(executionId)) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ ok: false, error: { errorCode: "invalid_execution_id" } });
+    }
+
+    try {
+      const files = await collectRepositoryFiles(repositoryPath, maxFiles);
+      const artifacts: Array<{ relativePath: string; artifactType: "OPENAPI" | "ROUTE" | "GRAPHQL" | "DTO" }> = [];
+
+      for (const file of files) {
+        const normalized = file.relativePath.toLowerCase();
+        if (normalized.endsWith("openapi.yaml")) {
+          artifacts.push({ relativePath: file.relativePath, artifactType: "OPENAPI" });
+        } else if (normalized.includes("/routes/") && normalized.endsWith(".ts")) {
+          artifacts.push({ relativePath: file.relativePath, artifactType: "ROUTE" });
+        } else if (normalized.endsWith(".graphql")) {
+          artifacts.push({ relativePath: file.relativePath, artifactType: "GRAPHQL" });
+        } else if (normalized.endsWith(".dto.ts")) {
+          artifacts.push({ relativePath: file.relativePath, artifactType: "DTO" });
+        }
+      }
+
+      const typeOrder: Array<"OPENAPI" | "ROUTE" | "GRAPHQL" | "DTO"> = ["OPENAPI", "ROUTE", "GRAPHQL", "DTO"];
+      const artifactTypeCounts = typeOrder
+        .map((artifactType) => ({ artifactType, count: artifacts.filter((item) => item.artifactType === artifactType).length }))
+        .filter((item) => item.count > 0);
+
+      const evidence = createEvidence(executionId, EvidenceLevel.E2, "BACKEND_API_INDEX_SUMMARY", "memory://backend-api-index/pending", cid);
+      persistEvidenceLocation(evidence.id, `memory://backend-api-index/${evidence.id}`);
+
+      const result: BackendApiIndexResult = {
+        ok: true,
+        data: {
+          executionId,
+          totalArtifacts: artifacts.length,
+          artifactTypeCounts,
+          artifacts,
+          evidenceId: evidence.id
+        }
+      };
+
+      backendApiIndexResults.set(executionId, result);
+      return res.status(200).setHeader("x-correlation-id", cid).json(result);
+    } catch (error) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({
+        ok: false,
+        error: {
+          executionId,
+          errorCode: (error as Error).message,
+          message: (error as Error).message
+        }
+      });
+    }
+  });
+
+  router.get("/code-analysis/backend/api-index/:executionId/result", (req, res) => {
+    const cid = correlationId(req);
+    const result = backendApiIndexResults.get(req.params.executionId);
+    if (!result) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ ok: false, error: "backend_api_index_result_not_available" });
+    }
+    return res.status(200).setHeader("x-correlation-id", cid).json(result);
+  });
+
+  router.post("/code-analysis/backend/processing/start", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = String(req.body?.executionId ?? "").trim();
+    const repositoryPath = String(req.body?.repositoryPath ?? "").trim();
+    const maxFiles = parseLimitFilter(req.body?.maxFiles);
+    const maxMatchesPerFile = Number.isInteger(req.body?.maxMatchesPerFile) ? Number(req.body.maxMatchesPerFile) : 10;
+
+    if (!store.executions.has(executionId)) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ ok: false, error: { errorCode: "invalid_execution_id" } });
+    }
+
+    try {
+      const files = await collectRepositoryFiles(repositoryPath, maxFiles);
+      const candidates = files.filter((item) => item.relativePath.toLowerCase().endsWith(".ts"));
+      const analyzed: Array<{ relativePath: string; matches: RuleMatch[] }> = [];
+
+      for (const file of candidates) {
+        const content = await readFile(file.absolutePath, "utf8");
+        const matches = detectBackendProcessingRules(content, maxMatchesPerFile);
+        analyzed.push({ relativePath: file.relativePath, matches });
+      }
+
+      const filesWithMatches = analyzed.filter((item) => item.matches.length > 0);
+      const totalMatches = filesWithMatches.reduce((acc, item) => acc + item.matches.length, 0);
+
+      const evidence = createEvidence(executionId, EvidenceLevel.E2, "BACKEND_PROCESSING_SUMMARY", "memory://backend-processing/pending", cid);
+      persistEvidenceLocation(evidence.id, `memory://backend-processing/${evidence.id}`);
+
+      const result: BackendProcessingResult = {
+        ok: true,
+        data: {
+          executionId,
+          totalFilesScanned: candidates.length,
+          totalFilesWithMatches: filesWithMatches.length,
+          totalMatches,
+          files: filesWithMatches,
+          evidenceId: evidence.id
+        }
+      };
+
+      backendProcessingResults.set(executionId, result);
+      return res.status(200).setHeader("x-correlation-id", cid).json(result);
+    } catch (error) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({
+        ok: false,
+        error: {
+          executionId,
+          errorCode: (error as Error).message,
+          message: (error as Error).message
+        }
+      });
+    }
+  });
+
+  router.get("/code-analysis/backend/processing/:executionId/result", (req, res) => {
+    const cid = correlationId(req);
+    const result = backendProcessingResults.get(req.params.executionId);
+    if (!result) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ ok: false, error: "backend_processing_result_not_available" });
+    }
+    return res.status(200).setHeader("x-correlation-id", cid).json(result);
   });
 
   return router;
