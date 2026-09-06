@@ -254,6 +254,23 @@ function parseLimitFilter(raw: unknown): number {
   return value;
 }
 
+function parseCursorFilter(raw: unknown): number {
+  if (typeof raw === "undefined") {
+    return 0;
+  }
+
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error("invalid_cursor");
+  }
+
+  return value;
+}
+
+function normalizeDomain(value: string): string {
+  return value.trim().toLowerCase();
+}
+
 function persistEvidenceLocation(evidenceId: string, location: string): void {
   const existing = store.evidences.get(evidenceId);
   if (!existing) {
@@ -948,6 +965,361 @@ export function createStage2Router(): Router {
       ok(res, createReviewDecision(body.findingId, body.reviewState, body.comment, cid), cid);
     } catch (error) {
       notFound(res, (error as Error).message, cid);
+    }
+  });
+
+  router.get("/evidences", (req, res) => {
+    const cid = correlationId(req);
+    const executionId = typeof req.query.executionId === "string" ? req.query.executionId : "";
+    const kind = typeof req.query.kind === "string" ? req.query.kind : undefined;
+
+    if (executionId.trim().length === 0) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_required" });
+    }
+
+    try {
+      const from = parseIsoFilter(req.query.from, "invalid_from_filter");
+      const to = parseIsoFilter(req.query.to, "invalid_to_filter");
+      const limit = parseLimitFilter(req.query.limit);
+      const cursor = parseCursorFilter(req.query.cursor);
+
+      if (from && to && Date.parse(from) > Date.parse(to)) {
+        return res.status(400).setHeader("x-correlation-id", cid).json({ error: "invalid_time_window" });
+      }
+
+      const fromTs = from ? Date.parse(from) : undefined;
+      const toTs = to ? Date.parse(to) : undefined;
+
+      const allItems = Array.from(store.evidences.values())
+        .filter((item) => item.executionId === executionId)
+        .filter((item) => (kind ? item.kind === kind : true))
+        .filter((item) => {
+          const createdAtTs = Date.parse(item.createdAt);
+          if (typeof fromTs === "number" && createdAtTs < fromTs) return false;
+          if (typeof toTs === "number" && createdAtTs > toTs) return false;
+          return true;
+        })
+        .sort((left, right) => {
+          const delta = Date.parse(left.createdAt) - Date.parse(right.createdAt);
+          if (delta !== 0) return delta;
+          return left.id.localeCompare(right.id);
+        });
+
+      const pageItems = allItems.slice(cursor, cursor + limit);
+      const nextCursor = cursor + limit < allItems.length ? String(cursor + limit) : undefined;
+
+      return res.status(200).setHeader("x-correlation-id", cid).json({
+        data: {
+          executionId,
+          kind,
+          from,
+          to,
+          limit,
+          cursor: String(cursor),
+          nextCursor,
+          items: pageItems.map((item) => ({
+            evidenceId: item.id,
+            level: item.level,
+            kind: item.kind,
+            location: item.location,
+            createdAt: item.createdAt
+          }))
+        }
+      });
+    } catch (error) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: (error as Error).message });
+    }
+  });
+
+  router.get("/reports/executions/:executionId/executive-summary", (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+
+    if (!store.executions.has(executionId)) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
+    }
+
+    const evidences = Array.from(store.evidences.values()).filter((item) => item.executionId === executionId);
+    const observations = Array.from(store.observations.values()).filter((item) => item.executionId === executionId);
+
+    const byKindMap = new Map<string, { kind: string; count: number; evidenceIds: string[] }>();
+    const byLevelMap = new Map<string, { level: string; count: number; evidenceIds: string[] }>();
+
+    for (const evidence of evidences) {
+      const byKind = byKindMap.get(evidence.kind) ?? { kind: evidence.kind, count: 0, evidenceIds: [] };
+      byKind.count += 1;
+      byKind.evidenceIds.push(evidence.id);
+      byKindMap.set(evidence.kind, byKind);
+
+      const byLevel = byLevelMap.get(evidence.level) ?? { level: evidence.level, count: 0, evidenceIds: [] };
+      byLevel.count += 1;
+      byLevel.evidenceIds.push(evidence.id);
+      byLevelMap.set(evidence.level, byLevel);
+    }
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({
+      data: {
+        executionId,
+        totals: {
+          evidences: evidences.length,
+          observations: observations.length
+        },
+        evidenceByKind: Array.from(byKindMap.values()).sort((left, right) => left.kind.localeCompare(right.kind)),
+        evidenceByLevel: Array.from(byLevelMap.values()).sort((left, right) => left.level.localeCompare(right.level))
+      }
+    });
+  });
+
+  router.get("/reports/executions/:executionId/form-inventory", (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const pageId = typeof req.query.pageId === "string" ? req.query.pageId : undefined;
+
+    if (!store.executions.has(executionId)) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
+    }
+
+    const pages = Array.from(store.pages.values()).filter((item) => item.executionId === executionId);
+    if (pageId && !pages.some((item) => item.id === pageId)) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "page_id_not_found" });
+    }
+
+    const selectedPages = pageId ? pages.filter((item) => item.id === pageId) : pages;
+    const selectedPageIds = new Set(selectedPages.map((item) => item.id));
+    const fields = Array.from(store.formFields.values()).filter((item) => selectedPageIds.has(item.pageId));
+    const observations = Array.from(store.observations.values()).filter(
+      (item) => item.executionId === executionId && (!item.pageId || selectedPageIds.has(item.pageId))
+    );
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({
+      data: {
+        executionId,
+        totals: {
+          pages: selectedPages.length,
+          fields: fields.length,
+          observations: observations.length
+        },
+        pages: selectedPages.map((page) => {
+          const pageFields = fields.filter((item) => item.pageId === page.id);
+          return {
+            pageId: page.id,
+            url: page.url,
+            title: page.title,
+            fields: pageFields.map((field) => ({
+              fieldId: field.id,
+              formId: field.formId,
+              name: field.name,
+              type: field.type,
+              required: field.required,
+              observations: observations.filter((item) => item.formFieldId === field.id).length
+            }))
+          };
+        })
+      }
+    });
+  });
+
+  router.get("/reports/executions/:executionId/tracking-inventory", (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+
+    if (!store.executions.has(executionId)) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
+    }
+
+    const dynamic = getDynamicObservationResult(executionId);
+    if (!dynamic?.ok || !dynamic.data) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "tracking_inventory_not_available" });
+    }
+
+    const thirdPartyMap = new Map<string, { domain: string; requestIds: Set<string>; urls: Set<string>; requestCount: number }>();
+    for (const item of dynamic.data.network) {
+      if (!item.thirdPartyDomain) continue;
+      const key = normalizeDomain(item.thirdPartyDomain);
+      const row =
+        thirdPartyMap.get(key) ?? { domain: key, requestIds: new Set<string>(), urls: new Set<string>(), requestCount: 0 };
+      row.requestCount += 1;
+      row.requestIds.add(item.requestId);
+      row.urls.add(item.url);
+      thirdPartyMap.set(key, row);
+    }
+
+    const cookieItems = dynamic.data.storage.filter((item) => item.kind === "COOKIE");
+    const cookieMap = new Map<string, { key: string; observations: number }>();
+    for (const item of cookieItems) {
+      const key = normalizeDomain(item.key);
+      const row = cookieMap.get(key) ?? { key, observations: 0 };
+      row.observations += 1;
+      cookieMap.set(key, row);
+    }
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({
+      data: {
+        executionId,
+        totals: {
+          thirdParties: thirdPartyMap.size,
+          cookies: cookieMap.size,
+          cookieObservations: cookieItems.length
+        },
+        thirdParties: Array.from(thirdPartyMap.values())
+          .map((item) => ({
+            domain: item.domain,
+            requestCount: item.requestCount,
+            requestIds: Array.from(item.requestIds),
+            urls: Array.from(item.urls)
+          }))
+          .sort((left, right) => left.domain.localeCompare(right.domain)),
+        cookies: Array.from(cookieMap.values()).sort((left, right) => left.key.localeCompare(right.key))
+      }
+    });
+  });
+
+  router.post("/auth/evaluations/start", async (req, res) => {
+    const cid = correlationId(req);
+    const executionId = String(req.body?.executionId ?? "").trim();
+    const entryUrl = String(req.body?.entryUrl ?? "").trim();
+    const username = String(req.body?.username ?? "").trim();
+    const password = String(req.body?.password ?? "").trim();
+    const role = String(req.body?.role ?? "").trim().toLowerCase();
+
+    const execution = store.executions.get(executionId);
+    if (!execution) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({
+        ok: false,
+        error: {
+          executionId,
+          errorCode: "invalid_execution_id",
+          message: "execution_id_not_found"
+        }
+      });
+    }
+
+    if (!entryUrl || !username || !password || (role !== "cliente" && role !== "supervisor")) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({
+        ok: false,
+        error: {
+          executionId,
+          errorCode: "invalid_entry_url",
+          message: "invalid_authenticated_evaluation_input"
+        }
+      });
+    }
+
+    const sessionScopeId = `${execution.id}:${role}`;
+    transitionExecutionState(execution.id, ExecutionState.QUEUED, cid);
+    transitionExecutionState(execution.id, ExecutionState.RUNNING, cid);
+
+    try {
+      const login = await fetch(`${entryUrl}/auth/login`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-synthetic-client-id": sessionScopeId
+        },
+        body: JSON.stringify({ username, password, role })
+      });
+
+      if (login.status !== 200) {
+        throw new Error(`auth_login_failed:${login.status}`);
+      }
+
+      const profile = await fetch(`${entryUrl}/profile`, {
+        method: "GET",
+        headers: {
+          "x-synthetic-client-id": sessionScopeId
+        }
+      });
+
+      if (profile.status !== 200) {
+        throw new Error(`auth_profile_failed:${profile.status}`);
+      }
+
+      const profilePayload = (await profile.json()) as {
+        profile: {
+          username: string;
+          role: string;
+          panel: string;
+        };
+      };
+
+      const logout = await fetch(`${entryUrl}/auth/logout`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-synthetic-client-id": sessionScopeId
+        },
+        body: JSON.stringify({})
+      });
+
+      if (logout.status !== 200) {
+        throw new Error(`auth_logout_failed:${logout.status}`);
+      }
+
+      const loginEvidence = createEvidence(execution.id, EvidenceLevel.E2, "AUTH_STEP_LOGIN", "memory://auth-step-login/pending", cid);
+      const profileEvidence = createEvidence(execution.id, EvidenceLevel.E2, "AUTH_STEP_PROFILE", "memory://auth-step-profile/pending", cid);
+      const logoutEvidence = createEvidence(execution.id, EvidenceLevel.E2, "AUTH_STEP_LOGOUT", "memory://auth-step-logout/pending", cid);
+      const summaryEvidence = createEvidence(
+        execution.id,
+        EvidenceLevel.E2,
+        "AUTH_SESSION_PROFILE",
+        "memory://auth-session-profile/pending",
+        cid
+      );
+
+      const loginLocation = `memory://auth-step-login/${loginEvidence.id}`;
+      const profileLocation = `memory://auth-step-profile/${profileEvidence.id}`;
+      const logoutLocation = `memory://auth-step-logout/${logoutEvidence.id}`;
+      const summaryLocation = `memory://auth-session-profile/${summaryEvidence.id}`;
+
+      persistEvidenceLocation(loginEvidence.id, loginLocation);
+      persistEvidenceLocation(profileEvidence.id, profileLocation);
+      persistEvidenceLocation(logoutEvidence.id, logoutLocation);
+      persistEvidenceLocation(summaryEvidence.id, summaryLocation);
+
+      transitionExecutionState(execution.id, ExecutionState.COMPLETED, cid);
+      return res.status(200).setHeader("x-correlation-id", cid).json({
+        ok: true,
+        data: {
+          executionId: execution.id,
+          sessionScopeId,
+          profile: profilePayload.profile,
+          loggedOut: true,
+          evidenceId: summaryEvidence.id,
+          steps: [
+            {
+              step: "LOGIN",
+              statusHttp: login.status,
+              evidenceId: loginEvidence.id,
+              evidenceKind: loginEvidence.kind,
+              evidenceLocation: loginLocation
+            },
+            {
+              step: "PROFILE",
+              statusHttp: profile.status,
+              evidenceId: profileEvidence.id,
+              evidenceKind: profileEvidence.kind,
+              evidenceLocation: profileLocation
+            },
+            {
+              step: "LOGOUT",
+              statusHttp: logout.status,
+              evidenceId: logoutEvidence.id,
+              evidenceKind: logoutEvidence.kind,
+              evidenceLocation: logoutLocation
+            }
+          ]
+        }
+      });
+    } catch (error) {
+      transitionExecutionState(execution.id, ExecutionState.FAILED, cid);
+      return res.status(422).setHeader("x-correlation-id", cid).json({
+        ok: false,
+        error: {
+          executionId: execution.id,
+          errorCode: "internal_error",
+          message: (error as Error).message
+        }
+      });
     }
   });
 
