@@ -115,6 +115,7 @@ type FileItem = {
 type RuleMatch = {
   rule: string;
   line: number;
+  value?: string;
 };
 
 type FrontendIndexResult = {
@@ -167,6 +168,7 @@ const frontendIndexResults = new Map<string, FrontendIndexResult>();
 const frontendPatternResults = new Map<string, FrontendPatternResult>();
 const backendApiIndexResults = new Map<string, BackendApiIndexResult>();
 const backendProcessingResults = new Map<string, BackendProcessingResult>();
+const legalDiscrepancyResults = new Map<string, { ok: true; data: { executionId: string; totals: { discrepancies: number; observedCategories: number }; discrepancies: Array<{ kind: string; message: string }> } }>();
 
 function versionComparisonKey(baselineExecutionId: string, currentExecutionId: string): string {
   return `${baselineExecutionId}::${currentExecutionId}`;
@@ -403,7 +405,12 @@ function detectFrontendRules(content: string, maxMatchesPerFile: number): RuleMa
     const line = lines[index] ?? "";
     for (const candidate of rules) {
       if (candidate.pattern.test(line)) {
-        matches.push({ rule: candidate.rule, line: index + 1 });
+        const fetchMatch = line.match(/\bfetch\s*\(\s*["'`](\/[^"'`]*)["'`]/i);
+        matches.push({
+          rule: candidate.rule,
+          line: index + 1,
+          value: candidate.rule === "NETWORK_FETCH" ? fetchMatch?.[1] : undefined
+        });
         if (matches.length >= maxMatchesPerFile) {
           return matches;
         }
@@ -429,7 +436,12 @@ function detectBackendProcessingRules(content: string, maxMatchesPerFile: number
     const line = lines[index] ?? "";
     for (const candidate of rules) {
       if (candidate.pattern.test(line)) {
-        matches.push({ rule: candidate.rule, line: index + 1 });
+        const endpointMatch = line.match(/\brouter\.(?:get|post|put|patch|delete)\s*\(\s*["'`](\/[^"'`]*)["'`]/i);
+        matches.push({
+          rule: candidate.rule,
+          line: index + 1,
+          value: candidate.rule === "ROUTE_HANDLER" ? endpointMatch?.[1] : undefined
+        });
         if (matches.length >= maxMatchesPerFile) {
           return matches;
         }
@@ -1788,6 +1800,295 @@ export function createStage2Router(): Router {
     if (!result) {
       return res.status(422).setHeader("x-correlation-id", cid).json({ ok: false, error: "backend_processing_result_not_available" });
     }
+    return res.status(200).setHeader("x-correlation-id", cid).json(result);
+  });
+
+  router.get("/review/executions/:executionId/view", (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+
+    if (!store.executions.has(executionId)) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
+    }
+
+    const evidences = Array.from(store.evidences.values()).filter((item) => item.executionId === executionId);
+    const observations = Array.from(store.observations.values()).filter((item) => item.executionId === executionId);
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({
+      data: {
+        executionId,
+        evidenceCount: evidences.length,
+        observationCount: observations.length,
+        evidences,
+        observations
+      }
+    });
+  });
+
+  router.get("/code-analysis/backend/processing-flow/:executionId/view", (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const apiIndex = backendApiIndexResults.get(executionId);
+    if (!apiIndex) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "backend_api_index_result_not_available" });
+    }
+
+    const processing = backendProcessingResults.get(executionId);
+    if (!processing) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "backend_processing_result_not_available" });
+    }
+
+    const byRule = new Map<string, { rule: string; matchCount: number; files: Set<string> }>();
+    for (const file of processing.data.files) {
+      for (const match of file.matches) {
+        const row = byRule.get(match.rule) ?? { rule: match.rule, matchCount: 0, files: new Set<string>() };
+        row.matchCount += 1;
+        row.files.add(file.relativePath);
+        byRule.set(match.rule, row);
+      }
+    }
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({
+      data: {
+        executionId,
+        totals: {
+          apiArtifacts: apiIndex.data.totalArtifacts,
+          filesWithProcessingMatches: processing.data.totalFilesWithMatches,
+          processingMatches: processing.data.totalMatches,
+          distinctProcessingRules: byRule.size
+        },
+        byRule: Array.from(byRule.values()).map((item) => ({ rule: item.rule, matchCount: item.matchCount, filesCount: item.files.size })),
+        evidenceIds: {
+          apiIndexEvidenceId: apiIndex.data.evidenceId,
+          processingEvidenceId: processing.data.evidenceId
+        }
+      }
+    });
+  });
+
+  router.get("/lineage/correlations/:executionId/by-endpoint", (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const frontend = frontendPatternResults.get(executionId);
+    if (!frontend) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "frontend_pattern_detection_result_not_available" });
+    }
+
+    const backend = backendProcessingResults.get(executionId);
+    if (!backend) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "backend_processing_result_not_available" });
+    }
+
+    const frontendEndpoints = new Set(
+      frontend.data.files
+        .flatMap((file) => file.matches)
+        .filter((match) => match.rule === "NETWORK_FETCH" && typeof match.value === "string")
+        .map((match) => match.value as string)
+    );
+    const backendEndpoints = new Set(
+      backend.data.files
+        .flatMap((file) => file.matches)
+        .filter((match) => match.rule === "ROUTE_HANDLER" && typeof match.value === "string")
+        .map((match) => match.value as string)
+    );
+
+    const correlated = Array.from(frontendEndpoints).filter((endpoint) => backendEndpoints.has(endpoint));
+    return res.status(200).setHeader("x-correlation-id", cid).json({
+      data: {
+        executionId,
+        totals: {
+          correlatedEndpoints: correlated.length
+        },
+        correlations: correlated.map((endpoint) => ({ endpoint, status: "INFERRED_HIGH", confidence: 0.9 }))
+      }
+    });
+  });
+
+  router.get("/lineage/correlations/:executionId/by-dto-processing", (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const apiIndex = backendApiIndexResults.get(executionId);
+    if (!apiIndex) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "backend_api_index_result_not_available" });
+    }
+
+    const processing = backendProcessingResults.get(executionId);
+    if (!processing) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "backend_processing_result_not_available" });
+    }
+
+    const dtoArtifacts = apiIndex.data.artifacts.filter((item) => item.artifactType === "DTO");
+    const processingRefs = processing.data.files.flatMap((file) =>
+      file.matches.map((match) => ({ relativePath: file.relativePath, rule: match.rule, line: match.line }))
+    );
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({
+      data: {
+        executionId,
+        totals: {
+          dtoArtifacts: dtoArtifacts.length
+        },
+        correlations: dtoArtifacts.map((dto) => ({
+          dto,
+          status: "INFERRED_HIGH",
+          confidence: 0.8,
+          processingReferences: processingRefs
+        }))
+      }
+    });
+  });
+
+  router.get("/lineage/views/:executionId/consolidated", (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+    const frontend = frontendPatternResults.get(executionId);
+    if (!frontend) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "frontend_pattern_detection_result_not_available" });
+    }
+
+    const byEndpointFrontend = frontend.data.files
+      .flatMap((file) => file.matches)
+      .filter((match) => match.rule === "NETWORK_FETCH" && typeof match.value === "string")
+      .map((match) => match.value as string);
+
+    const byEndpointBackend = (backendProcessingResults.get(executionId)?.data.files ?? [])
+      .flatMap((file) => file.matches)
+      .filter((match) => match.rule === "ROUTE_HANDLER" && typeof match.value === "string")
+      .map((match) => match.value as string);
+
+    const nodes = new Set<string>();
+    const edges: Array<{ type: string; from: string; to: string }> = [];
+
+    for (const endpoint of byEndpointFrontend) {
+      nodes.add(`frontend:${endpoint}`);
+    }
+    for (const endpoint of byEndpointBackend) {
+      nodes.add(`backend:${endpoint}`);
+    }
+
+    for (const endpoint of byEndpointFrontend) {
+      if (byEndpointBackend.includes(endpoint)) {
+        edges.push({ type: "CALLS_ENDPOINT", from: `frontend:${endpoint}`, to: `backend:${endpoint}` });
+      }
+    }
+
+    const apiIndex = backendApiIndexResults.get(executionId);
+    if (apiIndex) {
+      const dtoArtifacts = apiIndex.data.artifacts.filter((item) => item.artifactType === "DTO");
+      for (const dto of dtoArtifacts) {
+        nodes.add(`dto:${dto.relativePath}`);
+        edges.push({ type: "MAPPED_TO_PROCESSING", from: `dto:${dto.relativePath}`, to: "backend:processing" });
+      }
+    }
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({
+      data: {
+        executionId,
+        totals: {
+          nodes: nodes.size,
+          edges: edges.length
+        },
+        nodes: Array.from(nodes).map((id) => ({ id })),
+        edges
+      }
+    });
+  });
+
+  router.post("/legal-analysis/discrepancies/start", (req, res) => {
+    const cid = correlationId(req);
+    const executionId = String(req.body?.executionId ?? "").trim();
+    const dynamic = getDynamicObservationResult(executionId);
+    if (!dynamic?.ok || !dynamic.data) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({
+        ok: false,
+        error: {
+          executionId,
+          errorCode: "tracking_inventory_not_available",
+          message: "dynamic_observation_result_not_available"
+        }
+      });
+    }
+
+    const declaredThirdParties = new Set((req.body?.declaredThirdParties ?? []).map((value: string) => normalizeDomain(String(value))));
+    const declaredPurposes = (req.body?.declaredPurposes ?? []).map((value: string) => normalizeDomain(String(value)));
+
+    const discrepancies: Array<{ kind: string; message: string }> = [];
+    const observedThirdParties = new Set(
+      dynamic.data.network
+        .map((item) => item.thirdPartyDomain)
+        .filter((item): item is string => typeof item === "string" && item.length > 0)
+        .map((item) => normalizeDomain(item))
+    );
+
+    for (const domain of observedThirdParties) {
+      if (!declaredThirdParties.has(domain)) {
+        discrepancies.push({
+          kind: "THIRD_PARTY_OBSERVED_NOT_DECLARED",
+          message: `Existe una posible discrepancia: tercero observado no declarado (${domain}). Requiere validacion.`
+        });
+      }
+    }
+
+    const observedCategories = new Set<string>();
+    if (dynamic.data.storage.some((item) => item.kind === "COOKIE")) {
+      observedCategories.add("COOKIE_TRACKING");
+    }
+    if (dynamic.data.network.length > 0) {
+      observedCategories.add("NETWORK_COLLECTION");
+    }
+
+    const purposeCompatible = declaredPurposes.some((item: string) => item.includes("analit") || item.includes("seguridad"));
+    if (observedCategories.size > 0 && !purposeCompatible) {
+      discrepancies.push({
+        kind: "PURPOSE_NOT_FOUND_FOR_OBSERVED_CATEGORY",
+        message: "No se encontro finalidad declarada para categorias observadas. Existe una posible discrepancia. Requiere validacion."
+      });
+    }
+
+    if (dynamic.data.consentEvaluation?.code === "TRACKING_AFTER_REJECT") {
+      discrepancies.push({
+        kind: "TRACKING_AFTER_REJECT",
+        message: "Existe una posible discrepancia: tracking posterior al rechazo. Requiere validacion."
+      });
+    }
+
+    if (dynamic.data.consentEvaluation?.code === "TRACKING_BEFORE_CONSENT") {
+      discrepancies.push({
+        kind: "CAPTURE_BEFORE_INFORMATION",
+        message: "Existe una posible discrepancia: captura previa a informacion y decision. Requiere validacion."
+      });
+    }
+
+    const result = {
+      ok: true as const,
+      data: {
+        executionId,
+        totals: {
+          discrepancies: discrepancies.length,
+          observedCategories: observedCategories.size
+        },
+        discrepancies
+      }
+    };
+
+    legalDiscrepancyResults.set(executionId, result);
+    return res.status(200).setHeader("x-correlation-id", cid).json(result);
+  });
+
+  router.get("/legal-analysis/discrepancies/:executionId/result", (req, res) => {
+    const cid = correlationId(req);
+    const result = legalDiscrepancyResults.get(req.params.executionId);
+    if (!result) {
+      return res.status(422).setHeader("x-correlation-id", cid).json({
+        ok: false,
+        error: {
+          executionId: req.params.executionId,
+          errorCode: "result_not_available",
+          message: "legal_discrepancies_result_not_available"
+        }
+      });
+    }
+
     return res.status(200).setHeader("x-correlation-id", cid).json(result);
   });
 
