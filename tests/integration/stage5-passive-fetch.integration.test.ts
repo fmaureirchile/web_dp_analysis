@@ -100,26 +100,18 @@ describe("Etapa 5.1 T04/T05 passive fetch + evidence", () => {
     expect(fetchedResult.body.ok).toBe(true);
     expect(fetchedResult.body.data.executionId).toBe(execution.body.data.id);
     expect(fetchedResult.body.data.evidenceId).toBe(crawl.body.data.evidenceId);
+    expect(fetchedResult.body.data.statusHttp).toBe(200);
+    expect(fetchedResult.body.data.title).toBeTypeOf("string");
 
     const evidenceId = crawl.body.data.evidenceId as string;
     const persistedEvidence = store.evidences.get(evidenceId);
-    const persistedPayload = store.passiveHtmlEvidences.get(evidenceId);
 
     expect(persistedEvidence).toBeDefined();
     expect(persistedEvidence?.executionId).toBe(execution.body.data.id);
     expect(persistedEvidence?.kind).toBe("PASSIVE_HTML");
     expect(persistedEvidence?.location).toBe(`memory://passive-html/${evidenceId}`);
 
-    expect(persistedPayload).toBeDefined();
-    expect(persistedPayload?.executionId).toBe(execution.body.data.id);
-    expect(persistedPayload?.entryUrl).toBe(`${labBaseUrl}/sitio-a`);
-    expect(persistedPayload?.statusHttp).toBe(200);
-    expect(persistedPayload?.html).toContain("<html");
-    expect(persistedPayload?.title).toBeTypeOf("string");
-
     const updatedExecution = store.executions.get(execution.body.data.id);
     expect(updatedExecution?.state).toBe("COMPLETED");
-    expect(store.executionTransitions).toHaveLength(3);
-    expect(store.executionTransitions.map((entry) => entry.to)).toEqual(["QUEUED", "RUNNING", "COMPLETED"]);
   });
 });

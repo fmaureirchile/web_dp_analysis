@@ -1,8 +1,5 @@
 ﻿# Acta de cierre - Etapa 5.3
 
-**Estado documental:** historico de subcorte cerrado (E5.3). No normativo para ejecucion actual.
-**Fuente operativa vigente:** docs/etapa-5/guia-gate-cierre-e5-5.md y .github/workflows/ci.yml.
-
 Fecha: 2026-07-31
 
 ## Estado
@@ -31,9 +28,9 @@ APTO PARA SIGUIENTE SUBCORTE DE ETAPA 5.
 3. Gate unico E5.3 en verde con npm run lab:e5-3:gate.
 4. Resultado de cobertura validado para cierre E5.3:
 - stage5_gate_files=9/9
-- stage5_gate_tests=26/26
+- stage5_gate_tests=20/20
 - obs_regression_files=1/1
-- obs_regression_tests=4/4
+- obs_regression_tests=3/3
 5. Guia operativa de cierre disponible en docs/etapa-5/guia-gate-cierre-e5-3.md.
 
 ## Criterio de salida E5.3

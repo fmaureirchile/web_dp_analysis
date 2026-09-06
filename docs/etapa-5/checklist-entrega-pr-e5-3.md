@@ -1,8 +1,5 @@
 ﻿# Checklist final de entrega PR - E5.3
 
-**Estado documental:** historico de subcorte cerrado (E5.3). No normativo para ejecucion actual.
-**Fuente operativa vigente:** docs/etapa-5/guia-gate-cierre-e5-5.md y .github/workflows/ci.yml.
-
 ## Objetivo
 
 Asegurar que un PR de cierre E5.3 quede listo para revision y merge sin brechas tecnicas ni documentales.
@@ -16,8 +13,8 @@ Asegurar que un PR de cierre E5.3 quede listo para revision y merge sin brechas 
 ## Checklist tecnico minimo
 
 1. El comando npm run lab:e5-3:gate pasa en local.
-2. El gate funcional Stage 5 (npm run lab:e5-2:gate) mantiene 9 archivos y 26 tests en verde.
-3. El control dedicado de observabilidad (npm run lab:e5-3:obs-regression) mantiene 1 archivo y 4 tests en verde.
+2. El gate funcional Stage 5 (npm run lab:e5-2:gate) mantiene 9 archivos y 20 tests en verde.
+3. El control dedicado de observabilidad (npm run lab:e5-3:obs-regression) mantiene 1 archivo y 3 tests en verde.
 4. No hay regresion en eventos por executionId/correlationId (orden, detalle y aislamiento).
 5. Se mantiene la estrategia de estabilidad definida por ADR-007 mientras no se cumpla criterio de rollback.
 
@@ -33,7 +30,7 @@ Asegurar que un PR de cierre E5.3 quede listo para revision y merge sin brechas 
 
 1. Salida exitosa de npm run lab:e5-3:gate.
 2. Resultado de CI post-merge con linea unica de resumen:
-E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4.
+E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=20/20; obs_regression_files=1/1; obs_regression_tests=3/3.
 3. Referencia a nota de release E5.3.
 
 ## Evidencia final post-merge (lectura rapida)
@@ -49,6 +46,6 @@ E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression
 
 CI post-merge en verde: workflow validate ejecutado con estado Success.
 Gate E5.3 ejecutado correctamente con validacion funcional Stage 5 y regresion de observabilidad.
-Resumen final del gate: E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4.
+Resumen final del gate: E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=20/20; obs_regression_files=1/1; obs_regression_tests=3/3.
 Evidencia documental actualizada en docs/etapa-5/nota-release-e5-3.md.
 

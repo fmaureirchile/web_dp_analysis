@@ -4,11 +4,7 @@ import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { app } from "../../apps/api/src/server";
-import {
-  getPassiveHtmlEvidenceReferenceByExecutionId,
-  resetStore,
-  store
-} from "../../apps/api/src/stage2/in-memory-store";
+import { resetStore } from "../../apps/api/src/stage2/in-memory-store";
 import { buildLaboratoryServer } from "../../test-lab/sites/lab-server";
 
 let labServer: ReturnType<ReturnType<typeof buildLaboratoryServer>["listen"]> | undefined;
@@ -96,15 +92,14 @@ describe("Etapa 5.2 T02 evidencia durable", () => {
     expect(crawl.status).toBe(200);
     const evidenceId = crawl.body.data.evidenceId as string;
 
-    // Simula reinicio de proceso: vaciamos estado en memoria y recuperamos desde capa durable.
+    // Simula reinicio de proceso: vaciamos estado en memoria y recuperamos desde la API durable.
     resetStore();
-    expect(store.evidences.size).toBe(0);
 
-    const recovered = await getPassiveHtmlEvidenceReferenceByExecutionId(execution.body.data.id);
+    const recovered = await request(app).get(`/api/v1/crawler/passive/single-page/${execution.body.data.id}/result`);
 
-    expect(recovered).toBeDefined();
-    expect(recovered?.executionId).toBe(execution.body.data.id);
-    expect(recovered?.evidenceId).toBe(evidenceId);
-    expect(recovered?.location).toBe(`memory://passive-html/${evidenceId}`);
+    expect(recovered.status).toBe(200);
+    expect(recovered.body.ok).toBe(true);
+    expect(recovered.body.data.executionId).toBe(execution.body.data.id);
+    expect(recovered.body.data.evidenceId).toBe(evidenceId);
   });
 });

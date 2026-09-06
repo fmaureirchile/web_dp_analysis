@@ -25,8 +25,8 @@ APTO PARA CIERRE DE ETAPA 5.
 
 1. Comando de continuidad E5.5: npm run lab:e5-4:gate.
 2. Validacion de coherencia documental: npm run docs:stage5:coherence.
-3. Gate Stage 5.2 validado con 10/10 archivos y 23/23 tests.
-4. Regression de observabilidad validada con 1/1 archivo y 3/3 tests.
+3. Gate Stage 5.2 validado con 10/10 archivos y 26/26 tests.
+4. Regression de observabilidad validada con 1/1 archivo y 4/4 tests.
 5. Salida CI de tendencia E5.3 con campos:
 - duration_seconds
 - previous_duration_seconds
@@ -34,7 +34,7 @@ APTO PARA CIERRE DE ETAPA 5.
 - threshold_seconds=480
 6. Artifact de historico disponible: stage5-gate-timing-history.
 7. Resumen E5.4 en CI con formato extendido:
-E5.4 gate result: stage5_gate_files=10/10; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds={actual}; previous_stage5_3_gate_duration_seconds={previo|na}; stage5_3_gate_delta_seconds={delta|na}.
+E5.4 gate result: stage5_gate_files=10/10; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds={actual}; previous_stage5_3_gate_duration_seconds={previo|na}; stage5_3_gate_delta_seconds={delta|na}.
 
 ## Criterio de salida E5.5
 

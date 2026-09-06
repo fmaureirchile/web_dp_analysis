@@ -25,11 +25,11 @@ npm run lab:e5-4:gate
 
 Resultado esperado:
 
-- Gate funcional Stage 5.2: 9 archivos y 26 tests en verde.
-- Observability regression E5.3: 1 archivo y 4 tests en verde.
+- Gate funcional Stage 5.2: 9 archivos y 20 tests en verde.
+- Observability regression E5.3: 1 archivo y 3 tests en verde.
 - Coherencia documental Stage 5: [docs:stage5:coherence] OK.
 - Resumen final CI E5.4:
-  E5.4 gate result: stage5_gate_files=9/9; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds=15.
+  E5.4 gate result: stage5_gate_files=9/9; stage5_gate_tests=20/20; obs_regression_files=1/1; obs_regression_tests=3/3; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds=15.
 
 ## Impacto operativo
 

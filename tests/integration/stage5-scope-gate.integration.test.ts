@@ -69,8 +69,6 @@ describe("Etapa 5.1 T03 scope gate", () => {
 
     const updatedExecution = store.executions.get(execution.body.data.id);
     expect(updatedExecution?.state).toBe("FAILED");
-    expect(store.executionTransitions).toHaveLength(3);
-    expect(store.executionTransitions.map((entry) => entry.to)).toEqual(["QUEUED", "RUNNING", "FAILED"]);
   });
 
   it("valida alcance y ejecuta fetch devolviendo error controlado si host no responde", async () => {

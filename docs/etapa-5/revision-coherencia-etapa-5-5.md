@@ -28,7 +28,7 @@ Verificar coherencia entre backlog E5.5, implementacion tecnica, validaciones au
 
 3. E5-5-T03 (matriz E2E fetch failures): coherente.
 - Cobertura de timeout, non-html y size-limit integrada en fixtures/tests de laboratorio.
-- Gate E5.2 mantiene estado en verde (10/10 archivos, 23/23 tests).
+- Gate E5.2 mantiene estado en verde (10/10 archivos, 26/26 tests).
 
 4. E5-5-T04 (refuerzo coherencia documental): coherente.
 - Se conserva control obligatorio npm run docs:stage5:coherence en CI.

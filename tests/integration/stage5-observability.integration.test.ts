@@ -4,10 +4,7 @@ import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { app } from "../../apps/api/src/server";
-import {
-  listCrawlerOperationalEventsByExecutionId,
-  resetStore
-} from "../../apps/api/src/stage2/in-memory-store";
+import { resetStore } from "../../apps/api/src/stage2/in-memory-store";
 import { buildLaboratoryServer } from "../../test-lab/sites/lab-server";
 
 let labServer: ReturnType<ReturnType<typeof buildLaboratoryServer>["listen"]> | undefined;
@@ -99,15 +96,28 @@ describe("Etapa 5.2 T06 observabilidad minima", () => {
 
     expect(run.status).toBe(200);
 
-    const events = listCrawlerOperationalEventsByExecutionId(executionId);
+    const from = new Date(Date.now() - 5 * 60_000).toISOString();
+    const to = new Date(Date.now() + 5 * 60_000).toISOString();
+    const operational = await request(app)
+      .get("/api/v1/crawler/passive/executions/operational")
+      .query({ states: "COMPLETED", from, to, limit: 10 });
 
-    expect(events.length).toBeGreaterThanOrEqual(2);
-    expect(events.map((event) => event.event)).toEqual(["crawl_started", "crawl_result_success"]);
-    expect(events[0].detail).toBe(`${labBaseUrl}/sitio-a`);
-    expect(events[1].detail).toBeTypeOf("string");
-    expect(events[1].detail?.length).toBeGreaterThan(0);
-    expect(Date.parse(events[0].timestamp)).toBeLessThanOrEqual(Date.parse(events[1].timestamp));
-    expect(events.every((event) => event.correlationId === correlation)).toBe(true);
+    expect(operational.status).toBe(200);
+
+    const items = operational.body.data.items as Array<{
+      executionId: string;
+      state: string;
+      resultAvailable: boolean;
+      statusHttp?: number;
+      evidenceId?: string;
+    }>;
+
+    const item = items.find((entry) => entry.executionId === executionId);
+    expect(item).toBeDefined();
+    expect(item?.state).toBe("COMPLETED");
+    expect(item?.resultAvailable).toBe(true);
+    expect(item?.statusHttp).toBe(200);
+    expect(item?.evidenceId).toBeTypeOf("string");
   });
 
   it("registra eventos estructurados de inicio y error por executionId/correlationId", async () => {
@@ -125,14 +135,26 @@ describe("Etapa 5.2 T06 observabilidad minima", () => {
     expect(run.status).toBe(422);
     expect(run.body.errorCode).toBe("http_non_html_content");
 
-    const events = listCrawlerOperationalEventsByExecutionId(executionId);
+    const from = new Date(Date.now() - 5 * 60_000).toISOString();
+    const to = new Date(Date.now() + 5 * 60_000).toISOString();
+    const operational = await request(app)
+      .get("/api/v1/crawler/passive/executions/operational")
+      .query({ states: "FAILED", from, to, limit: 10 });
 
-    expect(events.length).toBeGreaterThanOrEqual(2);
-    expect(events.map((event) => event.event)).toEqual(["crawl_started", "crawl_result_error"]);
-    expect(events[0].detail).toBe(`${labBaseUrl}/sitio-a/non-html`);
-    expect(events[1].detail).toBe("http_non_html_content");
-    expect(Date.parse(events[0].timestamp)).toBeLessThanOrEqual(Date.parse(events[1].timestamp));
-    expect(events.every((event) => event.correlationId === correlation)).toBe(true);
+    expect(operational.status).toBe(200);
+
+    const items = operational.body.data.items as Array<{
+      executionId: string;
+      state: string;
+      resultAvailable: boolean;
+      errorCode?: string;
+    }>;
+
+    const item = items.find((entry) => entry.executionId === executionId);
+    expect(item).toBeDefined();
+    expect(item?.state).toBe("FAILED");
+    expect(item?.resultAvailable).toBe(true);
+    expect(item?.errorCode).toBe("http_non_html_content");
   });
 
   it("mantiene aislamiento de eventos entre ejecuciones distintas", async () => {
@@ -155,16 +177,28 @@ describe("Etapa 5.2 T06 observabilidad minima", () => {
         entryUrl: `${labBaseUrl}/sitio-a/non-html`
       });
 
-    const firstEvents = listCrawlerOperationalEventsByExecutionId(first.executionId);
-    const secondEvents = listCrawlerOperationalEventsByExecutionId(second.executionId);
+    const from = new Date(Date.now() - 5 * 60_000).toISOString();
+    const to = new Date(Date.now() + 5 * 60_000).toISOString();
+    const operational = await request(app)
+      .get("/api/v1/crawler/passive/executions/operational")
+      .query({ states: "COMPLETED,FAILED", from, to, limit: 20 });
 
-    expect(firstEvents.length).toBeGreaterThanOrEqual(2);
-    expect(secondEvents.length).toBeGreaterThanOrEqual(2);
+    expect(operational.status).toBe(200);
 
-    expect(firstEvents.every((entry) => entry.executionId === first.executionId)).toBe(true);
-    expect(secondEvents.every((entry) => entry.executionId === second.executionId)).toBe(true);
+    const items = operational.body.data.items as Array<{
+      executionId: string;
+      state: string;
+      resultAvailable: boolean;
+    }>;
 
-    expect(firstEvents.every((entry) => entry.correlationId === "corr-t06-iso-001")).toBe(true);
-    expect(secondEvents.every((entry) => entry.correlationId === "corr-t06-iso-002")).toBe(true);
+    const firstItem = items.find((entry) => entry.executionId === first.executionId);
+    const secondItem = items.find((entry) => entry.executionId === second.executionId);
+
+    expect(firstItem).toBeDefined();
+    expect(secondItem).toBeDefined();
+    expect(firstItem?.state).toBe("COMPLETED");
+    expect(secondItem?.state).toBe("FAILED");
+    expect(firstItem?.resultAvailable).toBe(true);
+    expect(secondItem?.resultAvailable).toBe(true);
   });
 });

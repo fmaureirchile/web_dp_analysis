@@ -23,11 +23,11 @@ Comandos base:
 
 Resultados esperados:
 
-1. Gate funcional Stage 5.2: 10/10 archivos y 23/23 tests en verde.
-2. Regression de observabilidad E5.3: 1/1 archivo y 3/3 tests en verde.
+1. Gate funcional Stage 5.2: 10/10 archivos y 26/26 tests en verde.
+2. Regression de observabilidad E5.3: 1/1 archivo y 4/4 tests en verde.
 3. Coherencia documental Stage 5: [docs:stage5:coherence] OK.
 4. Resumen final CI E5.4:
-E5.4 gate result: stage5_gate_files=10/10; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds={actual}; previous_stage5_3_gate_duration_seconds={previo|na}; stage5_3_gate_delta_seconds={delta|na}.
+E5.4 gate result: stage5_gate_files=10/10; stage5_gate_tests=26/26; obs_regression_files=1/1; obs_regression_tests=4/4; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds={actual}; previous_stage5_3_gate_duration_seconds={previo|na}; stage5_3_gate_delta_seconds={delta|na}.
 
 ## Impacto operativo
 

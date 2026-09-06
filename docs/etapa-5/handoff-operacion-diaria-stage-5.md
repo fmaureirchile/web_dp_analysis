@@ -72,8 +72,8 @@ Parametros:
 Salida esperada:
 
 1. Exit code 0.
-2. Resultado funcional Stage 5.2: 10/10 archivos y 23/23 tests.
-3. Resultado observabilidad E5.3: 1/1 archivo y 3/3 tests.
+2. Resultado funcional Stage 5.2: 10/10 archivos y 26/26 tests.
+3. Resultado observabilidad E5.3: 1/1 archivo y 4/4 tests.
 4. Coherencia documental: [docs:stage5:coherence] OK.
 5. Resumen CI E5.4 con campos temporales:
 - last_stage5_3_gate_duration_seconds
