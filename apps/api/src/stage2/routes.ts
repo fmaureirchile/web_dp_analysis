@@ -1,56 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { Router, type Request, type Response } from "express";
 import {
-  type BackendApiArtifactType,
-  type BackendApiIndexedArtifactDto,
-  type BackendApiIndexResultDto,
-  type ExecutionRetentionState,
-  type ExecutionDataRetentionResultDto,
-  type StartExecutionDataRetentionDto,
-  type ExecutionDataPurgeResultDto,
-  type BackendProcessingFileDetectionsDto,
-  type BackendProcessingFlowViewDto,
-  type BackendProcessingMatchDto,
-  type BackendProcessingDetectionResultDto,
-  type LegalDiscrepancyDetectionResultDto,
-  type LegalDiscrepancyItemDto,
-  type StartVersionComparisonDto,
-  type VersionComparisonChangeDto,
-  type VersionComparisonResultDto,
-  type LineageBackendReferenceDto,
-  type LineageConsolidatedViewDto,
-  type LineageCorrelationStatus,
-  type LineageDtoProcessingCorrelationViewDto,
-  type LineageEndpointCorrelationViewDto,
-  type LineageFrontendReferenceDto,
-  type StartLegalDiscrepancyDetectionDto,
-  type StartBackendApiIndexDto,
-  type StartBackendProcessingDetectionDto,
-  type FrontendFilePatternDetectionsDto,
-  type FrontendStaticFindingsViewDto,
-  type FrontendPatternDetectionResultDto,
-  type FrontendPatternMatchDto,
-  type StartFrontendPatternDetectionDto,
-  type FrontendFramework,
-  type FrontendIndexedFileDto,
-  type FrontendRepositoryIndexResultDto,
-  type StartFrontendRepositoryIndexDto,
-  type AuthenticatedEvaluationResultDto,
-  type StartAuthenticatedEvaluationDto,
-  type TrackingInventoryReportDto,
-  type ExecutiveSummaryReportDto,
-  type EvidenceQueryResultDto,
-  type FormInventoryReportDto,
-  type DynamicObservationErrorDto,
-  type DynamicObservationResultDto,
-  type OperationalExecutionItemDto,
-  type OperationalExecutionListDto,
-  type OperationalExecutionStateFilter,
-  type PassiveSinglePageCrawlErrorDto,
-  type PassiveSinglePageCrawlResultDto,
-  type ReviewExecutionViewDto,
+  DynamicObservationResultDto,
+  DynamicObservationSuccessDto,
   CreateAuthorizationDto,
   CreateEvidenceDto,
   CreateExecutionDto,
@@ -61,27 +13,24 @@ import {
   CreatePageDto,
   CreateProjectDto,
   CreateReviewDecisionDto,
+  CreateTargetDto,
+  PassiveSinglePageCrawlResultDto,
+  ScopeSimulationDto,
   StartDynamicObservationDto,
   StartPassiveSinglePageCrawlDto,
-  CreateTargetDto,
-  ScopeSimulationDto,
   ToggleKillSwitchDto
 } from "../../../../packages/contracts/src";
+import { EvidenceLevel, ExecutionState, ReviewState } from "../../../../packages/domain/src";
+import { captureDynamicObservation } from "../../../worker-browser/src/dynamic-observation";
 import {
   evaluatePassiveSinglePageScope,
   extractHtmlTitle,
   fetchPassiveSinglePageHtml
 } from "../../../worker-crawler/src";
-import { captureDynamicObservation } from "../../../worker-browser/src/dynamic-observation";
-import { EvidenceLevel, ExecutionState, ReviewState } from "../../../../packages/domain/src";
 import {
-  appendCrawlerOperationalEvent,
-  createBrowserDomEvidence,
-  createBrowserScreenshotEvidence,
   createAuthorization,
   createEvidence,
   createExecution,
-  createPassiveHtmlEvidence,
   createFinding,
   createFormField,
   createObservation,
@@ -90,37 +39,229 @@ import {
   createProject,
   createReviewDecision,
   createTarget,
-  getBackendApiIndexResult,
-  getBackendProcessingDetectionResult,
-  getVersionComparisonResult,
-  getFrontendPatternDetectionResult,
-  getFrontendRepositoryIndexResult,
-  getLegalDiscrepancyDetectionResult,
+  deleteDynamicObservationResult,
+  deletePassiveSinglePageResult,
   getDynamicObservationResult,
-  getExecutionByIdWithFallback,
-  getPassiveSinglePageCrawlResult,
-  listEvidenceReferencesByExecutionId,
-  listFormInventoryByExecutionId,
-  listObservationReferencesByExecutionId,
-  listTrackingInventoryByExecutionId,
-  listOperationalExecutions,
-  recordBackendApiIndexResult,
-  recordBackendProcessingDetectionResult,
-  recordVersionComparisonResult,
-  applyExecutionDataRetention,
-  purgeExecutionData,
-  recordFrontendPatternDetectionResult,
-  recordFrontendRepositoryIndexResult,
-  recordLegalDiscrepancyDetectionResult,
-  recordDynamicObservationError,
-  recordDynamicObservationSuccess,
-  recordPassiveSinglePageCrawlError,
-  recordPassiveSinglePageCrawlSuccess,
+  getPassiveSinglePageResult,
   simulateScope,
+  saveDynamicObservationResult,
+  savePassiveSinglePageResult,
   store,
   transitionExecutionState,
   toggleAuthorizationKillSwitch
 } from "./in-memory-store";
+
+const OPERATIONAL_STATES = ["COMPLETED", "COMPLETED_WITH_WARNINGS", "FAILED"] as const;
+
+type OperationalState = (typeof OPERATIONAL_STATES)[number];
+
+type VersionComparisonProbableCause =
+  | "SITE_CHANGE"
+  | "DOCUMENTATION_GAP"
+  | "RULE_CHANGE_OR_INSTRUMENTATION"
+  | "NO_CHANGES";
+
+type VersionComparisonChange = {
+  kind: "NEW_THIRD_PARTY" | "REMOVED_THIRD_PARTY" | "NEW_COOKIE" | "REMOVED_COOKIE" | "NEW_ENDPOINT";
+  value: string;
+  severity: "INFO" | "WARNING";
+  probableCause: VersionComparisonProbableCause;
+  message: string;
+  requiresValidation: true;
+};
+
+type VersionComparisonResult =
+  | {
+      ok: true;
+      data: {
+        baselineExecutionId: string;
+        currentExecutionId: string;
+        analyzedAt: string;
+        totals: {
+          changes: number;
+          newThirdParties: number;
+          removedThirdParties: number;
+          newCookies: number;
+          removedCookies: number;
+          newEndpoints: number;
+        };
+        alert: {
+          status: "NO_CHANGES" | "CHANGES_DETECTED";
+          probableCause: VersionComparisonProbableCause;
+          message: string;
+        };
+        changes: VersionComparisonChange[];
+      };
+    }
+  | {
+      ok: false;
+      error: {
+        baselineExecutionId: string;
+        currentExecutionId: string;
+        errorCode: "invalid_execution_id" | "tracking_inventory_not_available" | "result_not_available";
+        message: string;
+      };
+    };
+
+const versionComparisonResults = new Map<string, VersionComparisonResult>();
+
+function versionComparisonKey(baselineExecutionId: string, currentExecutionId: string): string {
+  return `${baselineExecutionId}::${currentExecutionId}`;
+}
+
+function uniqueSorted(values: Iterable<string>): string[] {
+  return Array.from(new Set(values)).sort((left, right) => left.localeCompare(right));
+}
+
+function collectThirdParties(result: DynamicObservationSuccessDto): Set<string> {
+  return new Set(
+    uniqueSorted(
+      result.network
+        .map((item) => item.thirdPartyDomain?.trim().toLowerCase())
+        .filter((item): item is string => typeof item === "string" && item.length > 0)
+    )
+  );
+}
+
+function collectCookies(result: DynamicObservationSuccessDto): Set<string> {
+  return new Set(
+    uniqueSorted(
+      result.storage
+        .filter((item) => item.kind === "COOKIE")
+        .map((item) => item.key.trim().toLowerCase())
+        .filter((item) => item.length > 0)
+    )
+  );
+}
+
+function normalizeEndpointSignature(rawUrl: string): string {
+  try {
+    const parsed = new URL(rawUrl);
+    return `${parsed.origin}${parsed.pathname}`.toLowerCase();
+  } catch {
+    return rawUrl.trim().toLowerCase();
+  }
+}
+
+function collectEndpoints(result: DynamicObservationSuccessDto): Set<string> {
+  return new Set(uniqueSorted(result.network.map((item) => normalizeEndpointSignature(item.url)).filter((item) => item.length > 0)));
+}
+
+function versionComparisonError(
+  baselineExecutionId: string,
+  currentExecutionId: string,
+  errorCode: "invalid_execution_id" | "tracking_inventory_not_available" | "result_not_available",
+  message: string
+): VersionComparisonResult {
+  return {
+    ok: false,
+    error: {
+      baselineExecutionId,
+      currentExecutionId,
+      errorCode,
+      message
+    }
+  };
+}
+
+function isClosedExecutionState(state: ExecutionState): boolean {
+  return (
+    state === ExecutionState.COMPLETED ||
+    state === ExecutionState.COMPLETED_WITH_WARNINGS ||
+    state === ExecutionState.FAILED ||
+    state === ExecutionState.CANCELLED
+  );
+}
+
+function purgeExecutionArtifacts(executionId: string): {
+  dynamicObservationResult: number;
+  passiveSinglePageResult: number;
+  evidences: number;
+  versionComparisons: number;
+} {
+  const dynamicObservationResult = deleteDynamicObservationResult(executionId) ? 1 : 0;
+  const passiveSinglePageResult = deletePassiveSinglePageResult(executionId) ? 1 : 0;
+
+  let evidences = 0;
+  for (const [evidenceId, evidence] of Array.from(store.evidences.entries())) {
+    if (evidence.executionId === executionId) {
+      store.evidences.delete(evidenceId);
+      evidences += 1;
+    }
+  }
+
+  let versionComparisons = 0;
+  for (const key of Array.from(versionComparisonResults.keys())) {
+    const [baselineExecutionId, currentExecutionId] = key.split("::");
+    if (baselineExecutionId === executionId || currentExecutionId === executionId) {
+      versionComparisonResults.delete(key);
+      versionComparisons += 1;
+    }
+  }
+
+  return {
+    dynamicObservationResult,
+    passiveSinglePageResult,
+    evidences,
+    versionComparisons
+  };
+}
+
+function parseStatesFilter(raw: unknown): OperationalState[] {
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    return [...OPERATIONAL_STATES];
+  }
+
+  const values = raw
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+
+  const uniqueValues = Array.from(new Set(values));
+  if (uniqueValues.length === 0) {
+    return [...OPERATIONAL_STATES];
+  }
+
+  if (uniqueValues.some((value) => !OPERATIONAL_STATES.includes(value as OperationalState))) {
+    throw new Error("invalid_states_filter");
+  }
+
+  return uniqueValues as OperationalState[];
+}
+
+function parseIsoFilter(raw: unknown, errorCode: string): string | undefined {
+  if (typeof raw === "undefined") {
+    return undefined;
+  }
+
+  if (typeof raw !== "string" || Number.isNaN(Date.parse(raw))) {
+    throw new Error(errorCode);
+  }
+
+  return raw;
+}
+
+function parseLimitFilter(raw: unknown): number {
+  if (typeof raw === "undefined") {
+    return 50;
+  }
+
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1 || value > 200) {
+    throw new Error("invalid_limit_filter");
+  }
+
+  return value;
+}
+
+function persistEvidenceLocation(evidenceId: string, location: string): void {
+  const existing = store.evidences.get(evidenceId);
+  if (!existing) {
+    return;
+  }
+
+  store.evidences.set(evidenceId, { ...existing, location });
+}
 
 function correlationId(req: Request): string {
   const value = req.header("x-correlation-id");
@@ -133,827 +274,6 @@ function ok<T>(res: Response, data: T, cid: string): void {
 
 function notFound(res: Response, message: string, cid: string): void {
   res.status(400).setHeader("x-correlation-id", cid).json({ error: message });
-}
-
-function crawlerError(
-  executionId: string,
-  entryUrl: string,
-  errorCode: PassiveSinglePageCrawlErrorDto["errorCode"],
-  message: string
-): PassiveSinglePageCrawlErrorDto {
-  return {
-    executionId,
-    entryUrl,
-    errorCode,
-    message
-  };
-}
-
-function crawlerErrorStatus(errorCode: PassiveSinglePageCrawlErrorDto["errorCode"]): 400 | 403 | 422 {
-  if (errorCode === "invalid_entry_url") {
-    return 400;
-  }
-
-  if (errorCode === "authorization_scope_rejected") {
-    return 403;
-  }
-
-  return 422;
-}
-
-function dynamicObservationError(
-  executionId: string,
-  entryUrl: string,
-  errorCode: DynamicObservationErrorDto["errorCode"],
-  message: string
-): DynamicObservationErrorDto {
-  return {
-    executionId,
-    entryUrl,
-    errorCode,
-    message
-  };
-}
-
-function dynamicObservationErrorStatus(errorCode: DynamicObservationErrorDto["errorCode"]): 400 | 403 | 422 {
-  if (errorCode === "invalid_execution_id" || errorCode === "invalid_entry_url") {
-    return 400;
-  }
-
-  if (errorCode === "authorization_scope_rejected") {
-    return 403;
-  }
-
-  return 422;
-}
-
-function isHttpEntryUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function authenticatedEvaluationError(
-  executionId: string,
-  entryUrl: string,
-  errorCode: "invalid_execution_id" | "invalid_entry_url" | "authentication_failed" | "profile_fetch_failed" | "internal_error",
-  message: string
-): AuthenticatedEvaluationResultDto {
-  return {
-    ok: false,
-    error: {
-      executionId,
-      entryUrl,
-      errorCode,
-      message
-    }
-  };
-}
-
-const OPERATIONAL_ALLOWED_STATES: ExecutionState[] = [
-  ExecutionState.COMPLETED,
-  ExecutionState.COMPLETED_WITH_WARNINGS,
-  ExecutionState.FAILED
-];
-
-function parseOperationalStates(raw: string | undefined): ExecutionState[] | undefined {
-  if (!raw || raw.trim().length === 0) {
-    return [ExecutionState.COMPLETED, ExecutionState.FAILED];
-  }
-
-  const values = raw
-    .split(",")
-    .map((value) => value.trim().toUpperCase())
-    .filter((value) => value.length > 0);
-
-  if (values.length === 0) {
-    return [ExecutionState.COMPLETED, ExecutionState.FAILED];
-  }
-
-  const parsed: ExecutionState[] = [];
-  for (const value of values) {
-    if (!(value in ExecutionState)) {
-      return undefined;
-    }
-    const state = ExecutionState[value as keyof typeof ExecutionState];
-    if (!OPERATIONAL_ALLOWED_STATES.includes(state)) {
-      return undefined;
-    }
-    parsed.push(state);
-  }
-
-  return Array.from(new Set(parsed));
-}
-
-function parseIso(raw: string | undefined): string | undefined {
-  if (!raw || raw.trim().length === 0) {
-    return undefined;
-  }
-
-  const parsed = Date.parse(raw);
-  if (Number.isNaN(parsed)) {
-    return undefined;
-  }
-
-  return new Date(parsed).toISOString();
-}
-
-function parseLimit(raw: string | undefined): number | undefined {
-  if (!raw || raw.trim().length === 0) {
-    return 50;
-  }
-
-  const parsed = Number(raw);
-  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > 200) {
-    return undefined;
-  }
-
-  return parsed;
-}
-
-function parseEvidenceLimit(raw: string | undefined): number | undefined {
-  if (!raw || raw.trim().length === 0) {
-    return 50;
-  }
-
-  const parsed = Number(raw);
-  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > 200) {
-    return undefined;
-  }
-
-  return parsed;
-}
-
-const FRONTEND_ALLOWED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".vue", ".svelte", ".html", ".css", ".scss"]);
-const FRONTEND_IGNORED_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", "coverage", ".next"]);
-const BACKEND_API_ALLOWED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".json", ".yaml", ".yml", ".graphql", ".gql"]);
-const BACKEND_API_IGNORED_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", "coverage", ".next", "validate_job_logs", "validate-job-logs"]);
-
-function frontendIndexError(
-  executionId: string,
-  repositoryPath: string,
-  errorCode: "invalid_execution_id" | "invalid_repository_path" | "repository_path_not_found" | "indexing_failed" | "result_not_available",
-  message: string
-): FrontendRepositoryIndexResultDto {
-  return {
-    ok: false,
-    error: {
-      executionId,
-      repositoryPath,
-      errorCode,
-      message
-    }
-  };
-}
-
-function backendApiIndexError(
-  executionId: string,
-  repositoryPath: string,
-  errorCode: "invalid_execution_id" | "invalid_repository_path" | "repository_path_not_found" | "indexing_failed" | "result_not_available",
-  message: string
-): BackendApiIndexResultDto {
-  return {
-    ok: false,
-    error: {
-      executionId,
-      repositoryPath,
-      errorCode,
-      message
-    }
-  };
-}
-
-function backendProcessingDetectionError(
-  executionId: string,
-  repositoryPath: string,
-  errorCode: "invalid_execution_id" | "invalid_repository_path" | "repository_path_not_found" | "detection_failed" | "result_not_available",
-  message: string
-): BackendProcessingDetectionResultDto {
-  return {
-    ok: false,
-    error: {
-      executionId,
-      repositoryPath,
-      errorCode,
-      message
-    }
-  };
-}
-
-const BACKEND_PROCESSING_PATTERNS: Array<{ rule: BackendProcessingMatchDto["rule"]; regex: RegExp }> = [
-  { rule: "ROUTE_HANDLER", regex: /\b(router|app)\.(get|post|put|patch|delete|use)\s*\(/i },
-  { rule: "CONTROLLER_USAGE", regex: /\bcontroller\b|controllers?\//i },
-  { rule: "SERVICE_USAGE", regex: /\bservice\b|services?\//i },
-  { rule: "INTEGRATION_USAGE", regex: /\b(prisma|redis|queue|webhook|axios|fetch|smtp|nodemailer|kafka|sqs)\b/i }
-];
-
-type BackendProcessingCandidateFile = {
-  relativePath: string;
-  bytes: number;
-};
-
-function detectBackendApiArtifactType(relativePath: string): BackendApiArtifactType | undefined {
-  const normalized = relativePath.toLowerCase();
-  const fileName = path.basename(normalized);
-
-  if (fileName.includes("openapi") || fileName.includes("swagger")) {
-    return "OPENAPI";
-  }
-
-  if (normalized.endsWith(".graphql") || normalized.endsWith(".gql") || normalized.includes("graphql")) {
-    return "GRAPHQL";
-  }
-
-  if (fileName.includes("route") || normalized.includes("/routes/")) {
-    return "ROUTE";
-  }
-
-  if (fileName.includes("dto") || normalized.includes("/contracts/")) {
-    return "DTO";
-  }
-
-  return undefined;
-}
-
-async function collectBackendApiArtifacts(repositoryPath: string, maxFiles: number): Promise<BackendApiIndexedArtifactDto[]> {
-  const artifacts: BackendApiIndexedArtifactDto[] = [];
-  const stack: string[] = [repositoryPath];
-
-  while (stack.length > 0 && artifacts.length < maxFiles) {
-    const currentDir = stack.pop() as string;
-    const entries = await fs.readdir(currentDir, { withFileTypes: true });
-    entries.sort((a, b) => a.name.localeCompare(b.name));
-
-    for (const entry of entries) {
-      if (artifacts.length >= maxFiles) break;
-      const absolutePath = path.join(currentDir, entry.name);
-
-      if (entry.isDirectory()) {
-        if (!BACKEND_API_IGNORED_DIRECTORIES.has(entry.name)) {
-          stack.push(absolutePath);
-        }
-        continue;
-      }
-
-      if (!entry.isFile()) continue;
-
-      const extension = path.extname(entry.name).toLowerCase();
-      if (!BACKEND_API_ALLOWED_EXTENSIONS.has(extension)) continue;
-
-      const relativePath = path.relative(repositoryPath, absolutePath).replaceAll("\\", "/");
-      const artifactType = detectBackendApiArtifactType(relativePath);
-      if (!artifactType) continue;
-
-      const stat = await fs.stat(absolutePath);
-      artifacts.push({
-        relativePath,
-        artifactType,
-        bytes: stat.size
-      });
-    }
-  }
-
-  artifacts.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
-  return artifacts;
-}
-
-function frontendPatternDetectionError(
-  executionId: string,
-  repositoryPath: string,
-  errorCode: "invalid_execution_id" | "invalid_repository_path" | "repository_path_not_found" | "detection_failed" | "result_not_available",
-  message: string
-): FrontendPatternDetectionResultDto {
-  return {
-    ok: false,
-    error: {
-      executionId,
-      repositoryPath,
-      errorCode,
-      message
-    }
-  };
-}
-
-const FRONTEND_CAPTURE_PATTERNS: Array<{ rule: FrontendPatternMatchDto["rule"]; regex: RegExp }> = [
-  { rule: "FORM_INPUT", regex: /<(input|textarea|select)\b|addEventListener\(\s*["'](?:input|change|submit)["']/i },
-  { rule: "NETWORK_FETCH", regex: /\b(fetch\s*\(|axios\.|XMLHttpRequest\b)/i },
-  { rule: "COOKIE_ACCESS", regex: /document\.cookie\b/i },
-  { rule: "STORAGE_ACCESS", regex: /\b(localStorage|sessionStorage)\b/i },
-  { rule: "ANALYTICS_BEACON", regex: /\b(gtag\s*\(|dataLayer\b|fbq\s*\(|analytics\.|sendBeacon\s*\()/i }
-];
-
-function lineFromOffset(content: string, offset: number): number {
-  return content.slice(0, offset).split(/\r?\n/).length;
-}
-
-function extractLineSnippet(content: string, offset: number): string {
-  const lineStart = Math.max(content.lastIndexOf("\n", offset - 1) + 1, 0);
-  const rawLineEnd = content.indexOf("\n", offset);
-  const lineEnd = rawLineEnd === -1 ? content.length : rawLineEnd;
-  return content.slice(lineStart, lineEnd).trim().slice(0, 220);
-}
-
-async function detectFrontendCapturePatterns(
-  repositoryPath: string,
-  files: FrontendIndexedFileDto[],
-  maxMatchesPerFile: number
-): Promise<FrontendFilePatternDetectionsDto[]> {
-  const output: FrontendFilePatternDetectionsDto[] = [];
-
-  for (const file of files) {
-    const absolutePath = path.join(repositoryPath, file.relativePath);
-    let content = "";
-
-    try {
-      content = await fs.readFile(absolutePath, "utf8");
-    } catch {
-      continue;
-    }
-
-    const matches: FrontendPatternMatchDto[] = [];
-
-    for (const pattern of FRONTEND_CAPTURE_PATTERNS) {
-      pattern.regex.lastIndex = 0;
-      const found = pattern.regex.exec(content);
-      if (!found || found.index === undefined) {
-        continue;
-      }
-
-      matches.push({
-        rule: pattern.rule,
-        line: lineFromOffset(content, found.index),
-        snippet: extractLineSnippet(content, found.index)
-      });
-
-      if (matches.length >= maxMatchesPerFile) {
-        break;
-      }
-    }
-
-    if (matches.length > 0) {
-      output.push({
-        relativePath: file.relativePath,
-        matches
-      });
-    }
-  }
-
-  output.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
-  return output;
-}
-
-async function detectBackendProcessingPoints(
-  repositoryPath: string,
-  candidates: BackendProcessingCandidateFile[],
-  maxMatchesPerFile: number
-): Promise<BackendProcessingFileDetectionsDto[]> {
-  const files: BackendProcessingFileDetectionsDto[] = [];
-
-  for (const candidate of candidates) {
-    const absolutePath = path.join(repositoryPath, candidate.relativePath);
-    let content = "";
-
-    try {
-      content = await fs.readFile(absolutePath, "utf8");
-    } catch {
-      continue;
-    }
-
-    const matches: BackendProcessingMatchDto[] = [];
-    for (const pattern of BACKEND_PROCESSING_PATTERNS) {
-      pattern.regex.lastIndex = 0;
-      const found = pattern.regex.exec(content);
-      if (!found || found.index === undefined) {
-        continue;
-      }
-
-      matches.push({
-        rule: pattern.rule,
-        line: lineFromOffset(content, found.index),
-        snippet: extractLineSnippet(content, found.index)
-      });
-
-      if (matches.length >= maxMatchesPerFile) {
-        break;
-      }
-    }
-
-    if (matches.length > 0) {
-      files.push({
-        relativePath: candidate.relativePath,
-        matches
-      });
-    }
-  }
-
-  files.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
-  return files;
-}
-
-function isBackendProcessingCandidate(relativePath: string): boolean {
-  const normalized = relativePath.toLowerCase();
-  const fileName = path.basename(normalized);
-
-  if (normalized.includes("/apps/api/")) {
-    return true;
-  }
-
-  return (
-    fileName.includes("route") ||
-    fileName.includes("controller") ||
-    fileName.includes("service") ||
-    normalized.includes("/routes/") ||
-    normalized.includes("/controllers/") ||
-    normalized.includes("/services/") ||
-    normalized.includes("/integrations/") ||
-    normalized.includes("/webhooks/")
-  );
-}
-
-async function collectBackendProcessingCandidates(
-  repositoryPath: string,
-  maxFiles: number
-): Promise<BackendProcessingCandidateFile[]> {
-  const files: BackendProcessingCandidateFile[] = [];
-  const stack: string[] = [repositoryPath];
-
-  while (stack.length > 0 && files.length < maxFiles) {
-    const currentDir = stack.pop() as string;
-    const entries = await fs.readdir(currentDir, { withFileTypes: true });
-    entries.sort((a, b) => a.name.localeCompare(b.name));
-
-    for (const entry of entries) {
-      if (files.length >= maxFiles) break;
-      const absolutePath = path.join(currentDir, entry.name);
-
-      if (entry.isDirectory()) {
-        if (!BACKEND_API_IGNORED_DIRECTORIES.has(entry.name)) {
-          stack.push(absolutePath);
-        }
-        continue;
-      }
-
-      if (!entry.isFile()) continue;
-
-      const extension = path.extname(entry.name).toLowerCase();
-      if (!BACKEND_API_ALLOWED_EXTENSIONS.has(extension)) continue;
-
-      const relativePath = path.relative(repositoryPath, absolutePath).replaceAll("\\", "/");
-      if (!isBackendProcessingCandidate(relativePath)) continue;
-
-      const stat = await fs.stat(absolutePath);
-      files.push({
-        relativePath,
-        bytes: stat.size
-      });
-    }
-  }
-
-  files.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
-  return files;
-}
-
-async function detectFrontendFramework(repositoryPath: string): Promise<FrontendFramework> {
-  const packageJsonPath = path.join(repositoryPath, "package.json");
-  try {
-    const raw = await fs.readFile(packageJsonPath, "utf8");
-    const parsed = JSON.parse(raw) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    };
-
-    const deps = {
-      ...(parsed.dependencies ?? {}),
-      ...(parsed.devDependencies ?? {})
-    };
-
-    if (deps.react) return "REACT";
-    if (deps.next) return "NEXT";
-    if (deps.vue) return "VUE";
-    if (deps["@angular/core"]) return "ANGULAR";
-    if (deps.svelte) return "SVELTE";
-    return "UNKNOWN";
-  } catch {
-    return "UNKNOWN";
-  }
-}
-
-async function collectFrontendFiles(repositoryPath: string, maxFiles: number): Promise<FrontendIndexedFileDto[]> {
-  const files: FrontendIndexedFileDto[] = [];
-  const stack: string[] = [repositoryPath];
-
-  while (stack.length > 0 && files.length < maxFiles) {
-    const currentDir = stack.pop() as string;
-    const entries = await fs.readdir(currentDir, { withFileTypes: true });
-    entries.sort((a, b) => a.name.localeCompare(b.name));
-
-    for (const entry of entries) {
-      if (files.length >= maxFiles) break;
-      const absolutePath = path.join(currentDir, entry.name);
-
-      if (entry.isDirectory()) {
-        if (!FRONTEND_IGNORED_DIRECTORIES.has(entry.name)) {
-          stack.push(absolutePath);
-        }
-        continue;
-      }
-
-      if (!entry.isFile()) continue;
-
-      const extension = path.extname(entry.name).toLowerCase();
-      if (!FRONTEND_ALLOWED_EXTENSIONS.has(extension)) continue;
-
-      const stat = await fs.stat(absolutePath);
-      files.push({
-        relativePath: path.relative(repositoryPath, absolutePath).replaceAll("\\", "/"),
-        extension,
-        bytes: stat.size
-      });
-    }
-  }
-
-  files.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
-  return files;
-}
-
-function normalizeEndpointCandidate(input: string): string | undefined {
-  const trimmed = input.trim();
-  if (trimmed.length === 0) {
-    return undefined;
-  }
-
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-    try {
-      const parsed = new URL(trimmed);
-      return parsed.pathname;
-    } catch {
-      return undefined;
-    }
-  }
-
-  if (!trimmed.startsWith("/")) {
-    return undefined;
-  }
-
-  return trimmed;
-}
-
-function extractSnippetEndpoints(snippet: string): string[] {
-  const endpoints = new Set<string>();
-  const regex = /["'`](https?:\/\/[^"'`\s]+|\/[A-Za-z0-9_\-./?=&]+)["'`]/g;
-
-  for (const match of snippet.matchAll(regex)) {
-    const candidate = normalizeEndpointCandidate(match[1]);
-    if (candidate) {
-      endpoints.add(candidate);
-    }
-  }
-
-  return Array.from(endpoints).sort((a, b) => a.localeCompare(b));
-}
-
-function normalizeTokenSource(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
-
-function extractDtoNameFromPath(relativePath: string): string {
-  const baseName = path.basename(relativePath).replace(/\.[a-z0-9]+$/i, "");
-  return baseName.replace(/([.-_]?dto)$/i, "");
-}
-
-function buildDtoCorrelationTokens(dtoName: string): string[] {
-  const camelSeparated = dtoName.replace(/([a-z])([A-Z])/g, "$1 $2");
-  const words = normalizeTokenSource(camelSeparated)
-    .split(/\s+/)
-    .filter((value) => value.length >= 3);
-
-  const tokens = new Set<string>(words);
-  if (words.length > 1) {
-    tokens.add(words.join(""));
-  }
-
-  return Array.from(tokens).sort((a, b) => a.localeCompare(b));
-}
-
-function endpointNodeId(scope: "frontend" | "backend", endpoint: string): string {
-  return `${scope}:endpoint:${endpoint}`;
-}
-
-function dtoNodeId(relativePath: string): string {
-  return `dto:${relativePath}`;
-}
-
-function processingNodeId(relativePath: string): string {
-  return `processing:${relativePath}`;
-}
-
-function legalDiscrepancyDetectionError(
-  executionId: string,
-  errorCode: "invalid_execution_id" | "invalid_declared_values" | "tracking_inventory_not_available" | "detection_failed" | "result_not_available",
-  message: string
-): LegalDiscrepancyDetectionResultDto {
-  return {
-    ok: false,
-    error: {
-      executionId,
-      errorCode,
-      message
-    }
-  };
-}
-
-function normalizeDeclaredValues(values: string[] | undefined): string[] | undefined {
-  if (values === undefined) {
-    return [];
-  }
-
-  if (!Array.isArray(values)) {
-    return undefined;
-  }
-
-  const normalized = values.map((item) => item.trim().toLowerCase()).filter((item) => item.length > 0);
-  return Array.from(new Set(normalized)).sort((a, b) => a.localeCompare(b));
-}
-
-function hasPurposeForCategory(category: string, declaredPurposes: string[]): boolean {
-  if (declaredPurposes.length === 0) {
-    return false;
-  }
-
-  const bag = declaredPurposes.join(" ");
-  if (category === "BEHAVIORAL_DATA") {
-    return /analit|analytics|medicion|personaliz|marketing|publicidad|seguimiento/.test(bag);
-  }
-
-  if (category === "TECHNICAL_DATA") {
-    return /seguridad|operacion|funcionamiento|tecnico|tecnica/.test(bag);
-  }
-
-  if (category === "CONTACT_DATA") {
-    return /contacto|soporte|comunicacion/.test(bag);
-  }
-
-  if (category === "AUTH_SECRET") {
-    return /seguridad|autentic|sesion|acceso|fraude|operacion/.test(bag);
-  }
-
-  if (category === "GOV_IDENTIFIER") {
-    return /identificacion|cumplimiento|regulator|verificacion|seguridad/.test(bag);
-  }
-
-  if (category === "FINANCIAL_DATA") {
-    return /pago|facturacion|financ|fraude|seguridad/.test(bag);
-  }
-
-  if (category === "HEALTH_DATA") {
-    return /salud|asistencia|servicio|seguridad/.test(bag);
-  }
-
-  return false;
-}
-
-function versionComparisonError(
-  baselineExecutionId: string,
-  currentExecutionId: string,
-  errorCode: "invalid_execution_id" | "tracking_inventory_not_available" | "comparison_failed" | "result_not_available",
-  message: string
-): VersionComparisonResultDto {
-  return {
-    ok: false,
-    error: {
-      baselineExecutionId,
-      currentExecutionId,
-      errorCode,
-      message
-    }
-  };
-}
-
-function executionDataPurgeError(
-  executionId: string,
-  errorCode: "invalid_execution_id" | "purge_failed",
-  message: string
-): ExecutionDataPurgeResultDto {
-  return {
-    ok: false,
-    error: {
-      executionId,
-      errorCode,
-      message
-    }
-  };
-}
-
-function executionDataRetentionError(
-  errorCode: "invalid_window_minutes" | "invalid_states" | "retention_failed",
-  message: string
-): ExecutionDataRetentionResultDto {
-  return {
-    ok: false,
-    error: {
-      errorCode,
-      message
-    }
-  };
-}
-
-const RETENTION_ALLOWED_STATES: ExecutionRetentionState[] = ["COMPLETED", "COMPLETED_WITH_WARNINGS", "FAILED"];
-
-function parseRetentionStates(raw: ExecutionRetentionState[] | undefined): ExecutionState[] | undefined {
-  if (raw === undefined) {
-    return [ExecutionState.COMPLETED, ExecutionState.COMPLETED_WITH_WARNINGS, ExecutionState.FAILED];
-  }
-
-  if (!Array.isArray(raw) || raw.length === 0) {
-    return undefined;
-  }
-
-  const normalized = raw.map((item) => String(item).toUpperCase()) as ExecutionRetentionState[];
-  if (normalized.some((item) => !RETENTION_ALLOWED_STATES.includes(item))) {
-    return undefined;
-  }
-
-  const unique = Array.from(new Set(normalized));
-  return unique.map((item) => ExecutionState[item]);
-}
-
-function toObservedEndpointSignature(method: string, rawUrl: string): string | undefined {
-  try {
-    const parsed = new URL(rawUrl);
-    return `${method.toUpperCase()} ${parsed.pathname}`;
-  } catch {
-    return undefined;
-  }
-}
-
-function collectObservedEndpointSignatures(network: Array<{ method: string; url: string }>): Set<string> {
-  const signatures = new Set<string>();
-
-  for (const item of network) {
-    const signature = toObservedEndpointSignature(item.method, item.url);
-    if (signature) {
-      signatures.add(signature);
-    }
-  }
-
-  return signatures;
-}
-
-function buildVersionComparisonAlert(changes: VersionComparisonChangeDto[]): {
-  status: "NO_CHANGES" | "CHANGES_DETECTED";
-  probableCause:
-    | "NO_RELEVANT_CHANGE"
-    | "SITE_CHANGE"
-    | "DOCUMENTATION_GAP"
-    | "RULE_CHANGE_OR_INSTRUMENTATION"
-    | "MIXED_CHANGE_REQUIRES_REVIEW";
-  message: string;
-} {
-  if (changes.length === 0) {
-    return {
-      status: "NO_CHANGES",
-      probableCause: "NO_RELEVANT_CHANGE",
-      message: "No se observaron cambios relevantes entre baseline y version actual."
-    };
-  }
-
-  const causes = new Set(changes.map((item) => item.probableCause));
-  if (causes.size === 1) {
-    const [singleCause] = Array.from(causes);
-
-    if (singleCause === "DOCUMENTATION_GAP") {
-      return {
-        status: "CHANGES_DETECTED",
-        probableCause: "DOCUMENTATION_GAP",
-        message: "Se observaron cambios que podrian indicar brecha documental. Requiere validacion."
-      };
-    }
-
-    if (singleCause === "RULE_CHANGE_OR_INSTRUMENTATION") {
-      return {
-        status: "CHANGES_DETECTED",
-        probableCause: "RULE_CHANGE_OR_INSTRUMENTATION",
-        message: "Se observaron cambios compatibles con ajuste de reglas o instrumentacion. Requiere validacion."
-      };
-    }
-
-    if (singleCause === "SITE_CHANGE") {
-      return {
-        status: "CHANGES_DETECTED",
-        probableCause: "SITE_CHANGE",
-        message: "Se observaron cambios tecnicos probables en el sitio. Requiere validacion."
-      };
-    }
-  }
-
-  return {
-    status: "CHANGES_DETECTED",
-    probableCause: "MIXED_CHANGE_REQUIRES_REVIEW",
-    message: "Se observaron cambios mixtos entre baseline y version actual. Requiere validacion para determinar causa probable."
-  };
 }
 
 export function createStage2Router(): Router {
@@ -1061,6 +381,488 @@ export function createStage2Router(): Router {
     }
   });
 
+  router.post("/crawler/passive/single-page", async (req, res) => {
+    const cid = correlationId(req);
+    const body = req.body as StartPassiveSinglePageCrawlDto;
+    const execution = store.executions.get(body.executionId);
+
+    if (!execution) {
+      return res.status(404).setHeader("x-correlation-id", cid).json({ errorCode: "execution_not_found" });
+    }
+
+    try {
+      transitionExecutionState(execution.id, ExecutionState.QUEUED, cid);
+      transitionExecutionState(execution.id, ExecutionState.RUNNING, cid);
+
+      const scopeResult = await evaluatePassiveSinglePageScope(
+        {
+          request: body,
+          authorizationId: execution.authorizationId,
+          operation: execution.operation,
+          correlationId: cid
+        },
+        {
+          runScopeSimulation: async (input) =>
+            simulateScope(input.authorizationId, input.entryUrl, input.operation, undefined, input.correlationId)
+        }
+      );
+
+      if (!scopeResult.allowed) {
+        transitionExecutionState(execution.id, ExecutionState.FAILED, cid);
+        const errorResult: PassiveSinglePageCrawlResultDto = { ok: false, error: scopeResult.error };
+        savePassiveSinglePageResult(execution.id, errorResult);
+        return res.status(403).setHeader("x-correlation-id", cid).json(scopeResult.error);
+      }
+
+      const fetched = await fetchPassiveSinglePageHtml(body);
+
+      if (!fetched.ok) {
+        transitionExecutionState(execution.id, ExecutionState.FAILED, cid);
+        const errorResult: PassiveSinglePageCrawlResultDto = { ok: false, error: fetched.error };
+        savePassiveSinglePageResult(execution.id, errorResult);
+        return res.status(422).setHeader("x-correlation-id", cid).json(fetched.error);
+      }
+
+      const evidence = createEvidence(execution.id, EvidenceLevel.E2, "PASSIVE_HTML", "memory://passive-html/pending", cid);
+      persistEvidenceLocation(evidence.id, `memory://passive-html/${evidence.id}`);
+
+      const successData = {
+        executionId: execution.id,
+        entryUrl: body.entryUrl,
+        statusHttp: fetched.data.statusHttp,
+        title: extractHtmlTitle(fetched.data.html),
+        evidenceId: evidence.id,
+        fetchedAt: fetched.data.fetchedAt,
+        contentType: fetched.data.contentType,
+        contentLength: fetched.data.contentLength
+      };
+
+      transitionExecutionState(execution.id, ExecutionState.COMPLETED, cid);
+      const successResult: PassiveSinglePageCrawlResultDto = { ok: true, data: successData };
+      savePassiveSinglePageResult(execution.id, successResult);
+
+      return res.status(200).setHeader("x-correlation-id", cid).json(successResult);
+    } catch (error) {
+      const message = (error as Error).message;
+      transitionExecutionState(execution.id, ExecutionState.FAILED, cid);
+      const errorResult: PassiveSinglePageCrawlResultDto = {
+        ok: false,
+        error: {
+          executionId: execution.id,
+          entryUrl: body.entryUrl,
+          errorCode: "internal_error",
+          message
+        }
+      };
+      savePassiveSinglePageResult(execution.id, errorResult);
+      return res.status(422).setHeader("x-correlation-id", cid).json(errorResult.error);
+    }
+  });
+
+  router.get("/crawler/passive/single-page/:executionId/result", (req, res) => {
+    const cid = correlationId(req);
+    const result = getPassiveSinglePageResult(req.params.executionId);
+
+    if (!result) {
+      return res.status(404).setHeader("x-correlation-id", cid).json({ error: "result_not_found" });
+    }
+
+    return res.status(200).setHeader("x-correlation-id", cid).json(result);
+  });
+
+  router.get("/crawler/passive/executions/operational", (req, res) => {
+    const cid = correlationId(req);
+
+    try {
+      const states = parseStatesFilter(req.query.states);
+      const from = parseIsoFilter(req.query.from, "invalid_from_filter");
+      const to = parseIsoFilter(req.query.to, "invalid_to_filter");
+      const limit = parseLimitFilter(req.query.limit);
+      const fromTs = from ? Date.parse(from) : undefined;
+      const toTs = to ? Date.parse(to) : undefined;
+
+      const items = Array.from(store.executions.values())
+        .filter((execution) => states.includes(execution.state as OperationalState))
+        .filter((execution) => {
+          const executionTs = Date.parse(execution.updatedAt);
+          if (typeof fromTs === "number" && executionTs < fromTs) return false;
+          if (typeof toTs === "number" && executionTs > toTs) return false;
+          return true;
+        })
+        .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
+        .slice(0, limit)
+        .map((execution) => {
+          const result = getPassiveSinglePageResult(execution.id);
+          const success = result?.ok ? result.data : undefined;
+          const failure = result && !result.ok ? result.error : undefined;
+
+          return {
+            executionId: execution.id,
+            state: execution.state,
+            entryUrl: execution.entryUrl,
+            updatedAt: execution.updatedAt,
+            resultAvailable: Boolean(result),
+            statusHttp: success?.statusHttp,
+            title: success?.title,
+            evidenceId: success?.evidenceId,
+            errorCode: failure?.errorCode
+          };
+        });
+
+      return res.status(200).setHeader("x-correlation-id", cid).json({
+        data: {
+          states,
+          from,
+          to,
+          limit,
+          items
+        }
+      });
+    } catch (error) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({ error: (error as Error).message });
+    }
+  });
+
+  router.post("/browser/observations/start", async (req, res) => {
+    const cid = correlationId(req);
+    const body = req.body as StartDynamicObservationDto;
+    const execution = store.executions.get(body.executionId);
+
+    if (!execution) {
+      return res.status(404).setHeader("x-correlation-id", cid).json({ errorCode: "invalid_execution_id" });
+    }
+
+    transitionExecutionState(execution.id, ExecutionState.QUEUED, cid);
+    transitionExecutionState(execution.id, ExecutionState.RUNNING, cid);
+
+    const captured = await captureDynamicObservation(body);
+
+    if (!captured.ok) {
+      transitionExecutionState(execution.id, ExecutionState.FAILED, cid);
+      const errorResult: DynamicObservationResultDto = { ok: false, error: captured.error };
+      saveDynamicObservationResult(execution.id, errorResult);
+      return res.status(422).setHeader("x-correlation-id", cid).json(captured.error);
+    }
+
+    const domEvidence = createEvidence(
+      execution.id,
+      EvidenceLevel.E2,
+      "BROWSER_DOM_SNAPSHOT",
+      "memory://browser-dom/pending",
+      cid
+    );
+    const screenshotEvidence = createEvidence(
+      execution.id,
+      EvidenceLevel.E2,
+      "BROWSER_SCREENSHOT",
+      "memory://browser-screenshot/pending",
+      cid
+    );
+
+    persistEvidenceLocation(domEvidence.id, `memory://browser-dom/${domEvidence.id}`);
+    persistEvidenceLocation(screenshotEvidence.id, `memory://browser-screenshot/${screenshotEvidence.id}`);
+
+    const successData: DynamicObservationSuccessDto = {
+      executionId: execution.id,
+      entryUrl: captured.data.entryUrl,
+      completedAt: captured.data.completedAt,
+      pageSnapshots: [
+        {
+          pageUrl: captured.data.entryUrl,
+          title: captured.data.title,
+          capturedAt: captured.data.completedAt,
+          domEvidenceId: domEvidence.id,
+          screenshotEvidenceId: screenshotEvidence.id
+        }
+      ],
+      network: captured.data.network,
+      storage: captured.data.storage,
+      events: captured.data.events,
+      consentEvaluation: captured.data.consentEvaluation
+    };
+
+    transitionExecutionState(execution.id, ExecutionState.COMPLETED, cid);
+    const successResult: DynamicObservationResultDto = { ok: true, data: successData };
+    saveDynamicObservationResult(execution.id, successResult);
+
+    return res.status(200).setHeader("x-correlation-id", cid).json(successResult);
+  });
+
+  router.get("/browser/observations/:executionId/result", (req, res) => {
+    const cid = correlationId(req);
+    const result = getDynamicObservationResult(req.params.executionId);
+
+    if (!result) {
+      return res
+        .status(422)
+        .setHeader("x-correlation-id", cid)
+        .json({
+          executionId: req.params.executionId,
+          errorCode: "internal_error",
+          message: "dynamic_observation_result_not_available"
+        });
+    }
+
+    return res.status(200).setHeader("x-correlation-id", cid).json(result);
+  });
+
+  router.post("/monitoring/version-comparisons/start", (req, res) => {
+    const cid = correlationId(req);
+    const baselineExecutionId = String(req.body?.baselineExecutionId ?? "").trim();
+    const currentExecutionId = String(req.body?.currentExecutionId ?? "").trim();
+
+    if (baselineExecutionId.length === 0 || currentExecutionId.length === 0) {
+      const failure = versionComparisonError(
+        baselineExecutionId || "unknown_baseline",
+        currentExecutionId || "unknown_current",
+        "invalid_execution_id",
+        "baseline_execution_id_and_current_execution_id_required"
+      );
+      return res.status(400).setHeader("x-correlation-id", cid).json(failure);
+    }
+
+    if (!store.executions.has(baselineExecutionId) || !store.executions.has(currentExecutionId)) {
+      const failure = versionComparisonError(
+        baselineExecutionId,
+        currentExecutionId,
+        "invalid_execution_id",
+        "execution_id_not_found"
+      );
+      return res.status(400).setHeader("x-correlation-id", cid).json(failure);
+    }
+
+    const baselineDynamic = getDynamicObservationResult(baselineExecutionId);
+    const currentDynamic = getDynamicObservationResult(currentExecutionId);
+    if (!baselineDynamic?.ok || !baselineDynamic.data || !currentDynamic?.ok || !currentDynamic.data) {
+      const failure = versionComparisonError(
+        baselineExecutionId,
+        currentExecutionId,
+        "tracking_inventory_not_available",
+        "dynamic_observation_result_not_available"
+      );
+      versionComparisonResults.set(versionComparisonKey(baselineExecutionId, currentExecutionId), failure);
+      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
+    }
+
+    const baselineThirdParties = collectThirdParties(baselineDynamic.data);
+    const currentThirdParties = collectThirdParties(currentDynamic.data);
+    const baselineCookies = collectCookies(baselineDynamic.data);
+    const currentCookies = collectCookies(currentDynamic.data);
+    const baselineEndpoints = collectEndpoints(baselineDynamic.data);
+    const currentEndpoints = collectEndpoints(currentDynamic.data);
+
+    const newEndpoints = uniqueSorted(Array.from(currentEndpoints).filter((item) => !baselineEndpoints.has(item)));
+    const changes: VersionComparisonChange[] = [];
+
+    for (const item of uniqueSorted(currentThirdParties)) {
+      if (!baselineThirdParties.has(item)) {
+        changes.push({
+          kind: "NEW_THIRD_PARTY",
+          value: item,
+          severity: "WARNING",
+          probableCause: newEndpoints.length > 0 ? "SITE_CHANGE" : "DOCUMENTATION_GAP",
+          message: `No se observo ${item} en baseline y ahora si se observo. Existe un cambio tecnico probable. Requiere validacion.`,
+          requiresValidation: true
+        });
+      }
+    }
+
+    for (const item of uniqueSorted(baselineThirdParties)) {
+      if (!currentThirdParties.has(item)) {
+        changes.push({
+          kind: "REMOVED_THIRD_PARTY",
+          value: item,
+          severity: "INFO",
+          probableCause: "RULE_CHANGE_OR_INSTRUMENTATION",
+          message: `Se observo ${item} en baseline y ahora no se observo. Existe un cambio tecnico probable. Requiere validacion.`,
+          requiresValidation: true
+        });
+      }
+    }
+
+    for (const item of uniqueSorted(currentCookies)) {
+      if (!baselineCookies.has(item)) {
+        changes.push({
+          kind: "NEW_COOKIE",
+          value: item,
+          severity: "WARNING",
+          probableCause: newEndpoints.length > 0 ? "SITE_CHANGE" : "DOCUMENTATION_GAP",
+          message: `No se observo cookie ${item} en baseline y ahora si se observo. Existe un cambio tecnico probable. Requiere validacion.`,
+          requiresValidation: true
+        });
+      }
+    }
+
+    for (const item of uniqueSorted(baselineCookies)) {
+      if (!currentCookies.has(item)) {
+        changes.push({
+          kind: "REMOVED_COOKIE",
+          value: item,
+          severity: "INFO",
+          probableCause: "RULE_CHANGE_OR_INSTRUMENTATION",
+          message: `Se observo cookie ${item} en baseline y ahora no se observo. Existe un cambio tecnico probable. Requiere validacion.`,
+          requiresValidation: true
+        });
+      }
+    }
+
+    for (const item of newEndpoints) {
+      changes.push({
+        kind: "NEW_ENDPOINT",
+        value: item,
+        severity: "WARNING",
+        probableCause: "SITE_CHANGE",
+        message: `No se observo endpoint ${item} en baseline y ahora si se observo. Existe un cambio tecnico probable. Requiere validacion.`,
+        requiresValidation: true
+      });
+    }
+
+    const probableCause: VersionComparisonProbableCause =
+      changes.length === 0
+        ? "NO_CHANGES"
+        : changes.some((item) => item.kind === "NEW_ENDPOINT")
+          ? "SITE_CHANGE"
+          : changes.some((item) => item.kind === "NEW_THIRD_PARTY" || item.kind === "NEW_COOKIE")
+            ? "DOCUMENTATION_GAP"
+            : "RULE_CHANGE_OR_INSTRUMENTATION";
+
+    const result: VersionComparisonResult = {
+      ok: true,
+      data: {
+        baselineExecutionId,
+        currentExecutionId,
+        analyzedAt: new Date().toISOString(),
+        totals: {
+          changes: changes.length,
+          newThirdParties: changes.filter((item) => item.kind === "NEW_THIRD_PARTY").length,
+          removedThirdParties: changes.filter((item) => item.kind === "REMOVED_THIRD_PARTY").length,
+          newCookies: changes.filter((item) => item.kind === "NEW_COOKIE").length,
+          removedCookies: changes.filter((item) => item.kind === "REMOVED_COOKIE").length,
+          newEndpoints: changes.filter((item) => item.kind === "NEW_ENDPOINT").length
+        },
+        alert: {
+          status: changes.length === 0 ? "NO_CHANGES" : "CHANGES_DETECTED",
+          probableCause,
+          message:
+            changes.length === 0
+              ? "No se observaron cambios entre baseline y actual."
+              : "Existe un cambio tecnico probable entre baseline y actual. Requiere validacion."
+        },
+        changes
+      }
+    };
+
+    versionComparisonResults.set(versionComparisonKey(baselineExecutionId, currentExecutionId), result);
+    return res.status(200).setHeader("x-correlation-id", cid).json(result);
+  });
+
+  router.get("/monitoring/version-comparisons/:baselineExecutionId/:currentExecutionId/result", (req, res) => {
+    const cid = correlationId(req);
+    const { baselineExecutionId, currentExecutionId } = req.params;
+
+    if (!store.executions.has(baselineExecutionId) || !store.executions.has(currentExecutionId)) {
+      const failure = versionComparisonError(
+        baselineExecutionId,
+        currentExecutionId,
+        "invalid_execution_id",
+        "execution_id_not_found"
+      );
+      return res.status(400).setHeader("x-correlation-id", cid).json(failure);
+    }
+
+    const result = versionComparisonResults.get(versionComparisonKey(baselineExecutionId, currentExecutionId));
+    if (!result) {
+      const failure = versionComparisonError(
+        baselineExecutionId,
+        currentExecutionId,
+        "result_not_available",
+        "version_comparison_result_not_available"
+      );
+      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
+    }
+
+    return res.status(200).setHeader("x-correlation-id", cid).json(result);
+  });
+
+  router.post("/privacy/executions/:executionId/purge", (req, res) => {
+    const cid = correlationId(req);
+    const executionId = req.params.executionId;
+
+    if (!store.executions.has(executionId)) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({
+        ok: false,
+        error: {
+          executionId,
+          errorCode: "invalid_execution_id",
+          message: "execution_id_not_found"
+        }
+      });
+    }
+
+    const deletedCounts = purgeExecutionArtifacts(executionId);
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({
+      ok: true,
+      data: {
+        executionId,
+        purgedAt: new Date().toISOString(),
+        deletedCounts
+      }
+    });
+  });
+
+  router.post("/privacy/retention/apply", (req, res) => {
+    const cid = correlationId(req);
+    const windowMinutes = Number(req.body?.windowMinutes);
+
+    if (!Number.isInteger(windowMinutes) || windowMinutes <= 0) {
+      return res.status(400).setHeader("x-correlation-id", cid).json({
+        ok: false,
+        error: {
+          errorCode: "invalid_window_minutes",
+          message: "window_minutes_must_be_positive_integer"
+        }
+      });
+    }
+
+    const threshold = Date.now() - windowMinutes * 60_000;
+    const candidates = Array.from(store.executions.values()).filter((execution) => {
+      if (!isClosedExecutionState(execution.state)) {
+        return false;
+      }
+      const updatedAtTs = Date.parse(execution.updatedAt);
+      return Number.isFinite(updatedAtTs) && updatedAtTs < threshold;
+    });
+
+    let purgedExecutions = 0;
+    const deletedTotals = {
+      dynamicObservationResult: 0,
+      passiveSinglePageResult: 0,
+      evidences: 0,
+      versionComparisons: 0
+    };
+
+    for (const execution of candidates) {
+      const deleted = purgeExecutionArtifacts(execution.id);
+      purgedExecutions += 1;
+      deletedTotals.dynamicObservationResult += deleted.dynamicObservationResult;
+      deletedTotals.passiveSinglePageResult += deleted.passiveSinglePageResult;
+      deletedTotals.evidences += deleted.evidences;
+      deletedTotals.versionComparisons += deleted.versionComparisons;
+    }
+
+    return res.status(200).setHeader("x-correlation-id", cid).json({
+      ok: true,
+      data: {
+        windowMinutes,
+        candidateExecutions: candidates.length,
+        purgedExecutions,
+        deletedTotals,
+        appliedAt: new Date().toISOString()
+      }
+    });
+  });
+
   router.post("/scope/simulations", async (req, res) => {
     const cid = correlationId(req);
     const body = req.body as ScopeSimulationDto;
@@ -1076,420 +878,6 @@ export function createStage2Router(): Router {
   router.get("/scope/audits", (req, res) => {
     const cid = correlationId(req);
     res.status(200).setHeader("x-correlation-id", cid).json({ data: store.scopeAuditRequests });
-  });
-
-  router.post("/crawler/passive/single-page", async (req, res) => {
-    const cid = correlationId(req);
-    const body = req.body as StartPassiveSinglePageCrawlDto;
-
-    if (!body || typeof body.executionId !== "string" || typeof body.entryUrl !== "string") {
-      const invalidPayload = crawlerError(
-        body?.executionId ?? "unknown_execution",
-        body?.entryUrl ?? "unknown_entry_url",
-        "internal_error",
-        "invalid_request_payload"
-      );
-      return res.status(400).setHeader("x-correlation-id", cid).json(invalidPayload);
-    }
-
-    const execution = await getExecutionByIdWithFallback(body.executionId);
-    if (!execution) {
-      return res
-        .status(400)
-        .setHeader("x-correlation-id", cid)
-        .json(crawlerError(body.executionId, body.entryUrl, "internal_error", "execution_id_not_found"));
-    }
-
-      const traceCorrelationId = body.correlationId ?? cid;
-
-    if (!isHttpEntryUrl(body.entryUrl)) {
-      const invalidUrlError = crawlerError(
-        body.executionId,
-        body.entryUrl,
-        "invalid_entry_url",
-        "invalid_entry_url:unsupported_protocol"
-      );
-      await recordPassiveSinglePageCrawlError(body.executionId, invalidUrlError, cid);
-      appendCrawlerOperationalEvent(body.executionId, traceCorrelationId, "crawl_result_error", invalidUrlError.errorCode);
-      return res
-        .status(400)
-        .setHeader("x-correlation-id", cid)
-        .json(invalidUrlError);
-    }
-
-    if (execution.state !== ExecutionState.VALIDATED) {
-      appendCrawlerOperationalEvent(
-        body.executionId,
-        traceCorrelationId,
-        "crawl_result_error",
-        `execution_invalid_state:${execution.state}`
-      );
-      return res
-        .status(422)
-        .setHeader("x-correlation-id", cid)
-        .json(
-          crawlerError(
-            body.executionId,
-            body.entryUrl,
-            "internal_error",
-            `execution_invalid_state_for_passive_crawl:${execution.state}`
-          )
-        );
-    }
-
-    try {
-      await transitionExecutionState(body.executionId, ExecutionState.QUEUED, cid, "passive_crawl_queued");
-      await transitionExecutionState(body.executionId, ExecutionState.RUNNING, cid, "passive_crawl_started");
-      appendCrawlerOperationalEvent(body.executionId, traceCorrelationId, "crawl_started", body.entryUrl);
-
-      const gate = await evaluatePassiveSinglePageScope(
-        {
-          request: body,
-          authorizationId: execution.authorizationId,
-          operation: execution.operation,
-          correlationId: body.correlationId ?? cid
-        },
-        {
-          runScopeSimulation: async (input) =>
-            simulateScope(input.authorizationId, input.entryUrl, input.operation, undefined, input.correlationId)
-        }
-      );
-
-      if (!gate.allowed) {
-        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "authorization_scope_rejected");
-        await recordPassiveSinglePageCrawlError(body.executionId, gate.error, cid);
-        appendCrawlerOperationalEvent(body.executionId, traceCorrelationId, "crawl_result_error", gate.error.errorCode);
-        return res.status(403).setHeader("x-correlation-id", cid).json(gate.error);
-      }
-
-      const fetchResult = await fetchPassiveSinglePageHtml(body);
-      if (!fetchResult.ok) {
-        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, fetchResult.error.errorCode);
-        await recordPassiveSinglePageCrawlError(body.executionId, fetchResult.error, cid);
-        appendCrawlerOperationalEvent(body.executionId, traceCorrelationId, "crawl_result_error", fetchResult.error.errorCode);
-        return res
-          .status(crawlerErrorStatus(fetchResult.error.errorCode))
-          .setHeader("x-correlation-id", cid)
-          .json(fetchResult.error);
-      }
-
-      const title = extractHtmlTitle(fetchResult.data.html);
-      const evidence = await createPassiveHtmlEvidence(
-        body.executionId,
-        {
-          entryUrl: fetchResult.data.entryUrl,
-          fetchedAt: fetchResult.data.fetchedAt,
-          statusHttp: fetchResult.data.statusHttp,
-          contentType: fetchResult.data.contentType,
-          contentLength: fetchResult.data.contentLength,
-          html: fetchResult.data.html,
-          title
-        },
-        cid
-      );
-
-      const result = await recordPassiveSinglePageCrawlSuccess(
-        body.executionId,
-        {
-        executionId: body.executionId,
-        entryUrl: fetchResult.data.entryUrl,
-        statusHttp: fetchResult.data.statusHttp,
-        title,
-        evidenceId: evidence.id,
-        fetchedAt: fetchResult.data.fetchedAt,
-        contentType: fetchResult.data.contentType,
-        contentLength: fetchResult.data.contentLength
-        },
-        cid
-      );
-
-      await transitionExecutionState(body.executionId, ExecutionState.COMPLETED, cid, "passive_crawl_completed");
-      appendCrawlerOperationalEvent(body.executionId, traceCorrelationId, "crawl_result_success", evidence.id);
-
-      return res.status(200).setHeader("x-correlation-id", cid).json(result);
-    } catch (error) {
-      const currentExecution = store.executions.get(body.executionId);
-      if (currentExecution?.state === ExecutionState.RUNNING || currentExecution?.state === ExecutionState.QUEUED) {
-        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "internal_error");
-      }
-
-      const internalError = crawlerError(body.executionId, body.entryUrl, "internal_error", (error as Error).message);
-      await recordPassiveSinglePageCrawlError(body.executionId, internalError, cid);
-      appendCrawlerOperationalEvent(body.executionId, traceCorrelationId, "crawl_result_error", internalError.errorCode);
-
-      return res
-        .status(422)
-        .setHeader("x-correlation-id", cid)
-        .json(internalError);
-    }
-  });
-
-  router.get("/crawler/passive/single-page/:executionId/result", async (req, res) => {
-    const cid = correlationId(req);
-    const executionId = req.params.executionId;
-    const execution = await getExecutionByIdWithFallback(executionId);
-
-    if (!execution) {
-      return res
-        .status(400)
-        .setHeader("x-correlation-id", cid)
-        .json(crawlerError(executionId, "unknown_entry_url", "internal_error", "execution_id_not_found"));
-    }
-
-    const result = await getPassiveSinglePageCrawlResult(executionId);
-    if (!result) {
-      return res
-        .status(422)
-        .setHeader("x-correlation-id", cid)
-        .json(
-          crawlerError(
-            executionId,
-            execution.entryUrl ?? "unknown_entry_url",
-            "internal_error",
-            "passive_crawl_result_not_available"
-          )
-        );
-    }
-
-    return res.status(200).setHeader("x-correlation-id", cid).json(result);
-  });
-
-  router.get("/crawler/passive/executions/operational", async (req, res) => {
-    const cid = correlationId(req);
-
-    const states = parseOperationalStates(typeof req.query.states === "string" ? req.query.states : undefined);
-    const from = parseIso(typeof req.query.from === "string" ? req.query.from : undefined);
-    const to = parseIso(typeof req.query.to === "string" ? req.query.to : undefined);
-    const limit = parseLimit(typeof req.query.limit === "string" ? req.query.limit : undefined);
-
-    if (!states) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "invalid_states_filter" });
-    }
-
-    if (
-      typeof req.query.from === "string" && req.query.from.trim().length > 0 && !from
-    ) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "invalid_from_filter" });
-    }
-
-    if (
-      typeof req.query.to === "string" && req.query.to.trim().length > 0 && !to
-    ) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "invalid_to_filter" });
-    }
-
-    if (from && to && Date.parse(from) > Date.parse(to)) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "invalid_time_window" });
-    }
-
-    if (!limit) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "invalid_limit_filter" });
-    }
-
-    const rows = await listOperationalExecutions({
-      states,
-      from,
-      to,
-      limit
-    });
-
-    const items: OperationalExecutionItemDto[] = [];
-    for (const row of rows) {
-      const result = await getPassiveSinglePageCrawlResult(row.executionId);
-      const item: OperationalExecutionItemDto = {
-        executionId: row.executionId,
-        state: row.state as OperationalExecutionStateFilter,
-        entryUrl: row.entryUrl,
-        updatedAt: row.updatedAt,
-        resultAvailable: Boolean(result),
-        statusHttp: result?.data?.statusHttp,
-        title: result?.data?.title,
-        evidenceId: result?.data?.evidenceId,
-        errorCode: result?.error?.errorCode
-      };
-
-      items.push(item);
-    }
-
-    const response: OperationalExecutionListDto = {
-      states: states as OperationalExecutionStateFilter[],
-      from,
-      to,
-      limit,
-      items
-    };
-
-    return res.status(200).setHeader("x-correlation-id", cid).json({ data: response });
-  });
-
-  router.post("/browser/observations/start", async (req, res) => {
-    const cid = correlationId(req);
-    const body = req.body as StartDynamicObservationDto;
-
-    if (!body || typeof body.executionId !== "string" || typeof body.entryUrl !== "string") {
-      return res
-        .status(400)
-        .setHeader("x-correlation-id", cid)
-        .json(dynamicObservationError(
-          body?.executionId ?? "unknown_execution",
-          body?.entryUrl ?? "unknown_entry_url",
-          "internal_error",
-          "invalid_request_payload"
-        ));
-    }
-
-    const execution = await getExecutionByIdWithFallback(body.executionId);
-    if (!execution) {
-      return res
-        .status(400)
-        .setHeader("x-correlation-id", cid)
-        .json(dynamicObservationError(body.executionId, body.entryUrl, "invalid_execution_id", "execution_id_not_found"));
-    }
-
-    if (execution.state !== ExecutionState.VALIDATED) {
-      return res
-        .status(422)
-        .setHeader("x-correlation-id", cid)
-        .json(dynamicObservationError(
-          body.executionId,
-          body.entryUrl,
-          "internal_error",
-          `execution_invalid_state_for_dynamic_observation:${execution.state}`
-        ));
-    }
-
-    try {
-      await transitionExecutionState(body.executionId, ExecutionState.QUEUED, cid, "dynamic_observation_queued");
-      await transitionExecutionState(body.executionId, ExecutionState.RUNNING, cid, "dynamic_observation_started");
-
-      const gate = await evaluatePassiveSinglePageScope(
-        {
-          request: {
-            executionId: body.executionId,
-            entryUrl: body.entryUrl,
-            correlationId: body.correlationId,
-            timeoutMs: body.timeoutMs
-          },
-          authorizationId: execution.authorizationId,
-          operation: execution.operation,
-          correlationId: body.correlationId ?? cid
-        },
-        {
-          runScopeSimulation: async (input) =>
-            simulateScope(input.authorizationId, input.entryUrl, input.operation, undefined, input.correlationId)
-        }
-      );
-
-      if (!gate.allowed) {
-        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "authorization_scope_rejected");
-        const rejected = dynamicObservationError(
-          body.executionId,
-          body.entryUrl,
-          "authorization_scope_rejected",
-          gate.error.message
-        );
-        const result = recordDynamicObservationError(body.executionId, rejected);
-        return res.status(403).setHeader("x-correlation-id", cid).json(result.error);
-      }
-
-      const observed = await captureDynamicObservation({
-        executionId: body.executionId,
-        entryUrl: body.entryUrl,
-        timeoutMs: body.timeoutMs,
-        maxEvents: body.maxEvents
-      });
-
-      if (!observed.ok) {
-        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, observed.error.errorCode);
-        const result = recordDynamicObservationError(body.executionId, observed.error);
-        return res
-          .status(dynamicObservationErrorStatus(observed.error.errorCode))
-          .setHeader("x-correlation-id", cid)
-          .json(result.error);
-      }
-
-      const domEvidence = await createBrowserDomEvidence(
-        body.executionId,
-        {
-          pageUrl: observed.data.entryUrl,
-          capturedAt: observed.data.completedAt,
-          html: observed.data.domHtml,
-          title: observed.data.title
-        },
-        cid
-      );
-
-      const screenshotEvidence = await createBrowserScreenshotEvidence(
-        body.executionId,
-        {
-          pageUrl: observed.data.entryUrl,
-          capturedAt: observed.data.completedAt,
-          dataUrl: observed.data.screenshotDataUrl
-        },
-        cid
-      );
-
-      const success: NonNullable<DynamicObservationResultDto["data"]> = {
-        executionId: body.executionId,
-        entryUrl: observed.data.entryUrl,
-        completedAt: observed.data.completedAt,
-        pageSnapshots: [
-          {
-            pageUrl: observed.data.entryUrl,
-            title: observed.data.title,
-            capturedAt: observed.data.completedAt,
-            domEvidenceId: domEvidence.id,
-            screenshotEvidenceId: screenshotEvidence.id
-          }
-        ],
-        network: observed.data.network,
-        storage: observed.data.storage,
-        events: observed.data.events,
-        consentEvaluation: observed.data.consentEvaluation
-      };
-
-      const result = recordDynamicObservationSuccess(body.executionId, success);
-      await transitionExecutionState(body.executionId, ExecutionState.COMPLETED, cid, "dynamic_observation_completed");
-
-      return res.status(200).setHeader("x-correlation-id", cid).json(result);
-    } catch (error) {
-      const currentExecution = store.executions.get(body.executionId);
-      if (currentExecution?.state === ExecutionState.RUNNING || currentExecution?.state === ExecutionState.QUEUED) {
-        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "internal_error");
-      }
-
-      const internal = dynamicObservationError(body.executionId, body.entryUrl, "internal_error", (error as Error).message);
-      const result = recordDynamicObservationError(body.executionId, internal);
-      return res.status(422).setHeader("x-correlation-id", cid).json(result.error);
-    }
-  });
-
-  router.get("/browser/observations/:executionId/result", async (req, res) => {
-    const cid = correlationId(req);
-    const executionId = req.params.executionId;
-    const execution = await getExecutionByIdWithFallback(executionId);
-
-    if (!execution) {
-      return res
-        .status(400)
-        .setHeader("x-correlation-id", cid)
-        .json(dynamicObservationError(executionId, "unknown_entry_url", "invalid_execution_id", "execution_id_not_found"));
-    }
-
-    const result = getDynamicObservationResult(executionId);
-    if (!result) {
-      return res
-        .status(422)
-        .setHeader("x-correlation-id", cid)
-        .json(dynamicObservationError(
-          executionId,
-          execution.entryUrl ?? "unknown_entry_url",
-          "internal_error",
-          "dynamic_observation_result_not_available"
-        ));
-    }
-
-    return res.status(200).setHeader("x-correlation-id", cid).json(result);
   });
 
   router.post("/pages", (req, res) => {
@@ -1540,1802 +928,6 @@ export function createStage2Router(): Router {
       ok(res, createEvidence(body.executionId, body.level, body.kind, body.location, cid), cid);
     } catch (error) {
       notFound(res, (error as Error).message, cid);
-    }
-  });
-
-  router.get("/evidences", async (req, res) => {
-    const cid = correlationId(req);
-    const executionId = typeof req.query.executionId === "string" ? req.query.executionId : undefined;
-    const kind = typeof req.query.kind === "string" && req.query.kind.trim().length > 0 ? req.query.kind.trim() : undefined;
-    const from = parseIso(typeof req.query.from === "string" ? req.query.from : undefined);
-    const to = parseIso(typeof req.query.to === "string" ? req.query.to : undefined);
-    const cursor = typeof req.query.cursor === "string" && req.query.cursor.trim().length > 0 ? req.query.cursor.trim() : undefined;
-    const limit = parseEvidenceLimit(typeof req.query.limit === "string" ? req.query.limit : undefined);
-
-    if (!executionId || executionId.trim().length === 0) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_required" });
-    }
-
-    if (!limit) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "invalid_limit" });
-    }
-
-    if (typeof req.query.from === "string" && req.query.from.trim().length > 0 && !from) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "invalid_from_filter" });
-    }
-
-    if (typeof req.query.to === "string" && req.query.to.trim().length > 0 && !to) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "invalid_to_filter" });
-    }
-
-    if (from && to && Date.parse(from) > Date.parse(to)) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "invalid_time_window" });
-    }
-
-    const execution = await getExecutionByIdWithFallback(executionId);
-    if (!execution) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
-    }
-
-    const result = await listEvidenceReferencesByExecutionId({
-      executionId,
-      kind,
-      from,
-      to,
-      cursor,
-      limit
-    });
-
-    const payload: EvidenceQueryResultDto = {
-      executionId,
-      kind,
-      from,
-      to,
-      cursor,
-      nextCursor: result.nextCursor,
-      limit,
-      items: result.items
-    };
-
-    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
-  });
-
-  router.get("/review/executions/:executionId/view", async (req, res) => {
-    const cid = correlationId(req);
-    const executionId = req.params.executionId;
-    const execution = await getExecutionByIdWithFallback(executionId);
-
-    if (!execution) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
-    }
-
-    const evidences = await listEvidenceReferencesByExecutionId({
-      executionId,
-      limit: 200
-    });
-    const observations = listObservationReferencesByExecutionId(executionId);
-
-    const payload: ReviewExecutionViewDto = {
-      executionId,
-      executionState: execution.state,
-      entryUrl: execution.entryUrl,
-      generatedAt: new Date().toISOString(),
-      evidenceCount: evidences.items.length,
-      observationCount: observations.length,
-      evidences: evidences.items,
-      observations
-    };
-
-    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
-  });
-
-  router.get("/reports/executions/:executionId/executive-summary", async (req, res) => {
-    const cid = correlationId(req);
-    const executionId = req.params.executionId;
-    const execution = await getExecutionByIdWithFallback(executionId);
-
-    if (!execution) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
-    }
-
-    const evidences = await listEvidenceReferencesByExecutionId({
-      executionId,
-      limit: 200
-    });
-    const observations = listObservationReferencesByExecutionId(executionId);
-
-    const byKind = new Map<string, { count: number; evidenceIds: string[] }>();
-    const byLevel = new Map<string, { count: number; evidenceIds: string[] }>();
-
-    for (const item of evidences.items) {
-      const currentKind = byKind.get(item.kind) ?? { count: 0, evidenceIds: [] };
-      currentKind.count += 1;
-      currentKind.evidenceIds.push(item.evidenceId);
-      byKind.set(item.kind, currentKind);
-
-      const currentLevel = byLevel.get(item.level) ?? { count: 0, evidenceIds: [] };
-      currentLevel.count += 1;
-      currentLevel.evidenceIds.push(item.evidenceId);
-      byLevel.set(item.level, currentLevel);
-    }
-
-    const payload: ExecutiveSummaryReportDto = {
-      executionId,
-      executionState: execution.state,
-      entryUrl: execution.entryUrl,
-      generatedAt: new Date().toISOString(),
-      totals: {
-        evidences: evidences.items.length,
-        observations: observations.length
-      },
-      evidenceByKind: Array.from(byKind.entries())
-        .map(([kind, value]) => ({ kind, count: value.count, evidenceIds: value.evidenceIds }))
-        .sort((a, b) => a.kind.localeCompare(b.kind)),
-      evidenceByLevel: Array.from(byLevel.entries())
-        .map(([level, value]) => ({ level: level as typeof evidences.items[number]["level"], count: value.count, evidenceIds: value.evidenceIds }))
-        .sort((a, b) => a.level.localeCompare(b.level))
-    };
-
-    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
-  });
-
-  router.get("/reports/executions/:executionId/form-inventory", async (req, res) => {
-    const cid = correlationId(req);
-    const executionId = req.params.executionId;
-    const pageId = typeof req.query.pageId === "string" && req.query.pageId.trim().length > 0 ? req.query.pageId.trim() : undefined;
-
-    const execution = await getExecutionByIdWithFallback(executionId);
-    if (!execution) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
-    }
-
-    if (pageId) {
-      const pageExists = store.pages.get(pageId);
-      if (!pageExists || pageExists.executionId !== executionId) {
-        return res.status(400).setHeader("x-correlation-id", cid).json({ error: "page_id_not_found" });
-      }
-    }
-
-    const pages = listFormInventoryByExecutionId({ executionId, pageId });
-    const totalFields = pages.reduce((acc, page) => acc + page.fieldCount, 0);
-    const totalObservations = pages.reduce((acc, page) => acc + page.observationCount, 0);
-
-    const payload: FormInventoryReportDto = {
-      executionId,
-      executionState: execution.state,
-      entryUrl: execution.entryUrl,
-      pageId,
-      generatedAt: new Date().toISOString(),
-      totals: {
-        pages: pages.length,
-        fields: totalFields,
-        observations: totalObservations
-      },
-      pages
-    };
-
-    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
-  });
-
-  router.get("/reports/executions/:executionId/tracking-inventory", async (req, res) => {
-    const cid = correlationId(req);
-    const executionId = req.params.executionId;
-    const execution = await getExecutionByIdWithFallback(executionId);
-
-    if (!execution) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
-    }
-
-    const inventory = listTrackingInventoryByExecutionId(executionId);
-    const payload: TrackingInventoryReportDto = {
-      executionId,
-      executionState: execution.state,
-      entryUrl: execution.entryUrl,
-      generatedAt: new Date().toISOString(),
-      totals: {
-        thirdParties: inventory.thirdParties.length,
-        cookies: inventory.cookies.length,
-        networkRequests: inventory.networkRequests,
-        cookieObservations: inventory.cookieObservations
-      },
-      thirdParties: inventory.thirdParties,
-      cookies: inventory.cookies
-    };
-
-    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
-  });
-
-  router.post("/auth/evaluations/start", async (req, res) => {
-    const cid = correlationId(req);
-    const body = req.body as StartAuthenticatedEvaluationDto;
-
-    if (!body.executionId || body.executionId.trim().length === 0) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        authenticatedEvaluationError("unknown_execution", body.entryUrl ?? "unknown_entry_url", "invalid_execution_id", "execution_id_required")
-      );
-    }
-
-    if (!body.entryUrl || !isHttpEntryUrl(body.entryUrl)) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        authenticatedEvaluationError(body.executionId, body.entryUrl ?? "unknown_entry_url", "invalid_entry_url", "invalid_entry_url")
-      );
-    }
-
-    const execution = await getExecutionByIdWithFallback(body.executionId);
-    if (!execution) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        authenticatedEvaluationError(body.executionId, body.entryUrl, "invalid_execution_id", "execution_id_not_found")
-      );
-    }
-
-    if (!body.username || !body.password || (body.role !== "cliente" && body.role !== "supervisor")) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        authenticatedEvaluationError(body.executionId, body.entryUrl, "authentication_failed", "invalid_authentication_payload")
-      );
-    }
-
-    try {
-      await transitionExecutionState(body.executionId, ExecutionState.QUEUED, cid, "auth_evaluation_queued");
-      await transitionExecutionState(body.executionId, ExecutionState.RUNNING, cid, "auth_evaluation_started");
-
-      const origin = new URL(body.entryUrl).origin;
-      const sessionScopeId = `${body.executionId}:${body.role}`;
-      const loginUrl = new URL("/sitio-f/auth/login", origin);
-      const profileUrl = new URL("/sitio-f/profile", origin);
-      const logoutUrl = new URL("/sitio-f/auth/logout", origin);
-
-      const loginResponse = await fetch(loginUrl, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-synthetic-client-id": sessionScopeId
-        },
-        body: JSON.stringify({
-          username: body.username,
-          password: body.password,
-          role: body.role
-        })
-      });
-
-      if (loginResponse.status !== 200) {
-        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "auth_evaluation_login_failed");
-        return res.status(422).setHeader("x-correlation-id", cid).json(
-          authenticatedEvaluationError(body.executionId, body.entryUrl, "authentication_failed", "login_failed")
-        );
-      }
-
-      const loginEvidence = createEvidence(
-        body.executionId,
-        EvidenceLevel.E2,
-        "AUTH_STEP_LOGIN",
-        `memory://auth-step-login/${body.executionId}`,
-        cid
-      );
-
-      const profileResponse = await fetch(profileUrl, {
-        method: "GET",
-        headers: {
-          "x-synthetic-client-id": sessionScopeId
-        }
-      });
-
-      if (profileResponse.status !== 200) {
-        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "auth_evaluation_profile_failed");
-        return res.status(422).setHeader("x-correlation-id", cid).json(
-          authenticatedEvaluationError(body.executionId, body.entryUrl, "profile_fetch_failed", "profile_fetch_failed")
-        );
-      }
-
-      const profilePayload = (await profileResponse.json()) as {
-        profile: {
-          username: string;
-          role: "cliente" | "supervisor";
-          panel: string;
-          sections: string[];
-          syntheticDataAccess: string;
-        };
-      };
-
-      const profileEvidence = createEvidence(
-        body.executionId,
-        EvidenceLevel.E2,
-        "AUTH_SESSION_PROFILE",
-        `memory://auth-session-profile/${body.executionId}`,
-        cid
-      );
-
-      const logoutResponse = await fetch(logoutUrl, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-synthetic-client-id": sessionScopeId
-        },
-        body: JSON.stringify({})
-      });
-
-      const logoutEvidence = createEvidence(
-        body.executionId,
-        EvidenceLevel.E2,
-        "AUTH_STEP_LOGOUT",
-        `memory://auth-step-logout/${body.executionId}`,
-        cid
-      );
-
-      await transitionExecutionState(body.executionId, ExecutionState.COMPLETED, cid, "auth_evaluation_completed");
-
-      const payload: AuthenticatedEvaluationResultDto = {
-        ok: true,
-        data: {
-          steps: [
-            {
-              step: "LOGIN",
-              statusHttp: loginResponse.status,
-              evidenceId: loginEvidence.id,
-              evidenceKind: loginEvidence.kind,
-              evidenceLocation: loginEvidence.location,
-              timestamp: loginEvidence.createdAt
-            },
-            {
-              step: "PROFILE",
-              statusHttp: profileResponse.status,
-              evidenceId: profileEvidence.id,
-              evidenceKind: profileEvidence.kind,
-              evidenceLocation: profileEvidence.location,
-              timestamp: profileEvidence.createdAt
-            },
-            {
-              step: "LOGOUT",
-              statusHttp: logoutResponse.status,
-              evidenceId: logoutEvidence.id,
-              evidenceKind: logoutEvidence.kind,
-              evidenceLocation: logoutEvidence.location,
-              timestamp: logoutEvidence.createdAt
-            }
-          ],
-          executionId: body.executionId,
-          entryUrl: body.entryUrl,
-          role: body.role,
-          sessionScopeId,
-          authenticatedAt: new Date().toISOString(),
-          profile: {
-            username: profilePayload.profile.username,
-            role: profilePayload.profile.role,
-            panel: profilePayload.profile.panel,
-            sections: profilePayload.profile.sections,
-            syntheticDataAccess: profilePayload.profile.syntheticDataAccess
-          },
-          evidenceId: profileEvidence.id,
-          loggedOut: logoutResponse.status === 200
-        }
-      };
-
-      return res.status(200).setHeader("x-correlation-id", cid).json(payload);
-    } catch (error) {
-      await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "auth_evaluation_internal_error");
-      return res.status(422).setHeader("x-correlation-id", cid).json(
-        authenticatedEvaluationError(body.executionId, body.entryUrl, "internal_error", (error as Error).message)
-      );
-    }
-  });
-
-  router.post("/code-analysis/frontend/index/start", async (req, res) => {
-    const cid = correlationId(req);
-    const body = req.body as StartFrontendRepositoryIndexDto;
-
-    if (!body.executionId || body.executionId.trim().length === 0) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        frontendIndexError("unknown_execution", body.repositoryPath ?? "unknown_repository", "invalid_execution_id", "execution_id_required")
-      );
-    }
-
-    if (!body.repositoryPath || body.repositoryPath.trim().length === 0) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        frontendIndexError(body.executionId, "unknown_repository", "invalid_repository_path", "repository_path_required")
-      );
-    }
-
-    const maxFiles = body.maxFiles ?? 500;
-    if (!Number.isInteger(maxFiles) || maxFiles <= 0 || maxFiles > 2000) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        frontendIndexError(body.executionId, body.repositoryPath, "invalid_repository_path", "invalid_max_files")
-      );
-    }
-
-    const execution = await getExecutionByIdWithFallback(body.executionId);
-    if (!execution) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        frontendIndexError(body.executionId, body.repositoryPath, "invalid_execution_id", "execution_id_not_found")
-      );
-    }
-
-    const repositoryPath = path.resolve(body.repositoryPath);
-    const repositoryStat = await fs.stat(repositoryPath).catch(() => undefined);
-    if (!repositoryStat || !repositoryStat.isDirectory()) {
-      const failure = recordFrontendRepositoryIndexResult(
-        body.executionId,
-        frontendIndexError(body.executionId, repositoryPath, "repository_path_not_found", "repository_path_not_found")
-      );
-      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
-    }
-
-    try {
-      await transitionExecutionState(body.executionId, ExecutionState.QUEUED, cid, "frontend_index_queued");
-      await transitionExecutionState(body.executionId, ExecutionState.RUNNING, cid, "frontend_index_started");
-
-      const framework = await detectFrontendFramework(repositoryPath);
-      const indexedFiles = await collectFrontendFiles(repositoryPath, maxFiles);
-      const totalBytes = indexedFiles.reduce((sum, file) => sum + file.bytes, 0);
-
-      const fileTypeCountMap = new Map<string, number>();
-      for (const file of indexedFiles) {
-        fileTypeCountMap.set(file.extension, (fileTypeCountMap.get(file.extension) ?? 0) + 1);
-      }
-
-      const evidence = createEvidence(
-        body.executionId,
-        EvidenceLevel.E2,
-        "FRONTEND_INDEX_SUMMARY",
-        `memory://frontend-index/${body.executionId}`,
-        cid
-      );
-
-      const success: FrontendRepositoryIndexResultDto = {
-        ok: true,
-        data: {
-          executionId: body.executionId,
-          repositoryPath,
-          indexedAt: new Date().toISOString(),
-          framework,
-          totalFiles: indexedFiles.length,
-          totalBytes,
-          fileTypeCounts: Array.from(fileTypeCountMap.entries())
-            .map(([extension, count]) => ({ extension, count }))
-            .sort((a, b) => a.extension.localeCompare(b.extension)),
-          sampleFiles: indexedFiles.slice(0, 25),
-          evidenceId: evidence.id
-        }
-      };
-
-      recordFrontendRepositoryIndexResult(body.executionId, success);
-      await transitionExecutionState(body.executionId, ExecutionState.COMPLETED, cid, "frontend_index_completed");
-
-      return res.status(200).setHeader("x-correlation-id", cid).json(success);
-    } catch (error) {
-      const currentExecution = store.executions.get(body.executionId);
-      if (currentExecution?.state === ExecutionState.RUNNING || currentExecution?.state === ExecutionState.QUEUED) {
-        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "frontend_index_failed");
-      }
-
-      const failure = recordFrontendRepositoryIndexResult(
-        body.executionId,
-        frontendIndexError(body.executionId, repositoryPath, "indexing_failed", (error as Error).message)
-      );
-      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
-    }
-  });
-
-  router.get("/code-analysis/frontend/index/:executionId/result", async (req, res) => {
-    const cid = correlationId(req);
-    const executionId = req.params.executionId;
-    const execution = await getExecutionByIdWithFallback(executionId);
-
-    if (!execution) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        frontendIndexError(executionId, "unknown_repository", "invalid_execution_id", "execution_id_not_found")
-      );
-    }
-
-    const result = getFrontendRepositoryIndexResult(executionId);
-    if (!result) {
-      return res.status(422).setHeader("x-correlation-id", cid).json(
-        frontendIndexError(executionId, "unknown_repository", "result_not_available", "frontend_index_result_not_available")
-      );
-    }
-
-    return res.status(200).setHeader("x-correlation-id", cid).json(result);
-  });
-
-  router.post("/code-analysis/frontend/patterns/start", async (req, res) => {
-    const cid = correlationId(req);
-    const body = req.body as StartFrontendPatternDetectionDto;
-
-    if (!body.executionId || body.executionId.trim().length === 0) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        frontendPatternDetectionError("unknown_execution", body.repositoryPath ?? "unknown_repository", "invalid_execution_id", "execution_id_required")
-      );
-    }
-
-    if (!body.repositoryPath || body.repositoryPath.trim().length === 0) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        frontendPatternDetectionError(body.executionId, "unknown_repository", "invalid_repository_path", "repository_path_required")
-      );
-    }
-
-    const maxFiles = body.maxFiles ?? 500;
-    if (!Number.isInteger(maxFiles) || maxFiles <= 0 || maxFiles > 2000) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        frontendPatternDetectionError(body.executionId, body.repositoryPath, "invalid_repository_path", "invalid_max_files")
-      );
-    }
-
-    const maxMatchesPerFile = body.maxMatchesPerFile ?? 5;
-    if (!Number.isInteger(maxMatchesPerFile) || maxMatchesPerFile <= 0 || maxMatchesPerFile > 25) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        frontendPatternDetectionError(body.executionId, body.repositoryPath, "invalid_repository_path", "invalid_max_matches_per_file")
-      );
-    }
-
-    const execution = await getExecutionByIdWithFallback(body.executionId);
-    if (!execution) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        frontendPatternDetectionError(body.executionId, body.repositoryPath, "invalid_execution_id", "execution_id_not_found")
-      );
-    }
-
-    const repositoryPath = path.resolve(body.repositoryPath);
-    const repositoryStat = await fs.stat(repositoryPath).catch(() => undefined);
-    if (!repositoryStat || !repositoryStat.isDirectory()) {
-      const failure = recordFrontendPatternDetectionResult(
-        body.executionId,
-        frontendPatternDetectionError(body.executionId, repositoryPath, "repository_path_not_found", "repository_path_not_found")
-      );
-      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
-    }
-
-    try {
-      await transitionExecutionState(body.executionId, ExecutionState.QUEUED, cid, "frontend_pattern_detection_queued");
-      await transitionExecutionState(body.executionId, ExecutionState.RUNNING, cid, "frontend_pattern_detection_started");
-
-      const indexedFiles = await collectFrontendFiles(repositoryPath, maxFiles);
-      const files = await detectFrontendCapturePatterns(repositoryPath, indexedFiles, maxMatchesPerFile);
-      const totalMatches = files.reduce((sum, file) => sum + file.matches.length, 0);
-
-      const evidence = createEvidence(
-        body.executionId,
-        EvidenceLevel.E2,
-        "FRONTEND_PATTERN_SUMMARY",
-        `memory://frontend-patterns/${body.executionId}`,
-        cid
-      );
-
-      const success: FrontendPatternDetectionResultDto = {
-        ok: true,
-        data: {
-          executionId: body.executionId,
-          repositoryPath,
-          detectedAt: new Date().toISOString(),
-          totalFilesScanned: indexedFiles.length,
-          totalFilesWithMatches: files.length,
-          totalMatches,
-          files,
-          evidenceId: evidence.id
-        }
-      };
-
-      recordFrontendPatternDetectionResult(body.executionId, success);
-      await transitionExecutionState(body.executionId, ExecutionState.COMPLETED, cid, "frontend_pattern_detection_completed");
-
-      return res.status(200).setHeader("x-correlation-id", cid).json(success);
-    } catch (error) {
-      const currentExecution = store.executions.get(body.executionId);
-      if (currentExecution?.state === ExecutionState.RUNNING || currentExecution?.state === ExecutionState.QUEUED) {
-        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "frontend_pattern_detection_failed");
-      }
-
-      const failure = recordFrontendPatternDetectionResult(
-        body.executionId,
-        frontendPatternDetectionError(body.executionId, repositoryPath, "detection_failed", (error as Error).message)
-      );
-      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
-    }
-  });
-
-  router.get("/code-analysis/frontend/patterns/:executionId/result", async (req, res) => {
-    const cid = correlationId(req);
-    const executionId = req.params.executionId;
-    const execution = await getExecutionByIdWithFallback(executionId);
-
-    if (!execution) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        frontendPatternDetectionError(executionId, "unknown_repository", "invalid_execution_id", "execution_id_not_found")
-      );
-    }
-
-    const result = getFrontendPatternDetectionResult(executionId);
-    if (!result) {
-      return res.status(422).setHeader("x-correlation-id", cid).json(
-        frontendPatternDetectionError(executionId, "unknown_repository", "result_not_available", "frontend_pattern_detection_result_not_available")
-      );
-    }
-
-    return res.status(200).setHeader("x-correlation-id", cid).json(result);
-  });
-
-  router.get("/code-analysis/frontend/findings/:executionId/view", async (req, res) => {
-    const cid = correlationId(req);
-    const executionId = req.params.executionId;
-    const execution = await getExecutionByIdWithFallback(executionId);
-
-    if (!execution) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
-    }
-
-    const patternResult = getFrontendPatternDetectionResult(executionId);
-    if (!patternResult || !patternResult.ok || !patternResult.data) {
-      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "frontend_pattern_detection_result_not_available" });
-    }
-
-    const ruleStats = new Map<FrontendPatternMatchDto["rule"], { matches: number; files: Set<string> }>();
-    const fileSummaries = patternResult.data.files
-      .map((file) => {
-        const rules = Array.from(new Set(file.matches.map((match) => match.rule))).sort();
-        for (const match of file.matches) {
-          const current = ruleStats.get(match.rule) ?? { matches: 0, files: new Set<string>() };
-          current.matches += 1;
-          current.files.add(file.relativePath);
-          ruleStats.set(match.rule, current);
-        }
-
-        return {
-          relativePath: file.relativePath,
-          matchCount: file.matches.length,
-          rules
-        };
-      })
-      .sort((a, b) => a.relativePath.localeCompare(b.relativePath));
-
-    const byRule = Array.from(ruleStats.entries())
-      .map(([rule, stats]) => ({
-        rule,
-        matchCount: stats.matches,
-        filesCount: stats.files.size
-      }))
-      .sort((a, b) => a.rule.localeCompare(b.rule));
-
-    const payload: FrontendStaticFindingsViewDto = {
-      executionId,
-      generatedAt: new Date().toISOString(),
-      totals: {
-        scannedFiles: patternResult.data.totalFilesScanned,
-        filesWithMatches: patternResult.data.totalFilesWithMatches,
-        matches: patternResult.data.totalMatches,
-        distinctRules: byRule.length
-      },
-      byRule,
-      files: fileSummaries,
-      evidenceId: patternResult.data.evidenceId
-    };
-
-    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
-  });
-
-  router.post("/code-analysis/backend/api-index/start", async (req, res) => {
-    const cid = correlationId(req);
-    const body = req.body as StartBackendApiIndexDto;
-
-    if (!body.executionId || body.executionId.trim().length === 0) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        backendApiIndexError("unknown_execution", body.repositoryPath ?? "unknown_repository", "invalid_execution_id", "execution_id_required")
-      );
-    }
-
-    if (!body.repositoryPath || body.repositoryPath.trim().length === 0) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        backendApiIndexError(body.executionId, "unknown_repository", "invalid_repository_path", "repository_path_required")
-      );
-    }
-
-    const maxFiles = body.maxFiles ?? 500;
-    if (!Number.isInteger(maxFiles) || maxFiles <= 0 || maxFiles > 3000) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        backendApiIndexError(body.executionId, body.repositoryPath, "invalid_repository_path", "invalid_max_files")
-      );
-    }
-
-    const execution = await getExecutionByIdWithFallback(body.executionId);
-    if (!execution) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        backendApiIndexError(body.executionId, body.repositoryPath, "invalid_execution_id", "execution_id_not_found")
-      );
-    }
-
-    const repositoryPath = path.resolve(body.repositoryPath);
-    const repositoryStat = await fs.stat(repositoryPath).catch(() => undefined);
-    if (!repositoryStat || !repositoryStat.isDirectory()) {
-      const failure = recordBackendApiIndexResult(
-        body.executionId,
-        backendApiIndexError(body.executionId, repositoryPath, "repository_path_not_found", "repository_path_not_found")
-      );
-      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
-    }
-
-    try {
-      const currentState = store.executions.get(body.executionId)?.state;
-      const shouldTransitionLifecycle = currentState === ExecutionState.VALIDATED;
-
-      if (
-        currentState !== ExecutionState.VALIDATED &&
-        currentState !== ExecutionState.COMPLETED &&
-        currentState !== ExecutionState.COMPLETED_WITH_WARNINGS
-      ) {
-        throw new Error(`execution_invalid_state_for_backend_api_index:${currentState ?? "unknown"}`);
-      }
-
-      if (shouldTransitionLifecycle) {
-        await transitionExecutionState(body.executionId, ExecutionState.QUEUED, cid, "backend_api_index_queued");
-        await transitionExecutionState(body.executionId, ExecutionState.RUNNING, cid, "backend_api_index_started");
-      }
-
-      const artifacts = await collectBackendApiArtifacts(repositoryPath, maxFiles);
-      const typeMap = new Map<BackendApiArtifactType, number>();
-      for (const artifact of artifacts) {
-        typeMap.set(artifact.artifactType, (typeMap.get(artifact.artifactType) ?? 0) + 1);
-      }
-
-      const evidence = createEvidence(
-        body.executionId,
-        EvidenceLevel.E2,
-        "BACKEND_API_INDEX_SUMMARY",
-        `memory://backend-api-index/${body.executionId}`,
-        cid
-      );
-
-      const success: BackendApiIndexResultDto = {
-        ok: true,
-        data: {
-          executionId: body.executionId,
-          repositoryPath,
-          indexedAt: new Date().toISOString(),
-          totalArtifacts: artifacts.length,
-          artifactTypeCounts: Array.from(typeMap.entries())
-            .map(([artifactType, count]) => ({ artifactType, count }))
-            .sort((a, b) => a.artifactType.localeCompare(b.artifactType)),
-          artifacts: artifacts.slice(0, 200),
-          evidenceId: evidence.id
-        }
-      };
-
-      recordBackendApiIndexResult(body.executionId, success);
-      if (shouldTransitionLifecycle) {
-        await transitionExecutionState(body.executionId, ExecutionState.COMPLETED, cid, "backend_api_index_completed");
-      }
-
-      return res.status(200).setHeader("x-correlation-id", cid).json(success);
-    } catch (error) {
-      const currentExecution = store.executions.get(body.executionId);
-      if (currentExecution?.state === ExecutionState.RUNNING || currentExecution?.state === ExecutionState.QUEUED) {
-        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "backend_api_index_failed");
-      }
-
-      const failure = recordBackendApiIndexResult(
-        body.executionId,
-        backendApiIndexError(body.executionId, repositoryPath, "indexing_failed", (error as Error).message)
-      );
-      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
-    }
-  });
-
-  router.get("/code-analysis/backend/api-index/:executionId/result", async (req, res) => {
-    const cid = correlationId(req);
-    const executionId = req.params.executionId;
-    const execution = await getExecutionByIdWithFallback(executionId);
-
-    if (!execution) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        backendApiIndexError(executionId, "unknown_repository", "invalid_execution_id", "execution_id_not_found")
-      );
-    }
-
-    const result = getBackendApiIndexResult(executionId);
-    if (!result) {
-      return res.status(422).setHeader("x-correlation-id", cid).json(
-        backendApiIndexError(executionId, "unknown_repository", "result_not_available", "backend_api_index_result_not_available")
-      );
-    }
-
-    return res.status(200).setHeader("x-correlation-id", cid).json(result);
-  });
-
-  router.post("/code-analysis/backend/processing/start", async (req, res) => {
-    const cid = correlationId(req);
-    const body = req.body as StartBackendProcessingDetectionDto;
-
-    if (!body.executionId || body.executionId.trim().length === 0) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        backendProcessingDetectionError("unknown_execution", body.repositoryPath ?? "unknown_repository", "invalid_execution_id", "execution_id_required")
-      );
-    }
-
-    if (!body.repositoryPath || body.repositoryPath.trim().length === 0) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        backendProcessingDetectionError(body.executionId, "unknown_repository", "invalid_repository_path", "repository_path_required")
-      );
-    }
-
-    const maxFiles = body.maxFiles ?? 500;
-    if (!Number.isInteger(maxFiles) || maxFiles <= 0 || maxFiles > 3000) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        backendProcessingDetectionError(body.executionId, body.repositoryPath, "invalid_repository_path", "invalid_max_files")
-      );
-    }
-
-    const maxMatchesPerFile = body.maxMatchesPerFile ?? 5;
-    if (!Number.isInteger(maxMatchesPerFile) || maxMatchesPerFile <= 0 || maxMatchesPerFile > 25) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        backendProcessingDetectionError(body.executionId, body.repositoryPath, "invalid_repository_path", "invalid_max_matches_per_file")
-      );
-    }
-
-    const execution = await getExecutionByIdWithFallback(body.executionId);
-    if (!execution) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        backendProcessingDetectionError(body.executionId, body.repositoryPath, "invalid_execution_id", "execution_id_not_found")
-      );
-    }
-
-    const repositoryPath = path.resolve(body.repositoryPath);
-    const repositoryStat = await fs.stat(repositoryPath).catch(() => undefined);
-    if (!repositoryStat || !repositoryStat.isDirectory()) {
-      const failure = recordBackendProcessingDetectionResult(
-        body.executionId,
-        backendProcessingDetectionError(body.executionId, repositoryPath, "repository_path_not_found", "repository_path_not_found")
-      );
-      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
-    }
-
-    try {
-      const currentState = store.executions.get(body.executionId)?.state;
-      const shouldTransitionLifecycle = currentState === ExecutionState.VALIDATED;
-
-      if (
-        currentState !== ExecutionState.VALIDATED &&
-        currentState !== ExecutionState.COMPLETED &&
-        currentState !== ExecutionState.COMPLETED_WITH_WARNINGS
-      ) {
-        throw new Error(`execution_invalid_state_for_backend_processing_detection:${currentState ?? "unknown"}`);
-      }
-
-      if (shouldTransitionLifecycle) {
-        await transitionExecutionState(body.executionId, ExecutionState.QUEUED, cid, "backend_processing_detection_queued");
-        await transitionExecutionState(body.executionId, ExecutionState.RUNNING, cid, "backend_processing_detection_started");
-      }
-
-      const candidates = await collectBackendProcessingCandidates(repositoryPath, maxFiles);
-      const files = await detectBackendProcessingPoints(repositoryPath, candidates, maxMatchesPerFile);
-      const totalMatches = files.reduce((sum, file) => sum + file.matches.length, 0);
-
-      const evidence = createEvidence(
-        body.executionId,
-        EvidenceLevel.E2,
-        "BACKEND_PROCESSING_SUMMARY",
-        `memory://backend-processing/${body.executionId}`,
-        cid
-      );
-
-      const success: BackendProcessingDetectionResultDto = {
-        ok: true,
-        data: {
-          executionId: body.executionId,
-          repositoryPath,
-          detectedAt: new Date().toISOString(),
-          totalFilesScanned: candidates.length,
-          totalFilesWithMatches: files.length,
-          totalMatches,
-          files,
-          evidenceId: evidence.id
-        }
-      };
-
-      recordBackendProcessingDetectionResult(body.executionId, success);
-      if (shouldTransitionLifecycle) {
-        await transitionExecutionState(body.executionId, ExecutionState.COMPLETED, cid, "backend_processing_detection_completed");
-      }
-
-      return res.status(200).setHeader("x-correlation-id", cid).json(success);
-    } catch (error) {
-      const currentExecution = store.executions.get(body.executionId);
-      if (currentExecution?.state === ExecutionState.RUNNING || currentExecution?.state === ExecutionState.QUEUED) {
-        await transitionExecutionState(body.executionId, ExecutionState.FAILED, cid, "backend_processing_detection_failed");
-      }
-
-      const failure = recordBackendProcessingDetectionResult(
-        body.executionId,
-        backendProcessingDetectionError(body.executionId, repositoryPath, "detection_failed", (error as Error).message)
-      );
-      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
-    }
-  });
-
-  router.get("/code-analysis/backend/processing/:executionId/result", async (req, res) => {
-    const cid = correlationId(req);
-    const executionId = req.params.executionId;
-    const execution = await getExecutionByIdWithFallback(executionId);
-
-    if (!execution) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(
-        backendProcessingDetectionError(executionId, "unknown_repository", "invalid_execution_id", "execution_id_not_found")
-      );
-    }
-
-    const result = getBackendProcessingDetectionResult(executionId);
-    if (!result) {
-      return res.status(422).setHeader("x-correlation-id", cid).json(
-        backendProcessingDetectionError(executionId, "unknown_repository", "result_not_available", "backend_processing_detection_result_not_available")
-      );
-    }
-
-    return res.status(200).setHeader("x-correlation-id", cid).json(result);
-  });
-
-  router.get("/code-analysis/backend/processing-flow/:executionId/view", async (req, res) => {
-    const cid = correlationId(req);
-    const executionId = req.params.executionId;
-    const execution = await getExecutionByIdWithFallback(executionId);
-
-    if (!execution) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
-    }
-
-    const apiIndexResult = getBackendApiIndexResult(executionId);
-    if (!apiIndexResult || !apiIndexResult.ok || !apiIndexResult.data) {
-      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "backend_api_index_result_not_available" });
-    }
-
-    const processingResult = getBackendProcessingDetectionResult(executionId);
-    if (!processingResult || !processingResult.ok || !processingResult.data) {
-      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "backend_processing_detection_result_not_available" });
-    }
-
-    const artifactTypeByPath = new Map<string, BackendApiArtifactType>();
-    for (const artifact of apiIndexResult.data.artifacts) {
-      artifactTypeByPath.set(artifact.relativePath, artifact.artifactType);
-    }
-
-    const ruleStats = new Map<BackendProcessingMatchDto["rule"], { matches: number; files: Set<string> }>();
-    const fileSummaries = processingResult.data.files
-      .map((file) => {
-        const rules = Array.from(new Set(file.matches.map((match) => match.rule))).sort();
-
-        for (const match of file.matches) {
-          const current = ruleStats.get(match.rule) ?? { matches: 0, files: new Set<string>() };
-          current.matches += 1;
-          current.files.add(file.relativePath);
-          ruleStats.set(match.rule, current);
-        }
-
-        return {
-          relativePath: file.relativePath,
-          artifactType: artifactTypeByPath.get(file.relativePath),
-          matchCount: file.matches.length,
-          rules
-        };
-      })
-      .sort((a, b) => a.relativePath.localeCompare(b.relativePath));
-
-    const byRule = Array.from(ruleStats.entries())
-      .map(([rule, stats]) => ({
-        rule,
-        matchCount: stats.matches,
-        filesCount: stats.files.size
-      }))
-      .sort((a, b) => a.rule.localeCompare(b.rule));
-
-    const payload: BackendProcessingFlowViewDto = {
-      executionId,
-      generatedAt: new Date().toISOString(),
-      totals: {
-        apiArtifacts: apiIndexResult.data.totalArtifacts,
-        filesWithProcessingMatches: processingResult.data.totalFilesWithMatches,
-        processingMatches: processingResult.data.totalMatches,
-        distinctProcessingRules: byRule.length
-      },
-      byRule,
-      files: fileSummaries,
-      evidenceIds: {
-        apiIndexEvidenceId: apiIndexResult.data.evidenceId,
-        processingEvidenceId: processingResult.data.evidenceId
-      }
-    };
-
-    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
-  });
-
-  router.get("/lineage/correlations/:executionId/by-endpoint", async (req, res) => {
-    const cid = correlationId(req);
-    const executionId = req.params.executionId;
-    const execution = await getExecutionByIdWithFallback(executionId);
-
-    if (!execution) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
-    }
-
-    const frontendResult = getFrontendPatternDetectionResult(executionId);
-    if (!frontendResult || !frontendResult.ok || !frontendResult.data) {
-      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "frontend_pattern_detection_result_not_available" });
-    }
-
-    const backendResult = getBackendProcessingDetectionResult(executionId);
-    if (!backendResult || !backendResult.ok || !backendResult.data) {
-      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "backend_processing_detection_result_not_available" });
-    }
-
-    const frontendEndpointMap = new Map<string, LineageFrontendReferenceDto[]>();
-    for (const file of frontendResult.data.files) {
-      for (const match of file.matches) {
-        const endpoints = extractSnippetEndpoints(match.snippet);
-        for (const endpoint of endpoints) {
-          const references = frontendEndpointMap.get(endpoint) ?? [];
-          references.push({
-            relativePath: file.relativePath,
-            rule: match.rule,
-            line: match.line,
-            snippet: match.snippet
-          });
-          frontendEndpointMap.set(endpoint, references);
-        }
-      }
-    }
-
-    const backendEndpointMap = new Map<string, LineageBackendReferenceDto[]>();
-    for (const file of backendResult.data.files) {
-      for (const match of file.matches) {
-        const endpoints = extractSnippetEndpoints(match.snippet);
-        for (const endpoint of endpoints) {
-          const references = backendEndpointMap.get(endpoint) ?? [];
-          references.push({
-            relativePath: file.relativePath,
-            rule: match.rule,
-            line: match.line,
-            snippet: match.snippet
-          });
-          backendEndpointMap.set(endpoint, references);
-        }
-      }
-    }
-
-    const allEndpoints = new Set<string>([...frontendEndpointMap.keys(), ...backendEndpointMap.keys()]);
-    const correlations = Array.from(allEndpoints)
-      .sort((a, b) => a.localeCompare(b))
-      .map((endpoint) => {
-        const frontendReferences = frontendEndpointMap.get(endpoint) ?? [];
-        const backendReferences = backendEndpointMap.get(endpoint) ?? [];
-        const hasFrontend = frontendReferences.length > 0;
-        const hasBackend = backendReferences.length > 0;
-
-        const status: LineageCorrelationStatus = hasFrontend && hasBackend ? "INFERRED_HIGH" : "PENDING";
-        const confidence = hasFrontend && hasBackend ? 0.8 : 0.3;
-
-        return {
-          endpoint,
-          status,
-          confidence,
-          frontendReferences,
-          backendReferences
-        };
-      });
-
-    const payload: LineageEndpointCorrelationViewDto = {
-      executionId,
-      generatedAt: new Date().toISOString(),
-      totals: {
-        frontendEndpoints: frontendEndpointMap.size,
-        backendEndpoints: backendEndpointMap.size,
-        correlatedEndpoints: correlations.filter((item) => item.frontendReferences.length > 0 && item.backendReferences.length > 0).length
-      },
-      correlations,
-      evidenceIds: {
-        frontendPatternEvidenceId: frontendResult.data.evidenceId,
-        backendProcessingEvidenceId: backendResult.data.evidenceId
-      }
-    };
-
-    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
-  });
-
-  router.get("/lineage/correlations/:executionId/by-dto-processing", async (req, res) => {
-    const cid = correlationId(req);
-    const executionId = req.params.executionId;
-    const execution = await getExecutionByIdWithFallback(executionId);
-
-    if (!execution) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
-    }
-
-    const apiIndexResult = getBackendApiIndexResult(executionId);
-    if (!apiIndexResult || !apiIndexResult.ok || !apiIndexResult.data) {
-      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "backend_api_index_result_not_available" });
-    }
-
-    const processingResult = getBackendProcessingDetectionResult(executionId);
-    if (!processingResult || !processingResult.ok || !processingResult.data) {
-      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "backend_processing_detection_result_not_available" });
-    }
-
-    const apiIndexData = apiIndexResult.data;
-    const processingData = processingResult.data;
-
-    const dtoArtifacts = apiIndexData.artifacts.filter((artifact) => artifact.artifactType === "DTO");
-    const correlations = dtoArtifacts
-      .map((artifact) => {
-        const dtoName = extractDtoNameFromPath(artifact.relativePath);
-        const tokens = buildDtoCorrelationTokens(dtoName);
-        const matchedTokens = new Set<string>();
-        const processingReferences: LineageBackendReferenceDto[] = [];
-
-        for (const file of processingData.files) {
-          const normalizedPath = normalizeTokenSource(file.relativePath);
-
-          for (const match of file.matches) {
-            const normalizedSnippet = normalizeTokenSource(match.snippet);
-            const hasTokenMatch = tokens.some((token) => {
-              const found = normalizedSnippet.includes(token) || normalizedPath.includes(token);
-              if (found) {
-                matchedTokens.add(token);
-              }
-              return found;
-            });
-
-            if (!hasTokenMatch) {
-              continue;
-            }
-
-            processingReferences.push({
-              relativePath: file.relativePath,
-              rule: match.rule,
-              line: match.line,
-              snippet: match.snippet
-            });
-          }
-        }
-
-        const status: LineageCorrelationStatus = processingReferences.length > 0 ? "INFERRED_HIGH" : "PENDING";
-        const confidence = processingReferences.length > 0 ? 0.78 : 0.25;
-
-        return {
-          dto: {
-            relativePath: artifact.relativePath,
-            dtoName
-          },
-          status,
-          confidence,
-          matchedTokens: Array.from(matchedTokens).sort((a, b) => a.localeCompare(b)),
-          processingReferences
-        };
-      })
-      .sort((a, b) => a.dto.relativePath.localeCompare(b.dto.relativePath));
-
-    const payload: LineageDtoProcessingCorrelationViewDto = {
-      executionId,
-      generatedAt: new Date().toISOString(),
-      totals: {
-        dtoArtifacts: dtoArtifacts.length,
-        dtoWithProcessingMatches: correlations.filter((item) => item.processingReferences.length > 0).length,
-        processingFiles: processingData.totalFilesWithMatches,
-        correlations: correlations.length
-      },
-      correlations,
-      evidenceIds: {
-        backendApiIndexEvidenceId: apiIndexData.evidenceId,
-        backendProcessingEvidenceId: processingData.evidenceId
-      }
-    };
-
-    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
-  });
-
-  router.get("/lineage/views/:executionId/consolidated", async (req, res) => {
-    const cid = correlationId(req);
-    const executionId = req.params.executionId;
-    const execution = await getExecutionByIdWithFallback(executionId);
-
-    if (!execution) {
-      return res.status(400).setHeader("x-correlation-id", cid).json({ error: "execution_id_not_found" });
-    }
-
-    const frontendResult = getFrontendPatternDetectionResult(executionId);
-    if (!frontendResult || !frontendResult.ok || !frontendResult.data) {
-      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "frontend_pattern_detection_result_not_available" });
-    }
-
-    const apiIndexResult = getBackendApiIndexResult(executionId);
-    if (!apiIndexResult || !apiIndexResult.ok || !apiIndexResult.data) {
-      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "backend_api_index_result_not_available" });
-    }
-
-    const processingResult = getBackendProcessingDetectionResult(executionId);
-    if (!processingResult || !processingResult.ok || !processingResult.data) {
-      return res.status(422).setHeader("x-correlation-id", cid).json({ error: "backend_processing_detection_result_not_available" });
-    }
-
-    const frontendData = frontendResult.data;
-    const apiIndexData = apiIndexResult.data;
-    const processingData = processingResult.data;
-
-    const frontendEndpointMap = new Map<string, LineageFrontendReferenceDto[]>();
-    for (const file of frontendData.files) {
-      for (const match of file.matches) {
-        const endpoints = extractSnippetEndpoints(match.snippet);
-        for (const endpoint of endpoints) {
-          const references = frontendEndpointMap.get(endpoint) ?? [];
-          references.push({
-            relativePath: file.relativePath,
-            rule: match.rule,
-            line: match.line,
-            snippet: match.snippet
-          });
-          frontendEndpointMap.set(endpoint, references);
-        }
-      }
-    }
-
-    const backendEndpointMap = new Map<string, LineageBackendReferenceDto[]>();
-    for (const file of processingData.files) {
-      for (const match of file.matches) {
-        const endpoints = extractSnippetEndpoints(match.snippet);
-        for (const endpoint of endpoints) {
-          const references = backendEndpointMap.get(endpoint) ?? [];
-          references.push({
-            relativePath: file.relativePath,
-            rule: match.rule,
-            line: match.line,
-            snippet: match.snippet
-          });
-          backendEndpointMap.set(endpoint, references);
-        }
-      }
-    }
-
-    const nodeMap = new Map<string, LineageConsolidatedViewDto["nodes"][number]>();
-    const edges: LineageConsolidatedViewDto["edges"] = [];
-
-    const allEndpoints = Array.from(new Set<string>([...frontendEndpointMap.keys(), ...backendEndpointMap.keys()])).sort((a, b) => a.localeCompare(b));
-    for (const endpoint of allEndpoints) {
-      const frontendRefs = frontendEndpointMap.get(endpoint) ?? [];
-      const backendRefs = backendEndpointMap.get(endpoint) ?? [];
-
-      if (frontendRefs.length > 0) {
-        nodeMap.set(endpointNodeId("frontend", endpoint), {
-          id: endpointNodeId("frontend", endpoint),
-          type: "FRONTEND_ENDPOINT",
-          label: endpoint,
-          status: "INFERRED_HIGH"
-        });
-      }
-
-      if (backendRefs.length > 0) {
-        nodeMap.set(endpointNodeId("backend", endpoint), {
-          id: endpointNodeId("backend", endpoint),
-          type: "BACKEND_ENDPOINT",
-          label: endpoint,
-          status: "INFERRED_HIGH"
-        });
-      }
-
-      if (frontendRefs.length > 0 && backendRefs.length > 0) {
-        edges.push({
-          id: `edge:endpoint:${endpoint}`,
-          type: "CALLS_ENDPOINT",
-          sourceId: endpointNodeId("frontend", endpoint),
-          targetId: endpointNodeId("backend", endpoint),
-          status: "INFERRED_HIGH",
-          confidence: 0.8
-        });
-      }
-    }
-
-    const dtoArtifacts = apiIndexData.artifacts.filter((artifact) => artifact.artifactType === "DTO");
-    for (const artifact of dtoArtifacts) {
-      const dtoName = extractDtoNameFromPath(artifact.relativePath);
-      const tokens = buildDtoCorrelationTokens(dtoName);
-      const dtoId = dtoNodeId(artifact.relativePath);
-
-      nodeMap.set(dtoId, {
-        id: dtoId,
-        type: "DTO_ARTIFACT",
-        label: dtoName,
-        status: "PENDING"
-      });
-
-      for (const file of processingData.files) {
-        const processingId = processingNodeId(file.relativePath);
-        const normalizedPath = normalizeTokenSource(file.relativePath);
-        let hasTokenMatch = false;
-
-        for (const match of file.matches) {
-          const normalizedSnippet = normalizeTokenSource(match.snippet);
-          const found = tokens.some((token) => normalizedSnippet.includes(token) || normalizedPath.includes(token));
-          if (found) {
-            hasTokenMatch = true;
-            break;
-          }
-        }
-
-        if (!hasTokenMatch) {
-          continue;
-        }
-
-        nodeMap.set(dtoId, {
-          id: dtoId,
-          type: "DTO_ARTIFACT",
-          label: dtoName,
-          status: "INFERRED_HIGH"
-        });
-
-        nodeMap.set(processingId, {
-          id: processingId,
-          type: "BACKEND_PROCESSING_FILE",
-          label: file.relativePath,
-          status: "INFERRED_HIGH"
-        });
-
-        edges.push({
-          id: `edge:dto:${artifact.relativePath}->${file.relativePath}`,
-          type: "MAPPED_TO_PROCESSING",
-          sourceId: dtoId,
-          targetId: processingId,
-          status: "INFERRED_HIGH",
-          confidence: 0.78
-        });
-      }
-    }
-
-    const nodes = Array.from(nodeMap.values()).sort((a, b) => a.id.localeCompare(b.id));
-    edges.sort((a, b) => a.id.localeCompare(b.id));
-
-    const payload: LineageConsolidatedViewDto = {
-      executionId,
-      generatedAt: new Date().toISOString(),
-      totals: {
-        nodes: nodes.length,
-        edges: edges.length,
-        endpointLinks: edges.filter((edge) => edge.type === "CALLS_ENDPOINT").length,
-        dtoProcessingLinks: edges.filter((edge) => edge.type === "MAPPED_TO_PROCESSING").length
-      },
-      nodes,
-      edges,
-      evidenceIds: {
-        frontendPatternEvidenceId: frontendData.evidenceId,
-        backendApiIndexEvidenceId: apiIndexData.evidenceId,
-        backendProcessingEvidenceId: processingData.evidenceId
-      }
-    };
-
-    return res.status(200).setHeader("x-correlation-id", cid).json({ data: payload });
-  });
-
-  router.post("/legal-analysis/discrepancies/start", async (req, res) => {
-    const cid = correlationId(req);
-    const body = req.body as StartLegalDiscrepancyDetectionDto;
-
-    if (!body.executionId || body.executionId.trim().length === 0) {
-      return res
-        .status(400)
-        .setHeader("x-correlation-id", cid)
-        .json(legalDiscrepancyDetectionError("unknown_execution", "invalid_execution_id", "execution_id_required"));
-    }
-
-    const execution = await getExecutionByIdWithFallback(body.executionId);
-    if (!execution) {
-      return res
-        .status(400)
-        .setHeader("x-correlation-id", cid)
-        .json(legalDiscrepancyDetectionError(body.executionId, "invalid_execution_id", "execution_id_not_found"));
-    }
-
-    const declaredThirdParties = normalizeDeclaredValues(body.declaredThirdParties);
-    const declaredCookieKeys = normalizeDeclaredValues(body.declaredCookieKeys);
-    const declaredPurposes = normalizeDeclaredValues(body.declaredPurposes);
-    if (!declaredThirdParties || !declaredCookieKeys || !declaredPurposes) {
-      return res
-        .status(400)
-        .setHeader("x-correlation-id", cid)
-        .json(legalDiscrepancyDetectionError(body.executionId, "invalid_declared_values", "invalid_declared_values"));
-    }
-
-    const dynamicResult = getDynamicObservationResult(body.executionId);
-    if (!dynamicResult || !dynamicResult.ok || !dynamicResult.data) {
-      const failure = recordLegalDiscrepancyDetectionResult(
-        body.executionId,
-        legalDiscrepancyDetectionError(body.executionId, "tracking_inventory_not_available", "dynamic_observation_result_not_available")
-      );
-      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
-    }
-
-    try {
-      const inventory = listTrackingInventoryByExecutionId(body.executionId);
-      const discrepancies: LegalDiscrepancyItemDto[] = [];
-      const observedCategories = new Set<string>();
-
-      for (const networkItem of dynamicResult.data.network) {
-        if (networkItem.classificationLabel && networkItem.classificationLabel !== "UNCLASSIFIED") {
-          observedCategories.add(networkItem.classificationLabel);
-        }
-      }
-
-      for (const storageItem of dynamicResult.data.storage) {
-        if (storageItem.classificationLabel && storageItem.classificationLabel !== "UNCLASSIFIED") {
-          observedCategories.add(storageItem.classificationLabel);
-        }
-      }
-
-      if (observedCategories.size === 0 && (inventory.thirdParties.length > 0 || inventory.cookies.length > 0)) {
-        observedCategories.add("BEHAVIORAL_DATA");
-      }
-
-      for (const thirdParty of inventory.thirdParties) {
-        const normalized = thirdParty.domain.trim().toLowerCase();
-        if (!declaredThirdParties.includes(normalized)) {
-          discrepancies.push({
-            kind: "THIRD_PARTY_OBSERVED_NOT_DECLARED",
-            observedValue: thirdParty.domain,
-            declaredInPolicy: false,
-            message: `Existe una posible discrepancia: se observo tercero ${thirdParty.domain} no encontrado en lo declarado. Requiere validacion.`,
-            requiresValidation: true
-          });
-        }
-      }
-
-      for (const cookie of inventory.cookies) {
-        const normalized = cookie.key.trim().toLowerCase();
-        if (!declaredCookieKeys.includes(normalized)) {
-          discrepancies.push({
-            kind: "COOKIE_OBSERVED_NOT_DECLARED",
-            observedValue: cookie.key,
-            declaredInPolicy: false,
-            message: `Existe una posible discrepancia: se observo cookie ${cookie.key} no encontrada en lo declarado. Requiere validacion.`,
-            requiresValidation: true
-          });
-        }
-      }
-
-      for (const category of Array.from(observedCategories).sort((a, b) => a.localeCompare(b))) {
-        if (!hasPurposeForCategory(category, declaredPurposes)) {
-          discrepancies.push({
-            kind: "PURPOSE_NOT_FOUND_FOR_OBSERVED_CATEGORY",
-            observedValue: category,
-            declaredInPolicy: false,
-            message: `No se encontro finalidad declarada para categoria observada ${category}. Existe una posible discrepancia. Requiere validacion.`,
-            requiresValidation: true
-          });
-        }
-      }
-
-      if (dynamicResult.data.consentEvaluation?.code === "TRACKING_AFTER_REJECT") {
-        discrepancies.push({
-          kind: "TRACKING_AFTER_REJECT",
-          observedValue: "tracking_after_reject",
-          declaredInPolicy: false,
-          message: "Se observo tracking posterior al rechazo de consentimiento. Existe una posible discrepancia. Requiere validacion.",
-          requiresValidation: true
-        });
-      }
-
-      if (dynamicResult.data.consentEvaluation?.code === "TRACKING_BEFORE_CONSENT") {
-        discrepancies.push({
-          kind: "CAPTURE_BEFORE_INFORMATION",
-          observedValue: "tracking_before_consent",
-          declaredInPolicy: false,
-          message: "Se observo captura previa a informacion y decision de consentimiento. Existe una posible discrepancia. Requiere validacion.",
-          requiresValidation: true
-        });
-      }
-
-      const success: LegalDiscrepancyDetectionResultDto = {
-        ok: true,
-        data: {
-          executionId: body.executionId,
-          analyzedAt: new Date().toISOString(),
-          totals: {
-            observedThirdParties: inventory.thirdParties.length,
-            observedCookies: inventory.cookies.length,
-            observedCategories: observedCategories.size,
-            discrepancies: discrepancies.length
-          },
-          declared: {
-            thirdParties: declaredThirdParties,
-            cookieKeys: declaredCookieKeys,
-            purposes: declaredPurposes
-          },
-          discrepancies,
-          summary:
-            discrepancies.length > 0
-              ? "Existe una posible discrepancia entre comportamiento observado y declarado. Requiere validacion."
-              : "No se observo discrepancia en terceros o cookies respecto de lo declarado. Requiere validacion humana del contexto."
-        }
-      };
-
-      recordLegalDiscrepancyDetectionResult(body.executionId, success);
-      return res.status(200).setHeader("x-correlation-id", cid).json(success);
-    } catch (error) {
-      const failure = recordLegalDiscrepancyDetectionResult(
-        body.executionId,
-        legalDiscrepancyDetectionError(body.executionId, "detection_failed", (error as Error).message)
-      );
-      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
-    }
-  });
-
-  router.get("/legal-analysis/discrepancies/:executionId/result", async (req, res) => {
-    const cid = correlationId(req);
-    const executionId = req.params.executionId;
-    const execution = await getExecutionByIdWithFallback(executionId);
-
-    if (!execution) {
-      return res
-        .status(400)
-        .setHeader("x-correlation-id", cid)
-        .json(legalDiscrepancyDetectionError(executionId, "invalid_execution_id", "execution_id_not_found"));
-    }
-
-    const result = getLegalDiscrepancyDetectionResult(executionId);
-    if (!result) {
-      return res
-        .status(422)
-        .setHeader("x-correlation-id", cid)
-        .json(legalDiscrepancyDetectionError(executionId, "result_not_available", "legal_discrepancy_result_not_available"));
-    }
-
-    return res.status(200).setHeader("x-correlation-id", cid).json(result);
-  });
-
-  router.post("/monitoring/version-comparisons/start", async (req, res) => {
-    const cid = correlationId(req);
-    const body = req.body as StartVersionComparisonDto;
-
-    if (!body.baselineExecutionId || !body.currentExecutionId) {
-      return res
-        .status(400)
-        .setHeader("x-correlation-id", cid)
-        .json(
-          versionComparisonError(
-            body.baselineExecutionId ?? "unknown_baseline",
-            body.currentExecutionId ?? "unknown_current",
-            "invalid_execution_id",
-            "baseline_execution_id_and_current_execution_id_required"
-          )
-        );
-    }
-
-    const baselineExecution = await getExecutionByIdWithFallback(body.baselineExecutionId);
-    const currentExecution = await getExecutionByIdWithFallback(body.currentExecutionId);
-    if (!baselineExecution || !currentExecution) {
-      return res
-        .status(400)
-        .setHeader("x-correlation-id", cid)
-        .json(versionComparisonError(body.baselineExecutionId, body.currentExecutionId, "invalid_execution_id", "execution_id_not_found"));
-    }
-
-    const baselineDynamic = getDynamicObservationResult(body.baselineExecutionId);
-    const currentDynamic = getDynamicObservationResult(body.currentExecutionId);
-    if (!baselineDynamic?.ok || !baselineDynamic.data || !currentDynamic?.ok || !currentDynamic.data) {
-      const failure = recordVersionComparisonResult(
-        body.baselineExecutionId,
-        body.currentExecutionId,
-        versionComparisonError(body.baselineExecutionId, body.currentExecutionId, "tracking_inventory_not_available", "dynamic_observation_result_not_available")
-      );
-      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
-    }
-
-    try {
-      const baselineInventory = listTrackingInventoryByExecutionId(body.baselineExecutionId);
-      const currentInventory = listTrackingInventoryByExecutionId(body.currentExecutionId);
-
-      const baselineThirdParties = new Set(baselineInventory.thirdParties.map((item) => item.domain.toLowerCase()));
-      const currentThirdParties = new Set(currentInventory.thirdParties.map((item) => item.domain.toLowerCase()));
-      const baselineCookies = new Set(baselineInventory.cookies.map((item) => item.key.toLowerCase()));
-      const currentCookies = new Set(currentInventory.cookies.map((item) => item.key.toLowerCase()));
-      const baselineEndpoints = collectObservedEndpointSignatures(baselineDynamic.data.network);
-      const currentEndpoints = collectObservedEndpointSignatures(currentDynamic.data.network);
-      const newEndpoints = Array.from(currentEndpoints)
-        .filter((item) => !baselineEndpoints.has(item))
-        .sort((a, b) => a.localeCompare(b));
-
-      const changes: VersionComparisonChangeDto[] = [];
-
-      for (const item of Array.from(currentThirdParties).sort((a, b) => a.localeCompare(b))) {
-        if (!baselineThirdParties.has(item)) {
-          changes.push({
-            kind: "NEW_THIRD_PARTY",
-            value: item,
-            severity: "WARNING",
-            probableCause: newEndpoints.length > 0 ? "SITE_CHANGE" : "DOCUMENTATION_GAP",
-            message: `No se observo ${item} en baseline y ahora si se observo. Existe un cambio tecnico probable. Requiere validacion.`,
-            requiresValidation: true
-          });
-        }
-      }
-
-      for (const item of Array.from(baselineThirdParties).sort((a, b) => a.localeCompare(b))) {
-        if (!currentThirdParties.has(item)) {
-          changes.push({
-            kind: "REMOVED_THIRD_PARTY",
-            value: item,
-            severity: "INFO",
-            probableCause: "RULE_CHANGE_OR_INSTRUMENTATION",
-            message: `Se observo ${item} en baseline y ahora no se observo. Existe un cambio tecnico probable. Requiere validacion.`,
-            requiresValidation: true
-          });
-        }
-      }
-
-      for (const item of Array.from(currentCookies).sort((a, b) => a.localeCompare(b))) {
-        if (!baselineCookies.has(item)) {
-          changes.push({
-            kind: "NEW_COOKIE",
-            value: item,
-            severity: "WARNING",
-            probableCause: newEndpoints.length > 0 ? "SITE_CHANGE" : "DOCUMENTATION_GAP",
-            message: `No se observo cookie ${item} en baseline y ahora si se observo. Existe un cambio tecnico probable. Requiere validacion.`,
-            requiresValidation: true
-          });
-        }
-      }
-
-      for (const item of Array.from(baselineCookies).sort((a, b) => a.localeCompare(b))) {
-        if (!currentCookies.has(item)) {
-          changes.push({
-            kind: "REMOVED_COOKIE",
-            value: item,
-            severity: "INFO",
-            probableCause: "RULE_CHANGE_OR_INSTRUMENTATION",
-            message: `Se observo cookie ${item} en baseline y ahora no se observo. Existe un cambio tecnico probable. Requiere validacion.`,
-            requiresValidation: true
-          });
-        }
-      }
-
-      for (const item of newEndpoints) {
-        changes.push({
-          kind: "NEW_ENDPOINT",
-          value: item,
-          severity: "WARNING",
-          probableCause: "SITE_CHANGE",
-          message: `No se observo endpoint ${item} en baseline y ahora si se observo. Existe un cambio tecnico probable. Requiere validacion.`,
-          requiresValidation: true
-        });
-      }
-
-      const alert = buildVersionComparisonAlert(changes);
-
-      const result: VersionComparisonResultDto = {
-        ok: true,
-        data: {
-          baselineExecutionId: body.baselineExecutionId,
-          currentExecutionId: body.currentExecutionId,
-          comparedAt: new Date().toISOString(),
-          totals: {
-            baselineThirdParties: baselineInventory.thirdParties.length,
-            currentThirdParties: currentInventory.thirdParties.length,
-            baselineCookies: baselineInventory.cookies.length,
-            currentCookies: currentInventory.cookies.length,
-            baselineEndpoints: baselineEndpoints.size,
-            currentEndpoints: currentEndpoints.size,
-            newEndpoints: newEndpoints.length,
-            changes: changes.length
-          },
-          changes,
-          alert
-        }
-      };
-
-      recordVersionComparisonResult(body.baselineExecutionId, body.currentExecutionId, result);
-      return res.status(200).setHeader("x-correlation-id", cid).json(result);
-    } catch (error) {
-      const failure = recordVersionComparisonResult(
-        body.baselineExecutionId,
-        body.currentExecutionId,
-        versionComparisonError(body.baselineExecutionId, body.currentExecutionId, "comparison_failed", (error as Error).message)
-      );
-      return res.status(422).setHeader("x-correlation-id", cid).json(failure);
-    }
-  });
-
-  router.get("/monitoring/version-comparisons/:baselineExecutionId/:currentExecutionId/result", async (req, res) => {
-    const cid = correlationId(req);
-    const baselineExecutionId = req.params.baselineExecutionId;
-    const currentExecutionId = req.params.currentExecutionId;
-
-    const baselineExecution = await getExecutionByIdWithFallback(baselineExecutionId);
-    const currentExecution = await getExecutionByIdWithFallback(currentExecutionId);
-    if (!baselineExecution || !currentExecution) {
-      return res
-        .status(400)
-        .setHeader("x-correlation-id", cid)
-        .json(versionComparisonError(baselineExecutionId, currentExecutionId, "invalid_execution_id", "execution_id_not_found"));
-    }
-
-    const result = getVersionComparisonResult(baselineExecutionId, currentExecutionId);
-    if (!result) {
-      return res
-        .status(422)
-        .setHeader("x-correlation-id", cid)
-        .json(versionComparisonError(baselineExecutionId, currentExecutionId, "result_not_available", "version_comparison_result_not_available"));
-    }
-
-    return res.status(200).setHeader("x-correlation-id", cid).json(result);
-  });
-
-  router.post("/privacy/executions/:executionId/purge", async (req, res) => {
-    const cid = correlationId(req);
-    const executionId = req.params.executionId;
-
-    const execution = await getExecutionByIdWithFallback(executionId);
-    if (!execution) {
-      return res
-        .status(400)
-        .setHeader("x-correlation-id", cid)
-        .json(executionDataPurgeError(executionId, "invalid_execution_id", "execution_id_not_found"));
-    }
-
-    try {
-      const deletedCounts = purgeExecutionData(executionId);
-
-      const result: ExecutionDataPurgeResultDto = {
-        ok: true,
-        data: {
-          executionId,
-          purgedAt: new Date().toISOString(),
-          deletedCounts,
-          summary:
-            "Se eliminaron datos operativos asociados a la ejecucion. La ejecucion puede conservar metadatos administrativos. Requiere validacion de politicas de retencion."
-        }
-      };
-
-      return res.status(200).setHeader("x-correlation-id", cid).json(result);
-    } catch (error) {
-      return res
-        .status(422)
-        .setHeader("x-correlation-id", cid)
-        .json(executionDataPurgeError(executionId, "purge_failed", (error as Error).message));
-    }
-  });
-
-  router.post("/privacy/retention/apply", async (req, res) => {
-    const cid = correlationId(req);
-    const body = req.body as StartExecutionDataRetentionDto;
-
-    const windowMinutes = Number(body?.windowMinutes);
-    if (!Number.isInteger(windowMinutes) || windowMinutes <= 0 || windowMinutes > 525_600) {
-      return res
-        .status(400)
-        .setHeader("x-correlation-id", cid)
-        .json(executionDataRetentionError("invalid_window_minutes", "window_minutes_must_be_integer_between_1_and_525600"));
-    }
-
-    const states = parseRetentionStates(body?.states);
-    if (!states) {
-      return res.status(400).setHeader("x-correlation-id", cid).json(executionDataRetentionError("invalid_states", "invalid_retention_states"));
-    }
-
-    try {
-      const retention = applyExecutionDataRetention({
-        windowMinutes,
-        states
-      });
-
-      const result: ExecutionDataRetentionResultDto = {
-        ok: true,
-        data: {
-          appliedAt: new Date().toISOString(),
-          windowMinutes,
-          cutoffAt: retention.cutoffAt,
-          states: states.map((state) => state as ExecutionRetentionState),
-          candidateExecutions: retention.candidateExecutions,
-          purgedExecutions: retention.purgedExecutions,
-          deletedTotals: retention.deletedTotals,
-          summary:
-            retention.purgedExecutions > 0
-              ? "Se aplico retencion y se eliminaron datos operativos de ejecuciones fuera de ventana. Requiere validacion de politica por cliente."
-              : "No se detectaron ejecuciones fuera de ventana para purga. Requiere validacion de politica por cliente."
-        }
-      };
-
-      return res.status(200).setHeader("x-correlation-id", cid).json(result);
-    } catch (error) {
-      return res
-        .status(422)
-        .setHeader("x-correlation-id", cid)
-        .json(executionDataRetentionError("retention_failed", (error as Error).message));
     }
   });
 

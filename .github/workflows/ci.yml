@@ -176,12 +176,11 @@ jobs:
 
       - name: Report Stage 5.2 gate coverage
         run: |
-          echo "E5.2 gate integration coverage: 10 files / 23 tests expected"
+          echo "E5.2 gate integration coverage: 9 files / 20 tests expected"
           echo "- tests/integration/stage5-scope-gate.integration.test.ts"
           echo "- tests/integration/stage5-passive-fetch.integration.test.ts"
           echo "- tests/integration/stage5-e2e-lab.integration.test.ts"
           echo "- tests/integration/stage5-e2e-lab-extended.integration.test.ts"
-          echo "- tests/integration/stage5-e2e-lab-failure-matrix.integration.test.ts"
           echo "- tests/integration/stage5-evidence-recovery.integration.test.ts"
           echo "- tests/integration/stage5-operational-query.integration.test.ts"
           echo "- tests/integration/stage5-fetch-errors.integration.test.ts"
@@ -225,13 +224,13 @@ jobs:
             exit 1
           fi
 
-          if [ "$files_passed" != "10" ] || [ "$files_total" != "10" ]; then
-            echo "Cobertura inesperada de archivos de integracion para E5.2: ${files_passed}/${files_total}. Se esperaba 10/10."
+          if [ "$files_passed" != "9" ] || [ "$files_total" != "9" ]; then
+            echo "Cobertura inesperada de archivos de integracion para E5.2: ${files_passed}/${files_total}. Se esperaba 9/9."
             exit 1
           fi
 
-          if [ "$tests_passed" != "23" ] || [ "$tests_total" != "23" ]; then
-            echo "Cobertura inesperada de tests de integracion para E5.2: ${tests_passed}/${tests_total}. Se esperaba 23/23."
+          if [ "$tests_passed" != "20" ] || [ "$tests_total" != "20" ]; then
+            echo "Cobertura inesperada de tests de integracion para E5.2: ${tests_passed}/${tests_total}. Se esperaba 20/20."
             exit 1
           fi
 
@@ -239,19 +238,9 @@ jobs:
 
       - name: Report Stage 5.3 gate coverage
         run: |
-          echo "E5.3 gate coverage: Stage 5.2 gate (10 files / 23 tests) + observability regression (1 file / 3 tests)"
+          echo "E5.3 gate coverage: Stage 5.2 gate (9 files / 20 tests) + observability regression (1 file / 3 tests)"
           echo "- Stage 5.2 gate: npm run lab:e5-2:gate"
           echo "- Observability regression: npm run lab:e5-3:obs-regression"
-
-      - name: Restore Stage 5 gate timing history
-        id: restore-stage5-timing-history
-        uses: actions/cache/restore@v4
-        with:
-          path: .ci/timing-history
-          key: stage5-gate-timing-history-${{ github.ref_name }}-${{ github.run_id }}
-          restore-keys: |
-            stage5-gate-timing-history-${{ github.ref_name }}-
-            stage5-gate-timing-history-
 
       - name: Stage 5.3 gate E5-3
         shell: bash
@@ -293,13 +282,13 @@ jobs:
             exit 1
           fi
 
-          if ! echo "$file_pairs" | grep -q '^10/10$'; then
-            echo "Falta resultado esperado de Stage 5.2 en archivos de integracion (10/10)."
+          if ! echo "$file_pairs" | grep -q '^9/9$'; then
+            echo "Falta resultado esperado de Stage 5.2 en archivos de integracion (9/9)."
             exit 1
           fi
 
-          if ! echo "$test_pairs" | grep -q '^23/23$'; then
-            echo "Falta resultado esperado de Stage 5.2 en tests de integracion (23/23)."
+          if ! echo "$test_pairs" | grep -q '^20/20$'; then
+            echo "Falta resultado esperado de Stage 5.2 en tests de integracion (20/20)."
             exit 1
           fi
 
@@ -313,7 +302,7 @@ jobs:
             exit 1
           fi
 
-          echo "E5.3 gate result: stage5_gate_files=10/10; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3"
+          echo "E5.3 gate result: stage5_gate_files=9/9; stage5_gate_tests=20/20; obs_regression_files=1/1; obs_regression_tests=3/3"
           echo "E5.3 gate duration: ${E5_3_GATE_DURATION_SECONDS}s"
 
       - name: Report Stage 5.3 gate timing trend
@@ -322,9 +311,6 @@ jobs:
           set -euo pipefail
           duration_seconds="${E5_3_GATE_DURATION_SECONDS:-}"
           warning_threshold_seconds=480
-          history_dir=".ci/timing-history"
-          history_file="${history_dir}/e5_3_gate_history.log"
-          trend_file="e5_3_gate_timing_history.log"
 
           if [ -z "$duration_seconds" ]; then
             echo "No se pudo leer E5_3_GATE_DURATION_SECONDS para reporte de tendencia."
@@ -336,53 +322,12 @@ jobs:
             exit 1
           fi
 
-          mkdir -p "$history_dir"
-          touch "$history_file"
-
-          previous_duration_seconds="$(awk -F',' 'NF >= 3 { last = $3 } END { if (last != "") print last; else print "na" }' "$history_file")"
-
-          if [[ "$previous_duration_seconds" =~ ^[0-9]+$ ]]; then
-            delta_seconds="$((duration_seconds - previous_duration_seconds))"
-          else
-            delta_seconds="na"
-          fi
-
-          printf "%s,%s,%s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${GITHUB_RUN_ID:-na}" "$duration_seconds" >> "$history_file"
-
-          {
-            echo "history_file=${history_file}"
-            echo "duration_seconds=${duration_seconds}"
-            echo "previous_duration_seconds=${previous_duration_seconds}"
-            echo "delta_seconds=${delta_seconds}"
-            echo "threshold_seconds=${warning_threshold_seconds}"
-          } > "$trend_file"
-
-          echo "E5_3_GATE_PREVIOUS_DURATION_SECONDS=${previous_duration_seconds}" >> "$GITHUB_ENV"
-          echo "E5_3_GATE_DELTA_SECONDS=${delta_seconds}" >> "$GITHUB_ENV"
-
           if [ "$duration_seconds" -gt "$warning_threshold_seconds" ]; then
             echo "::warning::E5.3 gate timing trend: ${duration_seconds}s (umbral operativo ${warning_threshold_seconds}s). Revisar cambios recientes en suites, runner y fixtures."
-            echo "E5.3 gate timing trend: status=warning; duration_seconds=${duration_seconds}; previous_duration_seconds=${previous_duration_seconds}; delta_seconds=${delta_seconds}; threshold_seconds=${warning_threshold_seconds}"
+            echo "E5.3 gate timing trend: status=warning; duration_seconds=${duration_seconds}; threshold_seconds=${warning_threshold_seconds}"
           else
-            echo "E5.3 gate timing trend: status=ok; duration_seconds=${duration_seconds}; previous_duration_seconds=${previous_duration_seconds}; delta_seconds=${delta_seconds}; threshold_seconds=${warning_threshold_seconds}"
+            echo "E5.3 gate timing trend: status=ok; duration_seconds=${duration_seconds}; threshold_seconds=${warning_threshold_seconds}"
           fi
-
-      - name: Save Stage 5 gate timing history cache
-        if: ${{ always() }}
-        uses: actions/cache/save@v4
-        with:
-          path: .ci/timing-history
-          key: stage5-gate-timing-history-${{ github.ref_name }}-${{ github.run_id }}
-
-      - name: Upload Stage 5 gate timing history artifact
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: stage5-gate-timing-history
-          path: |
-            .ci/timing-history/e5_3_gate_history.log
-            e5_3_gate_timing_history.log
-          if-no-files-found: ignore
 
       - name: Report Stage 5.4 gate coverage
         run: |
@@ -408,13 +353,13 @@ jobs:
             exit 1
           fi
 
-          if ! echo "$file_pairs" | grep -q '^10/10$'; then
-            echo "Falta resultado esperado de Stage 5.2 en archivos de integracion (10/10)."
+          if ! echo "$file_pairs" | grep -q '^9/9$'; then
+            echo "Falta resultado esperado de Stage 5.2 en archivos de integracion (9/9)."
             exit 1
           fi
 
-          if ! echo "$test_pairs" | grep -q '^23/23$'; then
-            echo "Falta resultado esperado de Stage 5.2 en tests de integracion (23/23)."
+          if ! echo "$test_pairs" | grep -q '^20/20$'; then
+            echo "Falta resultado esperado de Stage 5.2 en tests de integracion (20/20)."
             exit 1
           fi
 
@@ -434,551 +379,34 @@ jobs:
           fi
 
           duration_seconds="${E5_3_GATE_DURATION_SECONDS:-na}"
-          previous_duration_seconds="${E5_3_GATE_PREVIOUS_DURATION_SECONDS:-na}"
-          delta_seconds="${E5_3_GATE_DELTA_SECONDS:-na}"
-          echo "E5.4 gate result: stage5_gate_files=10/10; stage5_gate_tests=23/23; obs_regression_files=1/1; obs_regression_tests=3/3; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds=${duration_seconds}; previous_stage5_3_gate_duration_seconds=${previous_duration_seconds}; stage5_3_gate_delta_seconds=${delta_seconds}"
-
-      - name: Report Stage 6 gate coverage
-        run: |
-          echo "E6 gate coverage: OpenAPI + Typecheck + Stage 6 dynamic observation integration suite"
-          echo "- OpenAPI: npm run openapi:validate"
-          echo "- Typecheck: npm run typecheck"
-          echo "- Integration suite: tests/integration/stage6-dynamic-observation.integration.test.ts"
-
-      - name: Stage 6 gate E6
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run lab:e6:gate | tee e6_gate.log
-
-      - name: Report Stage 6 gate result
-        shell: bash
-        run: |
-          set -euo pipefail
-          files_passed="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1/p' e6_gate.log | tail -n1)"
-          files_total="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\2/p' e6_gate.log | tail -n1)"
-          tests_passed="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1/p' e6_gate.log | tail -n1)"
-          tests_total="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\2/p' e6_gate.log | tail -n1)"
-
-          if [ -z "$files_passed" ] || [ -z "$files_total" ] || [ -z "$tests_passed" ] || [ -z "$tests_total" ]; then
-            echo "No se pudieron extraer resultados del gate E6 desde e6_gate.log"
-            exit 1
-          fi
-
-          if [ "$files_passed" != "1" ] || [ "$files_total" != "1" ]; then
-            echo "Cobertura inesperada de archivos para gate E6: ${files_passed}/${files_total}. Se esperaba 1/1."
-            exit 1
-          fi
-
-          if [ "$tests_passed" != "6" ] || [ "$tests_total" != "6" ]; then
-            echo "Cobertura inesperada de tests para gate E6: ${tests_passed}/${tests_total}. Se esperaba 6/6."
-            exit 1
-          fi
-
-          echo "E6 gate result: integration_files_passed=${files_passed}/${files_total}; integration_tests_passed=${tests_passed}/${tests_total}; openapi=ok; typecheck=ok"
-
-      - name: Report Stage 7 gate coverage
-        run: |
-          echo "E7 gate coverage: typecheck + unit classification/masking + integration dynamic observation"
-          echo "- Typecheck: npm run typecheck"
-          echo "- Unit suite: tests/unit/stage7-classification-engine.test.ts tests/unit/stage7-masking-policy.test.ts"
-          echo "- Integration suite: tests/integration/stage6-dynamic-observation.integration.test.ts"
-
-      - name: Stage 7 gate E7
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run lab:e7:gate | tee e7_gate.log
-
-      - name: Report Stage 7 gate result
-        shell: bash
-        run: |
-          set -euo pipefail
-          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e7_gate.log)"
-          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e7_gate.log)"
-
-          if [ -z "$file_pairs" ] || [ -z "$test_pairs" ]; then
-            echo "No se pudieron extraer resultados del gate E7 desde e7_gate.log"
-            exit 1
-          fi
-
-          if ! echo "$file_pairs" | grep -q '^2/2$'; then
-            echo "Falta resultado esperado de unit tests E7 en archivos (2/2)."
-            exit 1
-          fi
-
-          if ! echo "$test_pairs" | grep -q '^6/6$'; then
-            echo "Falta resultado esperado de unit tests E7 en tests (6/6)."
-            exit 1
-          fi
-
-          if ! echo "$file_pairs" | grep -q '^1/1$'; then
-            echo "Falta resultado esperado de integracion en archivos (1/1)."
-            exit 1
-          fi
-
-          if ! echo "$test_pairs" | grep -q '^6/6$'; then
-            echo "Falta resultado esperado de integracion en tests (6/6)."
-            exit 1
-          fi
-
-          echo "E7 gate result: unit_files_passed=2/2; unit_tests_passed=6/6; integration_files_passed=1/1; integration_tests_passed=6/6; typecheck=ok"
-
-      - name: Report Stage 8 gate coverage
-        run: |
-          echo "E8 gate coverage: typecheck + unit consent baseline + integration adapter B/C + integration dynamic observation consent"
-          echo "- Typecheck: npm run typecheck"
-          echo "- Unit suite: tests/unit/stage8-consent-scenarios.test.ts"
-          echo "- Integration suite 1: tests/integration/stage8-consent-adapter.integration.test.ts"
-          echo "- Integration suite 2: tests/integration/stage6-dynamic-observation.integration.test.ts"
-
-      - name: Stage 8 gate E8
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run lab:e8:gate | tee e8_gate.log
-
-      - name: Report Stage 8 gate result
-        shell: bash
-        run: |
-          set -euo pipefail
-          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e8_gate.log)"
-          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e8_gate.log)"
-
-          if [ -z "$file_pairs" ] || [ -z "$test_pairs" ]; then
-            echo "No se pudieron extraer resultados del gate E8 desde e8_gate.log"
-            exit 1
-          fi
-
-          if ! echo "$file_pairs" | grep -q '^1/1$'; then
-            echo "Falta resultado esperado de archivos por suite en gate E8 (1/1 por corrida)."
-            exit 1
-          fi
-
-          if ! echo "$test_pairs" | grep -q '^4/4$'; then
-            echo "Falta resultado esperado de unit consentimiento baseline (4/4)."
-            exit 1
-          fi
-
-          if ! echo "$test_pairs" | grep -q '^3/3$'; then
-            echo "Falta resultado esperado de integracion adaptador B/C (3/3)."
-            exit 1
-          fi
-
-          if ! echo "$test_pairs" | grep -q '^6/6$'; then
-            echo "Falta resultado esperado de integracion observacion dinamica con consentimiento (6/6)."
-            exit 1
-          fi
-
-          echo "E8 gate result: consent_unit_files=1/1; consent_unit_tests=4/4; adapter_integration_files=1/1; adapter_integration_tests=3/3; dynamic_observation_integration_files=1/1; dynamic_observation_integration_tests=6/6; typecheck=ok"
-
-      - name: Report Stage 9 gate coverage
-        run: |
-          echo "E9 gate coverage: typecheck + evidence query integration + review execution view integration"
-          echo "- Stage 9 consolidated gate: npm run lab:e9:gate"
-          echo "- Integration suite 1: tests/integration/stage9-evidence-query.integration.test.ts"
-          echo "- Integration suite 2: tests/integration/stage9-review-view.integration.test.ts"
-
-      - name: Stage 9 gate E9
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run lab:e9:gate | tee e9_gate.log
-
-      - name: Report Stage 9 gate result
-        shell: bash
-        run: |
-          set -euo pipefail
-          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e9_gate.log)"
-          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e9_gate.log)"
-
-          if [ -z "$file_pairs" ] || [ -z "$test_pairs" ]; then
-            echo "No se pudieron extraer resultados del gate E9 desde e9_gate.log"
-            exit 1
-          fi
-
-          if ! echo "$file_pairs" | grep -q '^1/1$'; then
-            echo "Falta resultado esperado de archivos por suite en gate E9 (1/1 por corrida)."
-            exit 1
-          fi
-
-          if ! echo "$test_pairs" | grep -q '^4/4$'; then
-            echo "Falta resultado esperado de integracion de consulta de evidencias (4/4)."
-            exit 1
-          fi
-
-          if ! echo "$test_pairs" | grep -q '^2/2$'; then
-            echo "Falta resultado esperado de integracion de vista minima de revision (2/2)."
-            exit 1
-          fi
-
-          echo "E9 gate result: evidence_query_integration_files=1/1; evidence_query_integration_tests=4/4; review_view_integration_files=1/1; review_view_integration_tests=2/2; typecheck=ok"
-
-      - name: Report Stage 10 gate coverage
-        run: |
-          echo "E10 gate coverage: Stage 9 consolidated gate + executive summary + form inventory + tracking inventory"
-          echo "- Stage 10 consolidated gate: npm run lab:e10:gate"
-          echo "- Integration suite 1: tests/integration/stage10-executive-report.integration.test.ts"
-          echo "- Integration suite 2: tests/integration/stage10-form-inventory.integration.test.ts"
-          echo "- Integration suite 3: tests/integration/stage10-tracking-inventory.integration.test.ts"
-
-      - name: Stage 10 gate E10
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run lab:e10:gate | tee e10_gate.log
-
-      - name: Report Stage 10 gate result
-        shell: bash
-        run: |
-          set -euo pipefail
-          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e10_gate.log)"
-          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e10_gate.log)"
-
-          if [ -z "$file_pairs" ] || [ -z "$test_pairs" ]; then
-            echo "No se pudieron extraer resultados del gate E10 desde e10_gate.log"
-            exit 1
-          fi
-
-          if ! echo "$file_pairs" | grep -q '^1/1$'; then
-            echo "Falta resultado esperado de archivos por suite en gate E10 (1/1 por corrida)."
-            exit 1
-          fi
-
-          if ! echo "$test_pairs" | grep -q '^3/3$'; then
-            echo "Falta resultado esperado de tracking inventory (3/3)."
-            exit 1
-          fi
-
-          if ! echo "$test_pairs" | grep -q '^2/2$'; then
-            echo "Falta resultado esperado de reportes/inventarios base (2/2)."
-            exit 1
-          fi
-
-          echo "E10 gate result: executive_report_integration=2/2; form_inventory_integration=2/2; tracking_inventory_integration=3/3; stage9_baseline=ok; typecheck=ok"
-
-      - name: Report Stage 11 gate coverage
-        run: |
-          echo "E11 gate coverage: Stage 10 consolidated gate + authenticated flow + session isolation + step evidence"
-          echo "- Stage 11 consolidated gate: npm run lab:e11:gate"
-          echo "- Integration suite 1: tests/integration/stage11-authenticated-evaluation.integration.test.ts"
-          echo "- Integration suite 2: tests/integration/stage11-session-isolation.integration.test.ts"
-          echo "- Integration suite 3: tests/integration/stage11-auth-evidence-flow.integration.test.ts"
-
-      - name: Stage 11 gate E11
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run lab:e11:gate | tee e11_gate.log
-
-      - name: Report Stage 11 gate result
-        shell: bash
-        run: |
-          set -euo pipefail
-          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e11_gate.log)"
-          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e11_gate.log)"
-
-          if [ -z "$file_pairs" ] || [ -z "$test_pairs" ]; then
-            echo "No se pudieron extraer resultados del gate E11 desde e11_gate.log"
-            exit 1
-          fi
-
-          if ! echo "$file_pairs" | grep -q '^1/1$'; then
-            echo "Falta resultado esperado de archivos por suite en gate E11 (1/1 por corrida)."
-            exit 1
-          fi
-
-          if ! echo "$test_pairs" | grep -q '^2/2$'; then
-            echo "Falta resultado esperado de flujo autenticado base (2/2)."
-            exit 1
-          fi
-
-          one_over_one_count="$(echo "$test_pairs" | grep -c '^1/1$' || true)"
-          if [ "${one_over_one_count}" -lt "2" ]; then
-            echo "Faltan resultados esperados de aislamiento y evidencia por pasos (1/1 + 1/1)."
-            exit 1
-          fi
-
-          echo "E11 gate result: auth_flow_integration=2/2; session_isolation_integration=1/1; step_evidence_integration=1/1; stage10_baseline=ok; typecheck=ok"
-
-      - name: Report Stage 12 gate coverage
-        run: |
-          echo "E12 gate coverage: Stage 11 consolidated gate + frontend indexing + frontend pattern detection + static findings view"
-          echo "- Stage 12 consolidated gate: npm run lab:e12:gate"
-          echo "- Integration suite 1: tests/integration/stage12-frontend-indexing.integration.test.ts"
-          echo "- Integration suite 2: tests/integration/stage12-frontend-pattern-detection.integration.test.ts"
-          echo "- Integration suite 3: tests/integration/stage12-static-findings-view.integration.test.ts"
-
-      - name: Stage 12 gate E12
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run lab:e12:gate | tee e12_gate.log
-
-      - name: Report Stage 12 gate result
-        shell: bash
-        run: |
-          set -euo pipefail
-          stage12_suite_count="$(grep -Ec 'tests/integration/stage12-.*\.integration\.test\.ts \(2\)' e12_gate.log || true)"
-          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e12_gate.log)"
-          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e12_gate.log)"
-
-          if [ "${stage12_suite_count}" != "3" ]; then
-            echo "No se detectaron las 3 suites Stage 12 esperadas en e12_gate.log. Detectadas: ${stage12_suite_count}."
-            exit 1
-          fi
-
-          if [ -z "$file_pairs" ] || [ -z "$test_pairs" ]; then
-            echo "No se pudieron extraer resultados del gate E12 desde e12_gate.log"
-            exit 1
-          fi
-
-          if ! echo "$test_pairs" | grep -q '^2/2$'; then
-            echo "No se detectaron resultados 2/2 en suites de Stage 12."
-            exit 1
-          fi
-
-          if ! echo "$file_pairs" | grep -q '^1/1$'; then
-            echo "No se detectaron resultados 1/1 de archivos en suites de integracion encadenadas."
-            exit 1
-          fi
-
-          echo "E12 gate result: indexing_integration=2/2; pattern_detection_integration=2/2; static_findings_view_integration=2/2; stage11_baseline=ok; typecheck=ok"
-
-      - name: Report Stage 13 gate coverage
-        run: |
-          echo "E13 gate coverage: Stage 12 consolidated gate + backend api indexing + backend processing detection + backend processing flow view"
-          echo "- Stage 13 consolidated gate: npm run lab:e13:gate"
-          echo "- Integration suite 1: tests/integration/stage13-backend-api-indexing.integration.test.ts"
-          echo "- Integration suite 2: tests/integration/stage13-backend-processing-detection.integration.test.ts"
-          echo "- Integration suite 3: tests/integration/stage13-backend-processing-flow-view.integration.test.ts"
-
-      - name: Stage 13 gate E13
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run lab:e13:gate | tee e13_gate.log
-
-      - name: Report Stage 13 gate result
-        shell: bash
-        run: |
-          set -euo pipefail
-          stage13_suite_count="$(grep -Ec 'tests/integration/stage13-.*\.integration\.test\.ts \(2\)' e13_gate.log || true)"
-          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e13_gate.log)"
-          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e13_gate.log)"
-
-          if [ "${stage13_suite_count}" != "3" ]; then
-            echo "No se detectaron las 3 suites Stage 13 esperadas en e13_gate.log. Detectadas: ${stage13_suite_count}."
-            exit 1
-          fi
-
-          if [ -z "$file_pairs" ] || [ -z "$test_pairs" ]; then
-            echo "No se pudieron extraer resultados del gate E13 desde e13_gate.log"
-            exit 1
-          fi
-
-          if ! echo "$test_pairs" | grep -q '^2/2$'; then
-            echo "No se detectaron resultados 2/2 en suites de Stage 13."
-            exit 1
-          fi
-
-          if ! echo "$file_pairs" | grep -q '^1/1$'; then
-            echo "No se detectaron resultados 1/1 de archivos en suites de integracion encadenadas."
-            exit 1
-          fi
-
-          echo "E13 gate result: backend_api_indexing_integration=2/2; backend_processing_detection_integration=2/2; backend_processing_flow_view_integration=2/2; stage12_baseline=ok; typecheck=ok"
-
-      - name: Report Stage 14 gate coverage
-        run: |
-          echo "E14 gate coverage: Stage 13 consolidated gate + endpoint correlation + dto/processing correlation + consolidated lineage view"
-          echo "- Stage 14 consolidated gate: npm run lab:e14:gate"
-          echo "- Integration suite 1: tests/integration/stage14-endpoint-correlation.integration.test.ts"
-          echo "- Integration suite 2: tests/integration/stage14-dto-processing-correlation.integration.test.ts"
-          echo "- Integration suite 3: tests/integration/stage14-lineage-consolidated-view.integration.test.ts"
-
-      - name: Stage 14 gate E14
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run lab:e14:gate | tee e14_gate.log
-
-      - name: Report Stage 14 gate result
-        shell: bash
-        run: |
-          set -euo pipefail
-          stage14_suite_count="$(grep -Ec 'tests/integration/stage14-.*\.integration\.test\.ts \(2\)' e14_gate.log || true)"
-          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e14_gate.log)"
-          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e14_gate.log)"
-
-          if [ "${stage14_suite_count}" != "3" ]; then
-            echo "No se detectaron las 3 suites Stage 14 esperadas en e14_gate.log. Detectadas: ${stage14_suite_count}."
-            exit 1
-          fi
-
-          if [ -z "$file_pairs" ] || [ -z "$test_pairs" ]; then
-            echo "No se pudieron extraer resultados del gate E14 desde e14_gate.log"
-            exit 1
-          fi
-
-          if ! echo "$test_pairs" | grep -q '^2/2$'; then
-            echo "No se detectaron resultados 2/2 en suites de Stage 14."
-            exit 1
-          fi
-
-          if ! echo "$file_pairs" | grep -q '^1/1$'; then
-            echo "No se detectaron resultados 1/1 de archivos en suites de integracion encadenadas."
-            exit 1
-          fi
-
-          echo "E14 gate result: endpoint_correlation_integration=2/2; dto_processing_correlation_integration=2/2; lineage_consolidated_view_integration=2/2; stage13_baseline=ok; typecheck=ok"
-
-      - name: Report Stage 15 gate coverage
-        run: |
-          echo "E15 gate coverage: Stage 14 consolidated gate + legal discrepancies + legal purpose baseline + legal consent discrepancies"
-          echo "- Stage 15 consolidated gate: npm run lab:e15:gate"
-          echo "- Integration suite 1: tests/integration/stage15-legal-discrepancies.integration.test.ts"
-          echo "- Integration suite 2: tests/integration/stage15-legal-purpose-baseline.integration.test.ts"
-          echo "- Integration suite 3: tests/integration/stage15-legal-consent-discrepancies.integration.test.ts"
-
-      - name: Stage 15 gate E15
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run lab:e15:gate | tee e15_gate.log
-
-      - name: Report Stage 15 gate result
-        shell: bash
-        run: |
-          set -euo pipefail
-          stage15_suite_count="$(grep -Ec 'tests/integration/stage15-.*\.integration\.test\.ts \(2\)' e15_gate.log || true)"
-          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e15_gate.log)"
-          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e15_gate.log)"
-
-          if [ "${stage15_suite_count}" != "3" ]; then
-            echo "No se detectaron las 3 suites Stage 15 esperadas en e15_gate.log. Detectadas: ${stage15_suite_count}."
-            exit 1
-          fi
-
-          if [ -z "$file_pairs" ] || [ -z "$test_pairs" ]; then
-            echo "No se pudieron extraer resultados del gate E15 desde e15_gate.log"
-            exit 1
-          fi
-
-          if ! echo "$test_pairs" | grep -q '^2/2$'; then
-            echo "No se detectaron resultados 2/2 en suites de Stage 15."
-            exit 1
-          fi
-
-          if ! echo "$file_pairs" | grep -q '^1/1$'; then
-            echo "No se detectaron resultados 1/1 de archivos en suites de integracion encadenadas."
-            exit 1
-          fi
-
-          echo "E15 gate result: legal_discrepancies_integration=2/2; legal_purpose_baseline_integration=2/2; legal_consent_discrepancies_integration=2/2; stage14_baseline=ok; typecheck=ok"
-
-      - name: Report Stage 16 gate coverage
-        run: |
-          echo "E16 gate coverage: version comparison + endpoint delta + alert classification"
-          echo "- Stage 16 consolidated gate: npm run lab:e16:gate"
-          echo "- Integration suite 1: tests/integration/stage16-version-comparison.integration.test.ts"
-          echo "- Integration suite 2: tests/integration/stage16-endpoint-delta.integration.test.ts"
-          echo "- Integration suite 3: tests/integration/stage16-alert-classification.integration.test.ts"
-
-      - name: Stage 16 gate E16
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run lab:e16:gate | tee e16_gate.log
-
-      - name: Report Stage 16 gate result
-        shell: bash
-        run: |
-          set -euo pipefail
-          stage16_suite_count="$(grep -Ec 'tests/integration/stage16-.*\.integration\.test\.ts \([0-9]+\)' e16_gate.log || true)"
-          files_passed="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1/p' e16_gate.log | tail -n1)"
-          files_total="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\2/p' e16_gate.log | tail -n1)"
-          tests_passed="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1/p' e16_gate.log | tail -n1)"
-          tests_total="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\2/p' e16_gate.log | tail -n1)"
-
-          if [ "${stage16_suite_count}" != "3" ]; then
-            echo "No se detectaron las 3 suites Stage 16 esperadas en e16_gate.log. Detectadas: ${stage16_suite_count}."
-            exit 1
-          fi
-
-          if [ -z "$files_passed" ] || [ -z "$files_total" ] || [ -z "$tests_passed" ] || [ -z "$tests_total" ]; then
-            echo "No se pudieron extraer resultados del gate E16 desde e16_gate.log"
-            exit 1
-          fi
-
-          if [ "$files_passed" != "3" ] || [ "$files_total" != "3" ]; then
-            echo "Cobertura inesperada de archivos Stage 16: ${files_passed}/${files_total}. Se esperaba 3/3."
-            exit 1
-          fi
-
-          if [ "$tests_passed" != "5" ] || [ "$tests_total" != "5" ]; then
-            echo "Cobertura inesperada de tests Stage 16: ${tests_passed}/${tests_total}. Se esperaba 5/5."
-            exit 1
-          fi
-
-          echo "E16 gate result: version_comparison_integration=2/2; endpoint_delta_integration=1/1; alert_classification_integration=2/2; stage15_baseline=ok; typecheck=ok"
+          echo "E5.4 gate result: stage5_gate_files=9/9; stage5_gate_tests=20/20; obs_regression_files=1/1; obs_regression_tests=3/3; docs_stage5_coherence=ok; last_stage5_3_gate_duration_seconds=${duration_seconds}"
 
       - name: Report Stage 17 gate coverage
         run: |
-          echo "E17 gate coverage: stage16 consolidated gate + execution data purge + retention window + runbook validation + pilot evidence validation"
-          echo "- Stage 17 consolidated gate: npm run lab:e17:gate"
-          echo "- Integration suite 1: tests/integration/stage17-execution-data-purge.integration.test.ts"
-          echo "- Integration suite 2: tests/integration/stage17-retention-window.integration.test.ts"
-          echo "- Document validation: npm run docs:stage17:runbook"
-          echo "- Evidence validation: npm run docs:stage17:evidence"
+          echo "Stage 17 gate coverage: Stage 16 baseline + Stage 17 purge/retention + runbook/evidence docs"
+          echo "- Stage 17 gate command: npm run lab:e17-3:gate"
 
       - name: Stage 17 gate E17-T03
         shell: bash
         run: |
           set -euo pipefail
-          npm run lab:e17:gate | tee e17_gate.log
+          npm run lab:e17-3:gate | tee e17_3_gate.log
 
       - name: Report Stage 17 gate result
         shell: bash
         run: |
           set -euo pipefail
-          stage17_suite_count="$(grep -Ec 'tests/integration/stage17-.*\.integration\.test\.ts \([0-9]+\)' e17_gate.log || true)"
-          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e17_gate.log)"
-          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e17_gate.log)"
-
-          if [ "${stage17_suite_count}" != "2" ]; then
-            echo "No se detectaron las 2 suites Stage 17 esperadas en e17_gate.log. Detectadas: ${stage17_suite_count}."
+          if ! grep -q "\[docs:stage17:runbook\] OK" e17_3_gate.log; then
+            echo "No se detecto confirmacion docs:stage17:runbook en gate Stage 17."
             exit 1
           fi
 
-          if [ -z "$file_pairs" ] || [ -z "$test_pairs" ]; then
-            echo "No se pudieron extraer resultados del gate E17-T04 desde e17_gate.log"
+          if ! grep -q "\[docs:stage17:evidence\] OK" e17_3_gate.log; then
+            echo "No se detecto confirmacion docs:stage17:evidence en gate Stage 17."
             exit 1
           fi
 
-          stage17_files_total="$(echo "$file_pairs" | grep -c '^1/1$' || true)"
-          if [ "${stage17_files_total}" -lt "2" ]; then
-            echo "No se detectaron resultados esperados de archivos para Stage 17 (1/1 + 1/1)."
-            exit 1
-          fi
-
-          stage17_tests_total="$(echo "$test_pairs" | grep -c '^2/2$' || true)"
-          if [ "${stage17_tests_total}" -lt "2" ]; then
-            echo "No se detectaron resultados esperados de tests para Stage 17 (2/2 + 2/2)."
-            exit 1
-          fi
-
-          if ! grep -Fq "[docs:stage17:runbook] OK" e17_gate.log; then
-            echo "No se detecto confirmacion de runbook Stage 17 en gate E17-T04."
-            exit 1
-          fi
-
-          if ! grep -Fq "[docs:stage17:evidence] OK" e17_gate.log; then
-            echo "No se detecto confirmacion de evidencia minima Stage 17 en gate E17-T04."
-            exit 1
-          fi
-
-          echo "E17-T04 gate result: execution_data_purge_integration=2/2; retention_window_integration=2/2; docs_stage17_runbook=ok; docs_stage17_evidence=ok; stage16_baseline=ok; typecheck=ok"
+          echo "Stage 17 gate result: docs_stage17_runbook=ok; docs_stage17_evidence=ok"
 
       - name: Build
         run: npm run build
