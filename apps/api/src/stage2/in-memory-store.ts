@@ -160,10 +160,11 @@ async function assertRateLimit(authorizationId: string, maxRequestsPerMinute: nu
 }
 
 async function assertConcurrency(authorizationId: string, maxConcurrentExecutions: number): Promise<void> {
+  const concurrencyStates = new Set<ExecutionState>([ExecutionState.QUEUED, ExecutionState.RUNNING]);
   const activeCount = isPrismaPersistenceEnabled()
     ? await countActiveExecutions(authorizationId)
     : Array.from(store.executions.values()).filter(
-        (execution) => execution.authorizationId === authorizationId && !isTerminalState(execution.state)
+        (execution) => execution.authorizationId === authorizationId && concurrencyStates.has(execution.state)
       ).length;
 
   if (activeCount >= maxConcurrentExecutions) {
