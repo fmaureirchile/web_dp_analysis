@@ -86,8 +86,13 @@ function isHtmlContentType(contentType: string | null): boolean {
   return HTML_CONTENT_TYPES.some((candidate) => normalized.includes(candidate));
 }
 
-function extractSetCookieNames(headers: Headers): string[] {
-  const fromGetSetCookie = (headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
+type HeaderReader = {
+  get(name: string): string | null;
+  getSetCookie?: () => string[];
+};
+
+function extractSetCookieNames(headers: HeaderReader): string[] {
+  const fromGetSetCookie = headers.getSetCookie;
   const rawSetCookies =
     typeof fromGetSetCookie === "function"
       ? fromGetSetCookie.call(headers)
