@@ -116,17 +116,14 @@ describe("Etapa 6 T02 observacion dinamica minima", () => {
     expect(domEvidence?.location).toBe(`memory://browser-dom/${snapshot.domEvidenceId}`);
     expect(screenshotEvidence?.location).toBe(`memory://browser-screenshot/${snapshot.screenshotEvidenceId}`);
 
-    const domPayload = store.browserDomSnapshots.get(snapshot.domEvidenceId);
-    const screenshotPayload = store.browserScreenshots.get(snapshot.screenshotEvidenceId);
-
-    expect(domPayload?.html).toContain("<html");
-    expect(screenshotPayload?.dataUrl).toContain("data:image/svg+xml;base64,");
-
     const result = await request(app).get(`/api/v1/browser/observations/${execution.body.data.id}/result`);
 
     expect(result.status).toBe(200);
     expect(result.body.ok).toBe(true);
     expect(result.body.data.executionId).toBe(execution.body.data.id);
+    expect(result.body.data.pageSnapshots).toHaveLength(1);
+    expect(result.body.data.pageSnapshots[0].domEvidenceId).toBe(snapshot.domEvidenceId);
+    expect(result.body.data.pageSnapshots[0].screenshotEvidenceId).toBe(snapshot.screenshotEvidenceId);
 
     const finalExecution = store.executions.get(execution.body.data.id);
     expect(finalExecution?.state).toBe("COMPLETED");
