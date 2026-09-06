@@ -130,7 +130,34 @@ jobs:
           if-no-files-found: ignore
 
       - name: Laboratory gate E4-B1
-        run: npm run lab:e4b1:gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          attempt=1
+          max_attempts=2
+          while true; do
+            rm -f e4b1_gate.log
+            if npm run lab:e4b1:gate | tee e4b1_gate.log; then
+              break
+            fi
+
+            if grep -q "Worker exited unexpectedly" e4b1_gate.log && [ "$attempt" -lt "$max_attempts" ]; then
+              echo "Se detecto error intermitente de worker. Reintentando Laboratory gate E4-B1 (intento $((attempt + 1))/${max_attempts})..."
+              attempt=$((attempt + 1))
+              continue
+            fi
+
+            echo "Laboratory gate E4-B1 fallo de forma no recuperable."
+            exit 1
+          done
+
+      - name: Upload E4-B1 gate log on failure
+        if: ${{ failure() && always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e4b1-gate-log
+          path: e4b1_gate.log
+          if-no-files-found: ignore
 
       - name: Report Stage 5.1 gate coverage
         run: |
