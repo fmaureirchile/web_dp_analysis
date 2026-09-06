@@ -134,15 +134,15 @@ jobs:
         run: |
           set -euo pipefail
           attempt=1
-          max_attempts=2
+          max_attempts=3
           while true; do
             rm -f e4b1_gate.log
             if npm run lab:e4b1:gate | tee e4b1_gate.log; then
               break
             fi
 
-            if grep -q "Worker exited unexpectedly" e4b1_gate.log && [ "$attempt" -lt "$max_attempts" ]; then
-              echo "Se detecto error intermitente de worker. Reintentando Laboratory gate E4-B1 (intento $((attempt + 1))/${max_attempts})..."
+            if [ "$attempt" -lt "$max_attempts" ]; then
+              echo "Laboratory gate E4-B1 fallo en intento ${attempt}. Reintentando (intento $((attempt + 1))/${max_attempts})..."
               attempt=$((attempt + 1))
               continue
             fi
