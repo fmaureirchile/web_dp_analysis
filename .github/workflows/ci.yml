@@ -181,10 +181,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          files_passed="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1/p' e5_1_gate.log | tail -n1)"
-          files_total="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\2/p' e5_1_gate.log | tail -n1)"
-          tests_passed="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1/p' e5_1_gate.log | tail -n1)"
-          tests_total="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\2/p' e5_1_gate.log | tail -n1)"
+          clean_log="e5_1_gate.clean.log"
+          perl -pe 's/\e\[[0-9;]*[A-Za-z]//g' e5_1_gate.log > "$clean_log"
+
+          files_line="$(grep -E '^[[:space:]]*Test Files[[:space:]]+[0-9]+[[:space:]]+passed[[:space:]]+\([0-9]+\)' "$clean_log" | tail -n1 || true)"
+          tests_line="$(grep -E '^[[:space:]]*Tests[[:space:]]+[0-9]+[[:space:]]+passed[[:space:]]+\([0-9]+\)' "$clean_log" | tail -n1 || true)"
+
+          files_passed="$(echo "$files_line" | sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1/p')"
+          files_total="$(echo "$files_line" | sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\2/p')"
+          tests_passed="$(echo "$tests_line" | sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1/p')"
+          tests_total="$(echo "$tests_line" | sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\2/p')"
 
           if [ -z "$files_passed" ] || [ -z "$files_total" ] || [ -z "$tests_passed" ] || [ -z "$tests_total" ]; then
             echo "No se pudieron extraer los resultados reales del gate E5.1 desde e5_1_gate.log"
@@ -243,10 +249,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          files_passed="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1/p' e5_2_gate.log | tail -n1)"
-          files_total="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\2/p' e5_2_gate.log | tail -n1)"
-          tests_passed="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1/p' e5_2_gate.log | tail -n1)"
-          tests_total="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\2/p' e5_2_gate.log | tail -n1)"
+          clean_log="e5_2_gate.clean.log"
+          perl -pe 's/\e\[[0-9;]*[A-Za-z]//g' e5_2_gate.log > "$clean_log"
+
+          files_line="$(grep -E '^[[:space:]]*Test Files[[:space:]]+[0-9]+[[:space:]]+passed[[:space:]]+\([0-9]+\)' "$clean_log" | tail -n1 || true)"
+          tests_line="$(grep -E '^[[:space:]]*Tests[[:space:]]+[0-9]+[[:space:]]+passed[[:space:]]+\([0-9]+\)' "$clean_log" | tail -n1 || true)"
+
+          files_passed="$(echo "$files_line" | sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1/p')"
+          files_total="$(echo "$files_line" | sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\2/p')"
+          tests_passed="$(echo "$tests_line" | sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1/p')"
+          tests_total="$(echo "$tests_line" | sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\2/p')"
 
           if [ -z "$files_passed" ] || [ -z "$files_total" ] || [ -z "$tests_passed" ] || [ -z "$tests_total" ]; then
             echo "No se pudieron extraer los resultados reales del gate E5.2 desde e5_2_gate.log"
@@ -303,8 +315,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e5_3_gate.log)"
-          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e5_3_gate.log)"
+          clean_log="e5_3_gate.clean.log"
+          perl -pe 's/\e\[[0-9;]*[A-Za-z]//g' e5_3_gate.log > "$clean_log"
+
+          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' "$clean_log")"
+          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' "$clean_log")"
 
           if [ -z "$file_pairs" ] || [ -z "$test_pairs" ]; then
             echo "No se pudieron extraer resultados de integracion del gate E5.3 desde e5_3_gate.log"
