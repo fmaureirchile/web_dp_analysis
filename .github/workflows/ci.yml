@@ -389,8 +389,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e5_4_gate.log)"
-          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' e5_4_gate.log)"
+          clean_log="e5_4_gate.clean.log"
+          perl -pe 's/\e\[[0-9;]*[A-Za-z]//g' e5_4_gate.log > "$clean_log"
+
+          file_pairs="$(sed -nE 's/^[[:space:]]*Test Files[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' "$clean_log")"
+          test_pairs="$(sed -nE 's/^[[:space:]]*Tests[[:space:]]+([0-9]+)[[:space:]]+passed[[:space:]]+\(([0-9]+)\).*/\1\/\2/p' "$clean_log")"
 
           if [ -z "$file_pairs" ] || [ -z "$test_pairs" ]; then
             echo "No se pudieron extraer resultados de integracion del gate E5.4 desde e5_4_gate.log"
@@ -417,7 +420,7 @@ jobs:
             exit 1
           fi
 
-          if ! grep -Fq "[docs:stage5:coherence] OK" e5_4_gate.log; then
+          if ! grep -Fq "[docs:stage5:coherence] OK" "$clean_log"; then
             echo "No se detecto confirmacion de coherencia documental Stage 5 en gate E5.4."
             exit 1
           fi
