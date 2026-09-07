@@ -6,7 +6,7 @@ Ejecutar control minimo de 3 items previo a merge, manteniendo alcance estricto 
 ## Resultado por item
 1. Item 1 - `npm run docs:stage5:coherence`: PASS.
 2. Item 2 - `npm run lab:e5-4:gate`: PASS.
-3. Item 3 - URL y resumen de workflow `validate` en GitHub Actions: FAIL.
+3. Item 3 - URL y resumen de workflow `validate` en GitHub Actions: PASS.
 
 ## Evidencia local
 1. Commit en remoto: `915d1f1` en `origin/main`.
@@ -54,6 +54,22 @@ Ejecutar control minimo de 3 items previo a merge, manteniendo alcance estricto 
 19. Evidencia de anotaciones remotas (run #107): asercion en `tests/integration/stage3-safeguards.integration.test.ts` (esperado 201, recibido 400), ademas de salida con codigo 1 en Integration tests.
 20. Remediacion adicional aplicada: ajuste de `test:integration` para ejecutar en modo determinista `--pool=forks --maxWorkers=1`.
 21. Validacion local posterior (3 corridas consecutivas y corrida final determinista): 47/47 archivos y 112/112 tests en verde.
+22. Runs de estabilizacion de workflow:
+- #109: FAIL (validate, paso Integration tests).
+- #110: FAIL (validate, paso Laboratory gate E4-B1).
+- #111: FAIL (validate, paso Laboratory gate E4-B1).
+- #112: FAIL (validate, paso Laboratory gate E4-B1).
+- #113: FAIL (validate, paso Laboratory gate E4-B1).
+- #114: FAIL (validate, paso Report Stage 5.1 gate result).
+- #115: FAIL (validate, paso Report Stage 5.4 gate result).
+23. Remediaciones de cierre aplicadas en workflow CI:
+- `ci.yml`: reintentos controlados y artefacto de log para gate E4-B1.
+- `ci.yml`: parser robusto de resultados de gates Stage 5 (E5.1/E5.2/E5.3/E5.4) con limpieza ANSI y extraccion tolerante.
+24. Run final de confirmacion: #116 - https://github.com/fmaureirchile/web_dp_analysis/actions/runs/34071882698
+25. Resultado #116: SUCCESS.
+26. Jobs en #116:
+- validate: success.
+- db-migration: success.
 
 ## Remediacion aplicada
 1. Se corrigio lint en `apps/worker-crawler/src/passive-http-client.ts` (tipado de headers sin dependencia de global `Headers`).
@@ -68,5 +84,5 @@ Ejecutar control minimo de 3 items previo a merge, manteniendo alcance estricto 
 2. Los cambios fuera de Stage 5 permanecen fuera de este cierre.
 
 ## Cierre operativo
-Estado del control de merge: APTO CONDICIONADO (remediaciones aplicadas; espera validacion remota final).
-Condicion para cierre completo: nuevo run de CI posterior a la remediacion determinista en estado Success y publicacion de resumen final de validate.
+Estado del control de merge: APTO.
+Condicion para cierre completo: CUMPLIDA (run #116 en Success con validate y db-migration en verde).
