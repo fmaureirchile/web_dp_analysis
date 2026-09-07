@@ -80,3 +80,71 @@ Resultado esperado: `[docs:stage5:coherence] OK`.
 1. `npm run docs:stage17:evidence:json` -> OK (exit code 0).
 2. `npm run lab:e17:gate` -> OK (exit code 0).
 3. Estado final de continuidad 2026-09-06: Stage 17 tecnico y documental en verde.
+
+## Punto de control para retoma manana
+
+1. HEAD de retoma: `fb5aa04` (`feat(stage16-17): restore monitoring/privacy routes and recover e17 gate chain`).
+2. Estado de working tree al cierre:
+- 25 archivos modificados.
+- 6 archivos no trackeados.
+3. Pendiente principal para manana: paquete Stage 5 (docs + tests + ajustes auxiliares) aun sin commit.
+4. Archivos modificados pendientes (M):
+- `apps/api/src/stage2/prisma-persistence.ts`
+- `docs/etapa-5/acta-cierre-etapa-5-3.md`
+- `docs/etapa-5/acta-cierre-etapa-5-5.md`
+- `docs/etapa-5/backlog-etapa-5-5.md`
+- `docs/etapa-5/checklist-entrega-pr-e5-3.md`
+- `docs/etapa-5/checklist-entrega-pr-e5-4.md`
+- `docs/etapa-5/checklist-entrega-pr-e5-5.md`
+- `docs/etapa-5/guia-gate-cierre-e5-2.md`
+- `docs/etapa-5/guia-gate-cierre-e5-3.md`
+- `docs/etapa-5/guia-gate-cierre-e5-4.md`
+- `docs/etapa-5/guia-gate-cierre-e5-5.md`
+- `docs/etapa-5/handoff-operacion-diaria-stage-5.md`
+- `docs/etapa-5/nota-release-e5-4.md`
+- `docs/etapa-5/nota-release-e5-5.md`
+- `docs/etapa-5/reporte-seguimiento-tendencia-e5-5-2026-08-31.md`
+- `docs/etapa-5/revision-coherencia-etapa-5-5.md`
+- `packages/contracts/src/stage2-dto.ts`
+- `prisma/schema.prisma`
+- `tests/integration/stage3-safeguards.integration.test.ts`
+- `tests/integration/stage5-evidence-recovery.integration.test.ts`
+- `tests/integration/stage5-observability.integration.test.ts`
+- `tests/integration/stage5-passive-fetch.integration.test.ts`
+- `tests/integration/stage5-scope-gate.integration.test.ts`
+- `tests/integration/stage6-dynamic-observation.integration.test.ts`
+- `tools/validate-stage5-doc-coherence.ts`
+5. Archivos no trackeados pendientes (??):
+- `docs/etapa-5/paquete-merge-e5-4.md`
+- `docs/etapa-5/resumen-pr-e5-4.md`
+- `docs/punto-control_20260901.md`
+- `docs/punto-control_20260904.md`
+- `docs/punto-control_20260905.md`
+- `tools/run-npm-script-with-worker-retry.ts`
+6. Comandos de arranque recomendados manana:
+- `npm run docs:stage5:coherence`
+- `npm run lab:e5-4:gate`
+- `git status --short`
+
+## Punto de control final de cierre (actualizado)
+
+1. Estado CI final de la jornada: VERDE.
+2. Evidencia remota de cierre:
+- Run #116: https://github.com/fmaureirchile/web_dp_analysis/actions/runs/34071882698 -> `success` (`validate` y `db-migration` en verde).
+- Run #117: https://github.com/fmaureirchile/web_dp_analysis/actions/runs/34076024958 -> `success` (commit documental de cierre).
+3. HEAD de retoma confirmado: `66474cc` (`docs(stage5): close E5.4 merge control with CI run #116 success`).
+4. Estado local pendiente para proxima sesion (`git status --short`):
+- Modificados (M):
+	- `apps/api/src/stage2/prisma-persistence.ts`
+	- `docs/punto-control_20260906.md`
+	- `packages/contracts/src/stage2-dto.ts`
+	- `prisma/schema.prisma`
+	- `tests/integration/stage3-safeguards.integration.test.ts`
+- No trackeados (??):
+	- `docs/punto-control_20260901.md`
+	- `docs/punto-control_20260904.md`
+	- `docs/punto-control_20260905.md`
+5. Retoma recomendada (orden minimo):
+- `git status --short`
+- `npm run docs:stage5:coherence`
+- `npm run lab:e5-4:gate`
