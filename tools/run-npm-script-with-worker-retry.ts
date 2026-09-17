@@ -21,9 +21,21 @@ function isTransientFailure(output: string, code: number): boolean {
 
 async function runNpmScript(scriptName: string): Promise<{ code: number; output: string }> {
   return new Promise((resolve) => {
-    const child = spawn("npm", ["run", scriptName], {
+    const env: Record<string, string> = {};
+
+    for (const [key, value] of Object.entries(process.env)) {
+      if (typeof value === "string") {
+        env[key] = value;
+      }
+    }
+
+    // These keys can be injected by pnpm/corepack and trigger noisy npm warnings.
+    delete env.npm_config_verify_deps_before_run;
+    delete env.npm_config__jsr_registry;
+
+    const child = spawn(`npm run ${scriptName}`, {
       shell: true,
-      env: process.env
+      env
     });
 
     let combined = "";

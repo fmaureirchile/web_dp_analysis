@@ -3,7 +3,7 @@ import { defineConfig } from "vitest/config";
 const maxForksRaw = process.env.VITEST_MAX_FORKS;
 const maxForks = Number.isInteger(Number(maxForksRaw)) && Number(maxForksRaw) > 0
   ? Number(maxForksRaw)
-  : 4;
+  : 1;
 
 export default defineConfig({
   test: {
