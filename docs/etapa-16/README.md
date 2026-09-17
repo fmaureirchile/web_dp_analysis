@@ -4,6 +4,7 @@
 
 1. acta-inicio-etapa-16.md
 2. backlog-etapa-16.md
+3. acta-cierre-etapa-16.md
 
 ## Comando de validacion consolidado
 

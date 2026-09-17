@@ -4,6 +4,7 @@
 
 1. acta-inicio-etapa-14.md
 2. backlog-etapa-14.md
+3. acta-cierre-etapa-14.md
 
 ## Comando de validacion inicial
 

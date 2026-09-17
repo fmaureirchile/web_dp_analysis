@@ -4,6 +4,7 @@
 
 1. acta-inicio-etapa-15.md
 2. backlog-etapa-15.md
+3. acta-cierre-etapa-15.md
 
 ## Comando de validacion E15-T01
 
