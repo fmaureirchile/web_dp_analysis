@@ -2,7 +2,7 @@
   "meta": {
     "project": "Web Analysis",
     "lastUpdated": "2026-09-17",
-    "version": 13
+    "version": 14
   },
   "columns": [
     { "id": "todo", "name": "To Do" },
@@ -58,7 +58,7 @@
     {
       "id": "B-012",
       "title": "Mantener baseline Stage 17",
-      "description": "Baseline revalidado el 2026-09-17 con lab:e17:gate y validadores docs:stage17:runbook/docs:stage17:evidence en verde.",
+      "description": "Baseline automatizado y revalidado el 2026-09-17 con ops:stage17:baseline:record; evidencia generada en docs/etapa-17/evidencias/baseline-stage17-2026-09-17.md.",
       "stage": "17",
       "priority": "P2",
       "status": "in_progress",

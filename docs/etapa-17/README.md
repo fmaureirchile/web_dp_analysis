@@ -32,6 +32,18 @@ npm run docs:stage17:evidence
 npm run docs:stage17:evidence:json
 ```
 
+## Comando de registro diario de baseline
+
+```bash
+npm run ops:stage17:baseline:record
+```
+
+Genera un registro markdown en `docs/etapa-17/evidencias/baseline-stage17-YYYY-MM-DD.md` con:
+
+1. Resultado de `lab:e17:gate`.
+2. Salida de `docs:stage17:evidence:json`.
+3. Estado final OK/FAIL de la corrida.
+
 ## Cuando usarlo
 
 1. Despues de modificar el endpoint de purga de datos por ejecucion.
@@ -39,3 +51,4 @@ npm run docs:stage17:evidence:json
 3. Despues de modificar el runbook operativo inicial de piloto.
 4. En CI para validar hardening inicial Stage 17 con una unica invocacion.
 5. Para verificar que resultados purgados dejan trazas de error esperadas al consultar evidencia eliminada.
+6. Para registrar evidencia diaria de continuidad operativa en un solo comando.

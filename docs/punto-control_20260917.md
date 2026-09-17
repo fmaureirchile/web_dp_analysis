@@ -178,3 +178,9 @@ Validacion previa:
 2. Commit B: `7f4bea1` - `docs(stages): close stages 11-16 and archive control points`.
 3. Commit C: `27974a4` - `build(gates): stabilize integration runner and retry helper`.
 4. Estado de working tree post-consolidacion: limpio (`git status --short` sin salida).
+
+## Automatizacion baseline Stage 17
+
+1. Se agrego script operativo: `npm run ops:stage17:baseline:record`.
+2. El script ejecuta `lab:e17:gate` y `docs:stage17:evidence:json`, y registra resultado en markdown diario.
+3. Evidencia generada en esta ventana: `docs/etapa-17/evidencias/baseline-stage17-2026-09-17.md` con estado OK.
