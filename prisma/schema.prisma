@@ -182,32 +182,11 @@ model Execution {
   thirdParties    ThirdParty[]
   consentStates   ConsentState[]
   evidences       Evidence[]
-  passiveSinglePageResult PassiveSinglePageResult?
 
   @@index([projectId])
   @@index([authorizationId])
   @@index([targetId])
   @@index([scanProfileId])
-}
-
-model PassiveSinglePageResult {
-  executionId   String   @id
-  ok            Boolean
-  entryUrl      String
-  statusHttp    Int?
-  title         String?
-  evidenceId    String?
-  fetchedAt     DateTime?
-  contentType   String?
-  contentLength Int?
-  errorCode     String?
-  errorMessage  String?
-  correlationId String   @default("system")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  execution     Execution @relation(fields: [executionId], references: [id])
-
-  @@index([updatedAt])
 }
 
 model ScopeAuditRequest {
