@@ -2,7 +2,7 @@
   "meta": {
     "project": "Web Analysis",
     "lastUpdated": "2026-09-17",
-    "version": 12
+    "version": 13
   },
   "columns": [
     { "id": "todo", "name": "To Do" },
@@ -94,10 +94,10 @@
     {
       "id": "B-016",
       "title": "Consolidar commit tecnico Bloque D",
-      "description": "En progreso: archivos del Bloque D ya staged para commit tecnico aislado con trazabilidad de validaciones ampliadas.",
+      "description": "Cerrado: commit tecnico dedicado 6004033 aplicado y consolidacion A/B/C completada en commits limpios (d683f70, 7f4bea1, 27974a4).",
       "stage": "ops",
       "priority": "P1",
-      "status": "in_progress",
+      "status": "done",
       "source": "docs/punto-control_20260917.md"
     }
   ]

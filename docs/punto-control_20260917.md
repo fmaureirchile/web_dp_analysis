@@ -171,3 +171,10 @@ Validacion previa:
 - tests/integration/stage3-safeguards.integration.test.ts
 3. Commit ejecutado: `6004033` - `chore(stage2-3): consolidate deferred technical block D`.
 4. Criterio de cierre cumplido: bloque integrado en commit tecnico dedicado con trazabilidad explicita.
+
+## Consolidacion final A/B/C ejecutada
+
+1. Commit A: `d683f70` - `docs(ops): add local kanban and update progress control`.
+2. Commit B: `7f4bea1` - `docs(stages): close stages 11-16 and archive control points`.
+3. Commit C: `27974a4` - `build(gates): stabilize integration runner and retry helper`.
+4. Estado de working tree post-consolidacion: limpio (`git status --short` sin salida).
