@@ -1,0 +1,104 @@
+{
+  "meta": {
+    "project": "Web Analysis",
+    "lastUpdated": "2026-09-17",
+    "version": 12
+  },
+  "columns": [
+    { "id": "todo", "name": "To Do" },
+    { "id": "in_progress", "name": "In Progress" },
+    { "id": "done", "name": "Done" }
+  ],
+  "cards": [
+    {
+      "id": "B-007",
+      "title": "Cerrar paquete Stage 5 pendiente local",
+      "description": "Cerrado operativamente: validaciones Stage 5, Stage 16 y Stage 17 en verde en la ventana 2026-09-17; listo para consolidacion final de cambios.",
+      "stage": "5",
+      "priority": "P1",
+      "status": "done",
+      "source": "docs/punto-control_20260906.md"
+    },
+    {
+      "id": "B-008",
+      "title": "Limpieza de working tree",
+      "description": "Cerrada en gestion: inventario y destino por bloques definidos para retoma ordenada; Bloque D diferido a ciclo tecnico dedicado.",
+      "stage": "ops",
+      "priority": "P2",
+      "status": "done",
+      "source": "docs/punto-control_20260906.md"
+    },
+    {
+      "id": "B-009",
+      "title": "Cerrar Etapa 9",
+      "description": "Etapa cerrada documentalmente y gate validado.",
+      "stage": "9",
+      "priority": "P3",
+      "status": "done",
+      "source": "docs/etapa-9/acta-cierre-etapa-9.md"
+    },
+    {
+      "id": "B-010",
+      "title": "Cerrar Etapa 10",
+      "description": "Etapa cerrada documentalmente y gate validado.",
+      "stage": "10",
+      "priority": "P3",
+      "status": "done",
+      "source": "docs/etapa-10/acta-cierre-etapa-10.md"
+    },
+    {
+      "id": "B-011",
+      "title": "Cerrar Etapa 17",
+      "description": "Hardening y productizacion cerrados con cadena de gate en verde.",
+      "stage": "17",
+      "priority": "P2",
+      "status": "done",
+      "source": "docs/etapa-17/acta-cierre-etapa-17.md"
+    },
+    {
+      "id": "B-012",
+      "title": "Mantener baseline Stage 17",
+      "description": "Baseline revalidado el 2026-09-17 con lab:e17:gate y validadores docs:stage17:runbook/docs:stage17:evidence en verde.",
+      "stage": "17",
+      "priority": "P2",
+      "status": "in_progress",
+      "source": "docs/etapa-17/runbook-operativo-piloto.md"
+    },
+    {
+      "id": "B-013",
+      "title": "Sanear warning npm y pnpm",
+      "description": "Cerrado: helper de reintento sanitiza env (sin npm_config conflictivos) y ejecuta npm como comando unico; gates Stage 5 validados sin warnings de npm/pnpm.",
+      "stage": "ops",
+      "priority": "P3",
+      "status": "done",
+      "source": "docs/avance_20260904_1200.md"
+    },
+    {
+      "id": "B-014",
+      "title": "Resolver bloque tecnico Stage2/3 diferido",
+      "description": "Cerrado en analisis: se confirmo alto impacto (1188 lineas eliminadas) y se decide mantener diferido para ciclo tecnico dedicado.",
+      "stage": "ops",
+      "priority": "P2",
+      "status": "done",
+      "source": "docs/punto-control_20260917.md"
+    },
+    {
+      "id": "B-015",
+      "title": "Ejecutar ciclo tecnico Stage2/3",
+      "description": "Cerrado: ciclo tecnico ejecutado con validacion ampliada (typecheck + Stage3 + Stage5 + Stage6) en verde; bloque apto para integracion dedicada.",
+      "stage": "ops",
+      "priority": "P1",
+      "status": "done",
+      "source": "docs/punto-control_20260917.md"
+    },
+    {
+      "id": "B-016",
+      "title": "Consolidar commit tecnico Bloque D",
+      "description": "En progreso: archivos del Bloque D ya staged para commit tecnico aislado con trazabilidad de validaciones ampliadas.",
+      "stage": "ops",
+      "priority": "P1",
+      "status": "in_progress",
+      "source": "docs/punto-control_20260917.md"
+    }
+  ]
+}

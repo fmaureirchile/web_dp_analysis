@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kanban Backlog - Web Analysis</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page-bg"></div>
+    <main class="app-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Despliegue local</p>
+          <h1>Kanban de avance del proyecto</h1>
+          <p class="subtitle">Backlog completo precargado con filtros por etapa y prioridad, persistido en JSON del repo.</p>
+        </div>
+        <div class="hero-stats" id="hero-stats"></div>
+      </header>
+
+      <section class="toolbar">
+        <label>
+          Etapa
+          <select id="filter-stage"></select>
+        </label>
+        <label>
+          Prioridad
+          <select id="filter-priority"></select>
+        </label>
+        <label>
+          Buscar
+          <input id="filter-search" type="search" placeholder="Titulo o descripcion" />
+        </label>
+        <button id="save-board" type="button">Guardar cambios</button>
+      </section>
+
+      <section class="kanban" id="kanban"></section>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
