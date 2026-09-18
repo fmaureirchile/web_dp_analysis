@@ -184,3 +184,18 @@ Validacion previa:
 1. Se agrego script operativo: `npm run ops:stage17:baseline:record`.
 2. El script ejecuta `lab:e17:gate` y `docs:stage17:evidence:json`, y registra resultado en markdown diario.
 3. Evidencia generada en esta ventana: `docs/etapa-17/evidencias/baseline-stage17-2026-09-17.md` con estado OK.
+
+## Cierre de continuidad Etapa 5 (retoma)
+
+1. Commits integrados en `main`:
+- `1b9eb52` - `feat(stage5): add dynamic probe guardrails and web analyzer flow`.
+- `519bb1d` - `chore(ops-docs): add analysis stack launcher and stage5 operational docs`.
+2. Validaciones ejecutadas en verde durante la retoma:
+- `npm run lab:e5-4:gate`.
+- `npm run docs:stage5:coherence`.
+- `npm run test -- --config vitest.integration.config.ts --run tests/integration/web-probe-guardrails.integration.test.ts`.
+3. Tags de trazabilidad publicados sobre `519bb1d`:
+- `stage5-e5-4-gate-20260917`.
+- `checkpoint-20260917-etapa5-e5t04`.
+4. Higiene de ramas auxiliares:
+- eliminadas ramas temporales `stage5-squash-guardrails` y `stage5-squash-single` en local/remoto para evitar duplicidad de historia.
