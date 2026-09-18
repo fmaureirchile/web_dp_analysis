@@ -27,3 +27,16 @@ Este repositorio parte desde la metodologia de prompts secuenciales para constru
 ## Regla clave
 
 No implementar mas de una etapa por iteracion.
+
+## Levantamiento rapido back + front
+
+Documento unico recomendado:
+- docs/guia-levantamiento-back-front.md
+
+Comando directo (levanta API + Web):
+
+```bash
+npm run dev:analysis:start
+```
+
+Este comando inicia ambos servicios en paralelo y muestra en terminal los logs de cada proceso.
