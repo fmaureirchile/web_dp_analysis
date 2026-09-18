@@ -6,6 +6,8 @@ import {
 
 const DEFAULT_TIMEOUT_MS = 5000;
 const DEFAULT_MAX_RESPONSE_BYTES = 1024 * 1024;
+const NETWORK_MAX_ATTEMPTS = 3;
+const NETWORK_RETRY_BASE_DELAY_MS = 250;
 
 const HTML_CONTENT_TYPES = ["text/html", "application/xhtml+xml"];
 
@@ -151,66 +153,95 @@ async function readBodyWithLimit(response: Response, maxResponseBytes: number): 
   return merged;
 }
 
+function toNetworkErrorReason(error: unknown): string {
+  const typed = error as { cause?: { code?: unknown }; code?: unknown; message?: unknown };
+  const causeCode = typeof typed?.cause?.code === "string" ? typed.cause.code : undefined;
+  const directCode = typeof typed?.code === "string" ? typed.code : undefined;
+  const message = typeof typed?.message === "string" ? typed.message : "unknown";
+
+  return causeCode ?? directCode ?? message;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function fetchPassiveSinglePageHtml(request: StartPassiveSinglePageCrawlDto): Promise<PassiveHttpFetchResult> {
   if (!isSupportedEntryUrl(request.entryUrl)) {
     return toError(request, "invalid_entry_url", ERROR_MESSAGE_INVALID_ENTRY_URL);
   }
 
   const { timeoutMs, maxResponseBytes } = normalizeLimits(request);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let lastNetworkReason = "unknown";
 
-  try {
-    const response = await fetch(request.entryUrl, {
-      method: "GET",
-      redirect: "follow",
-      signal: controller.signal,
-      headers: {
-        accept: "text/html,application/xhtml+xml"
+  for (let attempt = 1; attempt <= NETWORK_MAX_ATTEMPTS; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(request.entryUrl, {
+        method: "GET",
+        redirect: "follow",
+        signal: controller.signal,
+        headers: {
+          accept: "text/html,application/xhtml+xml",
+          "accept-language": "es-CL,es;q=0.9,en;q=0.8",
+          "cache-control": "no-cache",
+          pragma: "no-cache",
+          "user-agent": "Mozilla/5.0 (compatible; WebAnalysisBot/0.1; +https://localhost/web-analysis)"
+        }
+      });
+
+      const contentType = response.headers.get("content-type");
+      if (!isHtmlContentType(contentType)) {
+        return toError(request, "http_non_html_content", ERROR_MESSAGE_NON_HTML_CONTENT);
       }
-    });
 
-    const contentType = response.headers.get("content-type");
-    if (!isHtmlContentType(contentType)) {
-      return toError(request, "http_non_html_content", ERROR_MESSAGE_NON_HTML_CONTENT);
-    }
+      const contentLengthHeader = response.headers.get("content-length");
+      const parsedContentLength = contentLengthHeader ? Number(contentLengthHeader) : undefined;
 
-    const contentLengthHeader = response.headers.get("content-length");
-    const parsedContentLength = contentLengthHeader ? Number(contentLengthHeader) : undefined;
-
-    if (typeof parsedContentLength === "number" && Number.isFinite(parsedContentLength) && parsedContentLength > maxResponseBytes) {
-      return toError(request, "response_size_limit_exceeded", ERROR_MESSAGE_SIZE_LIMIT);
-    }
-
-    const bodyBytes = await readBodyWithLimit(response, maxResponseBytes);
-    const html = new TextDecoder().decode(bodyBytes);
-
-    return {
-      ok: true,
-      data: {
-        executionId: request.executionId,
-        entryUrl: request.entryUrl,
-        finalUrl: response.url,
-        redirected: response.redirected,
-        setCookieNames: extractSetCookieNames(response.headers),
-        statusHttp: response.status,
-        fetchedAt: new Date().toISOString(),
-        contentType: contentType ?? undefined,
-        contentLength: Number.isFinite(parsedContentLength) ? parsedContentLength : bodyBytes.byteLength,
-        html
+      if (typeof parsedContentLength === "number" && Number.isFinite(parsedContentLength) && parsedContentLength > maxResponseBytes) {
+        return toError(request, "response_size_limit_exceeded", ERROR_MESSAGE_SIZE_LIMIT);
       }
-    };
-  } catch (error) {
-    if ((error as Error).name === "AbortError") {
-      return toError(request, "http_timeout", ERROR_MESSAGE_TIMEOUT);
-    }
 
-    if ((error as Error).message === "response_size_limit_exceeded") {
-      return toError(request, "response_size_limit_exceeded", ERROR_MESSAGE_SIZE_LIMIT);
-    }
+      const bodyBytes = await readBodyWithLimit(response, maxResponseBytes);
+      const html = new TextDecoder().decode(bodyBytes);
 
-    return toError(request, "http_fetch_failed", ERROR_MESSAGE_FETCH_FAILED);
-  } finally {
-    clearTimeout(timeout);
+      return {
+        ok: true,
+        data: {
+          executionId: request.executionId,
+          entryUrl: request.entryUrl,
+          finalUrl: response.url,
+          redirected: response.redirected,
+          setCookieNames: extractSetCookieNames(response.headers),
+          statusHttp: response.status,
+          fetchedAt: new Date().toISOString(),
+          contentType: contentType ?? undefined,
+          contentLength: Number.isFinite(parsedContentLength) ? parsedContentLength : bodyBytes.byteLength,
+          html
+        }
+      };
+    } catch (error) {
+      if ((error as Error).name === "AbortError") {
+        if (attempt >= NETWORK_MAX_ATTEMPTS) {
+          return toError(request, "http_timeout", ERROR_MESSAGE_TIMEOUT);
+        }
+      } else if ((error as Error).message === "response_size_limit_exceeded") {
+        return toError(request, "response_size_limit_exceeded", ERROR_MESSAGE_SIZE_LIMIT);
+      } else {
+        lastNetworkReason = toNetworkErrorReason(error);
+        if (attempt >= NETWORK_MAX_ATTEMPTS) {
+          return toError(request, "http_fetch_failed", `${ERROR_MESSAGE_FETCH_FAILED}:${lastNetworkReason}`);
+        }
+      }
+
+      const backoffMs = NETWORK_RETRY_BASE_DELAY_MS * attempt;
+      await wait(backoffMs);
+    } finally {
+      clearTimeout(timeout);
+    }
   }
+
+  return toError(request, "http_fetch_failed", `${ERROR_MESSAGE_FETCH_FAILED}:${lastNetworkReason}`);
 }

@@ -3,45 +3,211 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Kanban Backlog - Web Analysis</title>
+    <title>Web Analyzer - Front Operativo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div class="page-bg"></div>
-    <main class="app-shell">
-      <header class="hero">
-        <div>
-          <p class="eyebrow">Despliegue local</p>
-          <h1>Kanban de avance del proyecto</h1>
-          <p class="subtitle">Backlog completo precargado con filtros por etapa y prioridad, persistido en JSON del repo.</p>
+    <div class="aurora-bg"></div>
+    <main class="shell">
+      <header class="hero-panel reveal">
+        <div class="hero-copy">
+          <p class="eyebrow">Front real conectado a API</p>
+          <h1>Analiza URLs en lote</h1>
+          <p class="subtitle">
+            Ingresa una URL o varias separadas por coma. Ejecuta analisis pasivo o dinamico y descarga resultados en JSON o CSV.
+          </p>
         </div>
-        <div class="hero-stats" id="hero-stats"></div>
+        <div class="status-grid" id="status-grid"></div>
       </header>
 
-      <section class="toolbar">
-        <label>
-          Etapa
-          <select id="filter-stage"></select>
+      <section class="control-panel reveal" style="animation-delay: 120ms">
+        <label class="control full">
+          URLs
+          <textarea
+            id="urls-input"
+            placeholder="https://example.com, https://example.org/politica-cookies"
+            rows="5"
+          ></textarea>
         </label>
-        <label>
-          Prioridad
-          <select id="filter-priority"></select>
-        </label>
-        <label>
-          Buscar
-          <input id="filter-search" type="search" placeholder="Titulo o descripcion" />
-        </label>
-        <button id="save-board" type="button">Guardar cambios</button>
+
+        <div class="control-row">
+          <label class="control">
+            Modo de analisis
+            <select id="mode-select">
+              <option value="passive">Pasivo (HTML single-page)</option>
+              <option value="dynamic">Dinamico (observacion browser)</option>
+            </select>
+          </label>
+
+          <label class="control">
+            Cargar archivo .txt/.csv
+            <input id="urls-file-input" type="file" accept=".txt,.csv,text/plain,text/csv" />
+          </label>
+
+          <label class="control">
+            API base (solo lectura)
+            <input id="api-base" type="text" readonly />
+          </label>
+        </div>
+
+        <div class="control-row deep-row">
+          <label class="checkbox deep-toggle">
+            <input id="deep-navigation-toggle" type="checkbox" />
+            Navegacion profunda (subpaginas del mismo dominio)
+          </label>
+
+          <label class="control">
+            Profundidad maxima
+            <input id="deep-max-depth" type="number" min="1" max="4" value="1" disabled />
+          </label>
+
+          <label class="control">
+            Maximo de paginas
+            <input id="deep-max-pages" type="number" min="1" max="50" value="10" disabled />
+          </label>
+        </div>
+
+        <div class="control-row path-row">
+          <label class="control">
+            Include paths (opcional)
+            <input id="include-paths-input" type="text" placeholder="/conversemos, /contacto" />
+          </label>
+
+          <label class="control">
+            Exclude paths (opcional)
+            <input id="exclude-paths-input" type="text" placeholder="/assets, /blog" />
+          </label>
+        </div>
+
+        <div class="control-row summary-row">
+          <label class="control">
+            Modelo OpenAI para resumen
+            <input id="summary-model-input" type="text" placeholder="gpt-4o-mini" />
+          </label>
+
+          <label class="control">
+            Idioma resumen
+            <input id="summary-language-input" type="text" value="es-CL" />
+          </label>
+        </div>
+
+        <div class="control-row summary-row">
+          <label class="checkbox deep-toggle">
+            <input id="active-form-probe-toggle" type="checkbox" />
+            Validar envio de formulario (probe controlado, opcional)
+          </label>
+
+          <label class="control">
+            Max probes de formulario
+            <input id="max-form-probes-input" type="number" min="1" max="3" value="1" disabled />
+          </label>
+        </div>
+
+        <div class="control-row path-row">
+          <label class="control">
+            Probe include paths (allowlist)
+            <input id="probe-include-paths-input" type="text" placeholder="/conversemos, /contacto" disabled />
+          </label>
+
+          <label class="control">
+            Probe exclude paths (denylist)
+            <input id="probe-exclude-paths-input" type="text" placeholder="/admin, /checkout" disabled />
+          </label>
+        </div>
+
+        <div class="control-row summary-row">
+          <label class="checkbox deep-toggle">
+            <input id="probe-block-sensitive-toggle" type="checkbox" checked disabled />
+            Bloquear endpoints sensibles en probe (recomendado)
+          </label>
+        </div>
+
+        <div class="actions-row">
+          <button id="analyze-btn" type="button">Ejecutar analisis</button>
+          <button id="generate-summary-btn" type="button" class="secondary" disabled>Generar resumen ejecutivo</button>
+          <button id="download-summary-btn" type="button" class="secondary" disabled>Descargar resumen MD</button>
+          <button id="download-json-btn" type="button" class="secondary" disabled>Descargar JSON</button>
+          <button id="download-csv-btn" type="button" class="secondary" disabled>Descargar CSV</button>
+        </div>
+
+        <p class="hint">
+          Puedes usar comas o saltos de linea para separar URLs. Se ignoran duplicados automaticamente.
+        </p>
+        <p class="hint">
+          Si ingresas una URL sin protocolo (por ejemplo `www.beai.cl`), el sistema intenta normalizarla como `https://www.beai.cl`.
+        </p>
+        <p class="hint">
+          Include/Exclude paths aplican como prefijo de ruta y se separan por coma o salto de linea.
+        </p>
+        <p class="hint" id="ai-config-hint">OpenAI: estado de configuracion no disponible aun.</p>
+        <p class="hint">
+          El probe controlado de formulario envia payload sintetico y solo se recomienda en ambientes autorizados.
+        </p>
       </section>
 
-      <section class="kanban" id="kanban"></section>
+      <section class="results-panel reveal" style="animation-delay: 220ms">
+        <div class="results-head">
+          <h2>Resultados</h2>
+          <span id="run-meta">Sin ejecuciones</span>
+        </div>
+
+        <div class="results-filters">
+          <label class="control inline">
+            Estado
+            <select id="result-status-filter">
+              <option value="all">Todos</option>
+              <option value="ok">Solo OK</option>
+              <option value="error">Solo ERROR</option>
+            </select>
+          </label>
+          <label class="checkbox">
+            <input id="result-http-filter" type="checkbox" />
+            Solo HTTP >= 400
+          </label>
+        </div>
+
+        <div id="result-empty" class="empty-state">Todavia no hay resultados para mostrar.</div>
+        <div id="result-table-wrap" class="table-wrap hidden">
+          <table>
+            <thead>
+              <tr>
+                <th>URL</th>
+                <th>Estado</th>
+                <th>Modo</th>
+                <th>Titulo</th>
+                <th>HTTP</th>
+                <th>Metricas</th>
+                <th>Detalle</th>
+              </tr>
+            </thead>
+            <tbody id="result-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="json-panel reveal" style="animation-delay: 300ms">
+        <div class="results-head">
+          <h2>Salida tecnica</h2>
+          <span>Payload recibido</span>
+        </div>
+        <pre id="json-output">{}</pre>
+      </section>
+
+      <section class="summary-panel reveal" style="animation-delay: 340ms">
+        <div class="results-head">
+          <h2>Resumen ejecutivo</h2>
+          <span id="summary-meta">Sin resumen generado</span>
+        </div>
+        <pre id="summary-output">Genera el resumen despues de una corrida para obtener interpretacion asistida por OpenAI por dominio.</pre>
+      </section>
     </main>
+
     <script type="module" src="/app.js"></script>
   </body>
 </html>

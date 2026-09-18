@@ -81,7 +81,7 @@ describe("Etapa 5.1 T03 scope gate", () => {
         projectId: project.body.data.id,
         validFrom: isoNowPlus(-60),
         validTo: isoNowPlus(60),
-        allowedDomains: ["example.local"],
+        allowedDomains: ["127.0.0.1"],
         permittedOperations: ["SCAN_PASSIVE"]
       });
 
@@ -90,7 +90,7 @@ describe("Etapa 5.1 T03 scope gate", () => {
       .send({
         projectId: project.body.data.id,
         authorizationId: authorization.body.data.id,
-        baseUrl: "https://example.local/form"
+        baseUrl: "http://127.0.0.1:1/form"
       });
 
     const execution = await request(app)
@@ -107,7 +107,7 @@ describe("Etapa 5.1 T03 scope gate", () => {
       .post("/api/v1/crawler/passive/single-page")
       .send({
         executionId: execution.body.data.id,
-        entryUrl: "https://example.local/form"
+        entryUrl: "http://127.0.0.1:1/form"
       });
 
     expect(crawl.status).toBe(422);
